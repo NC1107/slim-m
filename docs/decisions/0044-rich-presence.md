@@ -38,7 +38,7 @@ This record fixes the privacy model, where activity comes from, the wire shape a
 | --- | --- | --- | --- |
 | Linux MPRIS over D-Bus | none | Linux desktop, any player that exposes `org.mpris.MediaPlayer2.*` (Spotify, browsers, mpv, VLC) | First slice. Local, private, no third party. |
 | Windows SMTC (`GlobalSystemMediaTransportControls`) | none | Windows 10+ desktop, any app that registers a media session | Built, see the amendment below. A runner method channel, no account. |
-| macOS Now Playing | none | macOS | Restricted. The MediaRemote framework is private and Apple has been closing it. Revisit only with a supported API. |
+| macOS Now Playing | none | macOS | Not built, see the amendment below. The only supported route is scripting Music and Spotify, and it needs an owner decision first. |
 | Spotify Web API | an OAuth app registered by the owner | any platform incl. phones | Later. Only the Spotify account, needs a token store and a refresh path. |
 | Game detection | none | desktop | Later, opt-in, allowlist only. |
 
@@ -126,3 +126,29 @@ It sees the title, artist and playback status of sessions that registered with W
 It does not see cover art, other apps' windows, or anything while the switch is off.
 The worker thread starts on the first `current` call and stops by itself fifteen seconds after the Dart side stops asking, so turning the switch off ends all reads.
 The WinRT code is its own CMake library because the runner builds with exceptions off and warnings as errors.
+
+### macOS Now Playing: decision, not built
+
+There is no public API that reports what another app is playing.
+
+- **`MediaRemote` (the framework behind Control Center)** is private.
+  Developers report that since macOS 15.4 the `mediaremoted` daemon only serves Apple-entitled processes, so third-party calls return nothing or fail, and the workaround in use spawns the system `/usr/bin/perl` to borrow its identity.
+  This comes from third-party reports, not an Apple statement: [feedback-assistant/reports#637](https://github.com/feedback-assistant/reports/issues/637), [LyricFever#94](https://github.com/aviwad/LyricFever/issues/94) and [ungive/mediaremote-adapter](https://github.com/ungive/mediaremote-adapter), read 2026-09-30.
+  Using it would put a private-API dependency that can break on any point release in a client we ship, so it is refused.
+- **`MPNowPlayingInfoCenter`** is public but only describes this app's own playback, so it cannot work for this.
+- **Scripting Music and Spotify** (`NSAppleScript` or ScriptingBridge) is public and supported.
+  It returns the player, track, artist and state.
+  It is the only acceptable route, with these costs:
+  - it covers exactly those two apps, not a browser, VLC or anything else;
+  - each target app triggers its own Automation consent prompt, which only appears once the switch is on;
+  - the client runs in the App Sandbox (`Runner/*.entitlements`), so it needs `com.apple.security.temporary-exception.apple-events` naming both bundle ids, and `NSAppleEventsUsageDescription` in `Info.plist`;
+  - a script must first check the app is running, because telling an app that is not running to do anything launches it.
+
+**Decision: do not build it yet.**
+The sandbox exception is a distribution question (store review tends to reject it) that the owner has not answered, there is no Mac here to run even one prompt, and Spotify account linking covers Spotify on a Mac without any of this.
+What would be left is Apple Music alone.
+One lead worth checking first: the players post public distributed notifications (`com.apple.Music.playerInfo`, `com.spotify.client.PlaybackStateChanged`) that would need no automation prompt.
+That is from one third-party project and is untested here, including whether a sandboxed app receives them.
+
+When the owner decides, the work is small: a `current` handler in the macOS runner answering the same `slimm/now_playing` channel the Windows source uses (`ChannelNowPlayingSource` needs no change), the entitlement, the usage string, and a row in `createNowPlayingSource`.
+It must stay off by default and be closed by hiding like every other feed.
