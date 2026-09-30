@@ -74,6 +74,15 @@ const Map<String, String> _allowlist = {
   'PUT /bots/ui': 'a bot registers its own menu entries and call controls '
       'from its process, never from this client - the same shape as PUT '
       '/bots/commands above. See docs/decisions/0045-bot-contributed-ui.md',
+  'PUT /channels/{}/watch-session': 'the bot running a watch party states '
+      'its session from its own process, never from this client, which only '
+      'reads it - the same shape as PUT /bots/ui above. See '
+      'docs/decisions/0050-watch-party-sync-authority-and-direct-play.md',
+  'DELETE /channels/{}/watch-session': 'the bot ends its own session, the '
+      'same shape as PUT /channels/{}/watch-session above',
+  'POST /channels/{}/watch-session/tick': 'the bot re-samples its session '
+      'every 5 seconds, the same shape as PUT /channels/{}/watch-session '
+      'above; this client receives the watch.tick frame instead',
   'POST /channels/{}/ephemeral-messages': 'a bot answers a member privately '
       'from its own process, never from this client, which only receives the '
       'message.ephemeral frame - the same shape as PUT /bots/commands above. '

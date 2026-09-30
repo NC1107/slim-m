@@ -321,6 +321,13 @@ pub enum Class {
     /// streak; a refill of one per five seconds bounds the sustained rate.
     /// See `docs/decisions/0044-rich-presence.md`.
     PresenceActivity,
+    /// A bot's watch-position tick (`POST /channels/{id}/watch-session/tick`).
+    ///
+    /// The bot sends one every 5 seconds per session, 0.2 a second, so this
+    /// is its own class rather than [`Class::CanvasCursor`]'s 15. Burst four
+    /// absorbs a retry after a stall; a refill of one per two seconds is
+    /// ten times the honest rate and still refuses a loop.
+    WatchTick,
 }
 
 impl Class {
@@ -366,6 +373,8 @@ impl Class {
             Class::Totp => (8.0, 1.0 / 10.0),
             // See this variant's own doc comment for how these were sized.
             Class::PresenceActivity => (6.0, 1.0 / 5.0),
+            // See this variant's own doc comment for how these were sized.
+            Class::WatchTick => (4.0, 1.0 / 2.0),
         }
     }
 
@@ -374,7 +383,7 @@ impl Class {
     /// [`Self::label`]; a class added to the enum without extending this
     /// array compiles clean and is simply never counted, so add to all three
     /// together.
-    pub const ALL: [Class; 25] = [
+    pub const ALL: [Class; 26] = [
         Class::Password,
         Class::Refresh,
         Class::Ticket,
@@ -400,39 +409,8 @@ impl Class {
         Class::SignInAlert,
         Class::PresenceActivity,
         Class::Totp,
+        Class::WatchTick,
     ];
-
-    /// The Prometheus label value for this class: lowercase, snake_case, and
-    /// stable across releases since a dashboard or alert may key on it.
-    pub fn label(self) -> &'static str {
-        match self {
-            Class::Password => "password",
-            Class::Refresh => "refresh",
-            Class::Ticket => "ticket",
-            Class::Write => "write",
-            Class::Typing => "typing",
-            Class::Read => "read",
-            Class::InviteCheck => "invite_check",
-            Class::Upload => "upload",
-            Class::Canvas => "canvas",
-            Class::CanvasCursor => "canvas_cursor",
-            Class::CanvasStrokePreview => "canvas_stroke_preview",
-            Class::Asset => "asset",
-            Class::Gif => "gif",
-            Class::LinkPreview => "link_preview",
-            Class::Ring => "ring",
-            Class::AuthedRead => "authed_read",
-            Class::Module => "module",
-            Class::CodeRunner => "code_runner",
-            Class::Webhook => "webhook",
-            Class::LiveKitWebhook => "livekit_webhook",
-            Class::Interaction => "interaction",
-            Class::ModulePost => "module_post",
-            Class::SignInAlert => "sign_in_alert",
-            Class::PresenceActivity => "presence_activity",
-            Class::Totp => "totp",
-        }
-    }
 }
 
 #[cfg(test)]

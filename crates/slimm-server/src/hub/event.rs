@@ -380,6 +380,26 @@ pub enum Event {
         channel_id: ChannelId,
         user_id: UserId,
     },
+    /// The room's watch position, re-sampled by the bot running the watch
+    /// party about every 5 seconds and on every play, pause or seek.
+    ///
+    /// Ephemeral by the reasons [`Event::CanvasCursorMoved`] gives: no `seq`,
+    /// never persisted, and a receiver that misses one is corrected by the
+    /// next. The durable copy is `watch_sessions`, which a late joiner or a
+    /// reconnect reads over REST. `ended` marks the bot's own end of the
+    /// session; a bot that just stops ticking is over once the session's
+    /// lifetime passes, so a receiver still treats silence as the end.
+    /// `bot_user_id` and the epoch together name which session this belongs to.
+    WatchTick {
+        channel_id: ChannelId,
+        bot_user_id: UserId,
+        ended: bool,
+        item_id: String,
+        playing: bool,
+        position_ms: i64,
+        sampled_at_ms: i64,
+        epoch: i64,
+    },
     /// A participant started or stopped sharing their screen, per LiveKit's
     /// `track_published`/`track_unpublished` webhooks. See
     /// `docs/decisions/0032-voice-participant-webhooks.md`.

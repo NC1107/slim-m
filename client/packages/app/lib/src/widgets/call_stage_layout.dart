@@ -42,6 +42,7 @@ import 'call_roster_motion.dart';
 import 'fullscreen_video_overlay.dart';
 import 'local_screen_share_banner.dart';
 import 'screen_share_stage.dart';
+import 'watch_session_bar.dart';
 
 /// The dock's own visible height plus its margin, so the last row of
 /// content reserves room rather than have the floating card cover it.
@@ -103,6 +104,8 @@ class CallStageLayout extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           _CallHeader(voice: voice),
+          if (!isDm && voice.channelId != null)
+            WatchSessionBar(channelId: voice.channelId!),
           // Withheld once the mirrored stage tile already says the same thing via its own caption.
           if (voice.screenSharing && sharer?.isLocal != true)
             const Padding(

@@ -6173,6 +6173,123 @@ paths:
         "429":
           $ref: "#/components/responses/TooManyRequests"
 
+  /channels/{channelId}/watch-session:
+    parameters:
+      - $ref: "#/components/parameters/ChannelId"
+    get:
+      operationId: getWatchSession
+      tags: [channels]
+      summary: What the room is watching and where it is.
+      description: >-
+        Decision 0050-watch-party-sync-authority-and-direct-play. The durable
+        copy of the position `watch.tick` carries, which a late joiner or a
+        reconnect reads here. A playing position is `position_ms` plus the time
+        since `sampled_at_ms`, measured on the server clock given as
+        `server_time_ms`. 404 when nothing is playing, for a caller who cannot
+        view the channel, once the bot has gone `ttl_ms` without a tick, and
+        once the bot is no longer on the call.
+      responses:
+        "200":
+          description: The session.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WatchSession"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
+    put:
+      operationId: setWatchSession
+      tags: [channels]
+      summary: A bot states the room's watch session.
+      description: >-
+        Decision 0050-watch-party-sync-authority-and-direct-play. Refused for a
+        caller that is not a bot, for a channel that is not a voice channel
+        the bot can view, and for a bot that is not on the call (403). The
+        epoch changes when `item_id` changes or `seeked` is true, and is a
+        millisecond timestamp so it never repeats across an end and a new
+        session. `controller_user_id` must be a user who can view the
+        channel, and is advisory. Fans out as a `watch.tick` so viewers hear
+        of a play, pause or seek now. A session whose bot is still on the call
+        and has ticked within `ttl_ms` is not replaced by another bot (409);
+        one whose bot has left is. Charged to the tick rate class.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SetWatchSessionRequest"
+      responses:
+        "204":
+          description: Set.
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
+    delete:
+      operationId: endWatchSession
+      tags: [channels]
+      summary: A bot ends its own watch session.
+      description: >-
+        Fans out a `watch.tick` with `ended` true. A bot that leaves the call
+        through `DELETE /channels/{channelId}/voice/heartbeat` ends its
+        session the same way.
+      responses:
+        "204":
+          description: Ended.
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
+
+  /channels/{channelId}/watch-session/tick:
+    parameters:
+      - $ref: "#/components/parameters/ChannelId"
+    post:
+      operationId: tickWatchSession
+      tags: [channels]
+      summary: A bot re-samples its session's position.
+      description: >-
+        Decision 0050-watch-party-sync-authority-and-direct-play. Send one
+        about every 5 seconds, paused or not: it is the session's heartbeat,
+        and a session `ttl_ms` without one reads as ended. Refused with 403
+        when the bot is not on the call. Fans out as a `watch.tick`. Charged
+        to its own rate class, not the write class.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/WatchTickRequest"
+      responses:
+        "204":
+          description: Sampled.
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
+
   /channels/{channelId}/bot-ui/{botId}/interactions:
     parameters:
       - $ref: "#/components/parameters/ChannelId"
@@ -12233,6 +12350,7 @@ components:
         - $ref: "#/components/schemas/VoiceParticipantJoined"
         - $ref: "#/components/schemas/VoiceParticipantLeft"
         - $ref: "#/components/schemas/VoiceScreenShareChanged"
+        - $ref: "#/components/schemas/WatchTick"
         - $ref: "#/components/schemas/CallRinging"
         - $ref: "#/components/schemas/CallRingEnded"
         - $ref: "#/components/schemas/CanvasObjectPlaced"
@@ -13271,6 +13389,117 @@ components:
           type: string
         is_sharing_screen:
           type: boolean
+
+    WatchSession:
+      type: object
+      required: [channel_id, bot_user_id, item_id, title, playing, position_ms, sampled_at_ms, epoch, ttl_ms, server_time_ms]
+      properties:
+        channel_id:
+          type: string
+          format: uuid
+        bot_user_id:
+          type: string
+          format: uuid
+        item_id:
+          type: string
+        title:
+          type: string
+        duration_ms:
+          type: [integer, "null"]
+          format: int64
+        playing:
+          type: boolean
+        position_ms:
+          type: integer
+          format: int64
+        sampled_at_ms:
+          type: integer
+          format: int64
+        epoch:
+          type: integer
+          format: int64
+        controller_user_id:
+          type: [string, "null"]
+          format: uuid
+          description: Advisory, for display; never an authority.
+        ttl_ms:
+          type: integer
+          format: int64
+          description: >
+            How long after `sampled_at_ms` the session still counts as live.
+            A viewer hides it on this rather than a number of its own.
+        server_time_ms:
+          type: integer
+          format: int64
+
+    SetWatchSessionRequest:
+      type: object
+      required: [item_id, title, playing, position_ms]
+      properties:
+        item_id:
+          type: string
+        title:
+          type: string
+        duration_ms:
+          type: integer
+          format: int64
+        playing:
+          type: boolean
+        position_ms:
+          type: integer
+          format: int64
+        seeked:
+          type: boolean
+        controller_user_id:
+          type: string
+          format: uuid
+
+    WatchTickRequest:
+      type: object
+      required: [playing, position_ms]
+      properties:
+        playing:
+          type: boolean
+        position_ms:
+          type: integer
+          format: int64
+
+    WatchTick:
+      type: object
+      required: [type, channel_id, bot_user_id, ended, item_id, playing, position_ms, sampled_at_ms, epoch]
+      description: >
+        The room's watch position, about every 5 seconds and on every play,
+        pause or seek. Ephemeral: no seq, never persisted, and a missed one is
+        corrected by the next. `ended` is true when the bot ended the session
+        or left the call; a session whose ticks just stop is over once
+        `ttl_ms` from the REST read has passed. `bot_user_id` and `epoch`
+        name the session: a tick for a lower epoch is older and is dropped.
+        Decision 0050-watch-party-sync-authority-and-direct-play.
+      properties:
+        type:
+          type: string
+          enum: [watch.tick]
+        channel_id:
+          type: string
+          format: uuid
+        bot_user_id:
+          type: string
+          format: uuid
+        ended:
+          type: boolean
+        item_id:
+          type: string
+        playing:
+          type: boolean
+        position_ms:
+          type: integer
+          format: int64
+        sampled_at_ms:
+          type: integer
+          format: int64
+        epoch:
+          type: integer
+          format: int64
 
     CallRinging:
       type: object

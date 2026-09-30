@@ -21,6 +21,7 @@ use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
 mod class;
+mod class_label;
 pub use class::Class;
 
 /// Most distinct keys tracked at once, across all classes.

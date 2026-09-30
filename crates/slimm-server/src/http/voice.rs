@@ -278,6 +278,8 @@ async fn forget_heartbeat(
         state
             .hub
             .publish(Event::VoiceActivityChanged { channel_id });
+        // A bot's watch session ends with its place on the call.
+        super::watch_session::end_for_departed(&state, ctx.user_id, channel_id).await?;
     }
     // See this function's own doc for why this runs regardless of the above.
     if let Some(ring_id) = state.voice.rings().cancel(channel_id, ctx.user_id) {

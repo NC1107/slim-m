@@ -335,6 +335,17 @@ impl Store {
             .bind(user_id)
             .execute(&mut *tx)
             .await?;
+        sqlx::query("DELETE FROM watch_sessions WHERE bot_user_id = ?")
+            .bind(user_id)
+            .execute(&mut *tx)
+            .await?;
+        // A controller hint naming a departed member would outlive them for the session's life.
+        sqlx::query(
+            "UPDATE watch_sessions SET controller_user_id = NULL WHERE controller_user_id = ?",
+        )
+        .bind(user_id)
+        .execute(&mut *tx)
+        .await?;
         // The role itself stays; it may be shared with a human.
         sqlx::query!(
             "UPDATE roles SET managed_bot_id = NULL WHERE managed_bot_id = ?",

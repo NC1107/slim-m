@@ -155,6 +155,8 @@ const DECISIONS: &[(&str, &str, OnDelete)] = &[
         OnDelete::Keep("somebody else's note about them, and theirs to keep"),
     ),
     ("users", "id", OnDelete::Keep("the tombstone itself")),
+    ("watch_sessions", "bot_user_id", OnDelete::Purge),
+    ("watch_sessions", "controller_user_id", OnDelete::Anonymize),
     ("webhooks", "created_by", OnDelete::Anonymize),
     ("webhooks", "user_id", OnDelete::Purge),
     ("ws_tickets", "user_id", OnDelete::CascadesFrom("devices")),

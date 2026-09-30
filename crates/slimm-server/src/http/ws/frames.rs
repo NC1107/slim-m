@@ -185,6 +185,18 @@ pub(super) enum ServerFrame {
     VoiceParticipantJoined { channel_id: String, user_id: String },
     #[serde(rename = "voice.participant_left")]
     VoiceParticipantLeft { channel_id: String, user_id: String },
+    /// See [`crate::hub::Event::WatchTick`].
+    #[serde(rename = "watch.tick")]
+    WatchTick {
+        channel_id: String,
+        bot_user_id: String,
+        ended: bool,
+        item_id: String,
+        playing: bool,
+        position_ms: i64,
+        sampled_at_ms: i64,
+        epoch: i64,
+    },
     #[serde(rename = "voice.screen_share_changed")]
     VoiceScreenShareChanged {
         channel_id: String,
