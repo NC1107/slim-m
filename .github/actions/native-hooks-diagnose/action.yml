@@ -1,0 +1,39 @@
+# SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
+#
+# Prints why a native build hook failed. Use it as an `if: failure()` step
+# after a client build.
+#
+# Flutter reports a failed hook as only "Building assets for package:X failed".
+# The cause (a failed download, a compiler error) goes to the hook's stderr,
+# which Flutter does not keep: hooks_runner/<pkg>/<hash>/stderr.txt is empty.
+# media_kit_libs_linux's CMake download of mimalloc fails the same way: CMake
+# deletes the bad file and reports only an integrity failure, so a missing or
+# empty archive is reported here as a failed download.
+# A hook that failed has an input.json and no output.json, and its stdout.txt
+# records the exact command Flutter ran, so this runs that command again.
+
+name: native hooks diagnose
+description: Re-run every native build hook that left no output and print what it says.
+
+runs:
+  using: composite
+  steps:
+    - shell: bash
+      working-directory: client
+      run: |
+        failed=0
+        for input in .dart_tool/hooks_runner/*/*/input.json; do
+          [ -f "$input" ] || continue
+          dir="$(dirname "$input")"
+          [ -f "$dir/output.json" ] && continue
+          failed=1
+          echo "::group::hook without output: $dir"
+          cmd="$(sed -n 's/^Running `\(.*\)`\.$/\1/p' "$dir/stdout.txt" | head -n 1)"
+          if [ -n "$cmd" ]; then bash -c "$cmd" 2>&1 | tail -n 80; else echo "no command recorded in $dir/stdout.txt"; fi
+          echo "::endgroup::"
+        done
+        if [ -d packages/app/build/linux ] && [ -z "$(find packages/app/build/linux -name 'mimalloc-*.tar.gz' -size +100k 2>/dev/null)" ]; then
+          echo "no complete mimalloc archive: media_kit_libs_linux's CMake download failed (its own message is only 'Integrity check failed')"
+          failed=1
+        fi
+        [ "$failed" = 1 ] || echo "every hook that started produced output; the failure was not in a native build hook"

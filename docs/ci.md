@@ -88,6 +88,24 @@ The binary size budget step exists because the brief treats binary size as a fir
 
 Path-gated so a server-only or schema-only change never triggers the Flutter client build.
 
+### Native build hooks are cached, and explain their own failures
+
+Every job that runs `flutter build` or `flutter test` (here, in `client-macos-ci`, `client-windows-ci`, `client-ios-ci`, `desktop-clients`, `main-builds`, `release` and `flatpak-ci`) uses two composite actions.
+`native-hooks-cache` caches `client/.dart_tool/hooks_runner/shared`, where sqlite3's build hook downloads the sqlite3mc binary (`shared/sqlite3/build/download-<hash>`).
+The key is the runner OS and arch plus `hashFiles('client/pubspec.lock', 'client/pubspec.yaml')`: the lockfile pins the sqlite3 version and so the sqlite3mc release, and `pubspec.yaml` carries the `source: sqlite3mc` user define.
+Only `shared` is cached because the per-hook directories beside it embed absolute pub-cache paths and are cheap to rebuild.
+With `shared` restored and no network, the hook finishes and the tests pass, which is how this was checked locally.
+
+Before this, nothing cached it, so an upstream hiccup failed an unrelated PR with only `Building assets for package:sqlite3 failed` (seen on #1501).
+`native-hooks-diagnose` runs as an `if: failure()` step after the build.
+Flutter does not keep a failed hook's stderr (`stderr.txt` is empty), so the action finds every hook directory with an `input.json` and no `output.json` and re-runs the command recorded in its `stdout.txt`, printing the real cause.
+
+`media_kit_libs_linux` has the same shape: its CMake downloads mimalloc at configure time, before any hook, into `build/linux/x64/release/mimalloc-*.tar.gz`.
+`native-hooks-cache` caches that archive on Linux, keyed on the lockfile (which pins the plugin and so the mimalloc release).
+CMake skips the download when the file exists and only MD5-checks what it just downloaded, so a stale entry is not a risk as long as only a successful build saves the cache, which `actions/cache` guarantees.
+A failed download leaves an empty archive and the log says only `Integrity check failed`, so `native-hooks-diagnose` reports a missing or empty archive as a failed download.
+With both caches restored and no network, a full `flutter build linux --release` succeeds.
+
 ### Goldens are not a separate job
 
 Golden-file assertions (`matchesGoldenFile`) live inside each package's ordinary `flutter test` suite, not in a job of their own.

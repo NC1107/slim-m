@@ -25,13 +25,7 @@ jobs:
   # Opens and maintains release PRs, and cuts releases on merge. A no-op on a
   # manual run on a tag, so downstream jobs can still resolve it via `needs`. See docs/ci.md.
   #
-  # Two independent invocations, one manifest file each, rather than one call
-  # sharing `.release-please-manifest.json` across both packages: a release
-  # commit for either package used to rewrite that one shared file, which
-  # conflicted the other package's still-open standing PR on every merge that
-  # didn't also touch it. Splitting the manifest removes the shared file
-  # rather than working around it, so there is nothing left for the two PRs
-  # to collide on. See docs/ci.md and PR #321.
+  # Two invocations, one manifest file each, so neither package's release commit conflicts the other's PR. See docs/ci.md.
   #
   # RELEASE_PLEASE_TOKEN decides whether the release PR's own checks ever run; without it they cannot. See docs/ci.md.
   release-please:
@@ -318,6 +312,7 @@ jobs:
           channel: stable
           flutter-version: 3.47.0
 
+      - uses: ./.github/actions/native-hooks-cache
       - name: build linux release
         run: |
           flutter config --enable-linux-desktop
@@ -438,6 +433,7 @@ jobs:
             dist/*/*.rpm
             dist/SHA256SUMS
             dist/SHA256SUMS.asc
+      - {if: failure(), uses: ./.github/actions/native-hooks-diagnose}
 
   # Submits the Fedora package to COPR. Inert without COPR_CONFIG or the spec,
   # and best effort: the .rpm is on the release, so a failure only warns.
@@ -584,6 +580,7 @@ jobs:
           channel: stable
           flutter-version: 3.47.0
 
+      - uses: ./.github/actions/native-hooks-cache
       - name: build android release
         if: steps.gate.outputs.ready == 'true'
         working-directory: client/packages/app
@@ -656,6 +653,7 @@ jobs:
           files: |
             client/packages/app/dist/slim-m-client-android.apk
             client/packages/app/dist/SHA256SUMS.android
+      - {if: failure(), uses: ./.github/actions/native-hooks-diagnose}
 
   # Signed ipa to TestFlight, reviewer-gated. Inert without its six secrets: it
   # warns and stops rather than faking an upload. See docs/ci.md.
@@ -781,6 +779,7 @@ jobs:
           channel: stable
           flutter-version: 3.47.0
 
+      - uses: ./.github/actions/native-hooks-cache
       - name: build ipa
         if: steps.gate.outputs.ready == 'true'
         working-directory: client/packages/app
@@ -802,3 +801,4 @@ jobs:
             --file "${ipa[0]}" \
             --apiKey "$APP_STORE_CONNECT_KEY_ID" \
             --apiIssuer "$APP_STORE_CONNECT_ISSUER_ID"
+      - {if: failure(), uses: ./.github/actions/native-hooks-diagnose}

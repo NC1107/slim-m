@@ -64,6 +64,8 @@ jobs:
           flutter-version: 3.47.0
           cache: true
 
+      - uses: ./.github/actions/native-hooks-cache
+
       - name: resolve workspace dependencies
         working-directory: client
         run: flutter pub get --enforce-lockfile
@@ -106,6 +108,8 @@ jobs:
           done
           exit 1
 
+      - {if: failure(), uses: ./.github/actions/native-hooks-diagnose}
+
   macos-client:
     name: macos tester build (ad-hoc signed)
     runs-on: macos-latest
@@ -125,6 +129,8 @@ jobs:
           channel: stable
           flutter-version: 3.47.0
           cache: true
+
+      - uses: ./.github/actions/native-hooks-cache
 
       - name: resolve workspace dependencies
         working-directory: client
@@ -152,6 +158,8 @@ jobs:
             sleep 60
           done
           exit 1
+
+      - {if: failure(), uses: ./.github/actions/native-hooks-diagnose}
 
   # Signs a manifest of the archives above; a no-op with a warning until UPDATE_SIGNING_KEY exists.
   update-manifest:
