@@ -32,7 +32,7 @@ Each section below is named for its workflow file.
 | `desktop-clients` | `client-v*` tag pushes, and by hand with a tag input | unsigned Windows and macOS tester archives, attached to the client's GitHub release. The two desktop platforms `release` does not package |
 | `update-manifest` | called by `desktop-clients` after its archives attach, and by hand with a tag input | signs a manifest (versions, artifact URLs, sha256s) of the desktop artifacts on a client release with the `UPDATE_SIGNING_KEY` secret, for the self-updater in decision 0041. Skips with a warning while the secret is unset |
 | `release` | pushes to `main`, and by hand on a `server-v*` / `client-v*` tag ref | the whole publish pipeline, including the web image under the server's version |
-| `release-tag-watchdog` | a 15-minute schedule, and by hand | every release-please manifest's version has a matching git tag, catching a release PR that merged with no tag ever following it, and no merged release PR is still labelled `autorelease: pending`, which silently fails every later release run |
+| `release-tag-watchdog` | an hourly schedule, and by hand | every release-please manifest's version has a matching git tag, catching a release PR that merged with no tag ever following it, and no merged release PR is still labelled `autorelease: pending`, which silently fails every later release run; and, in a second job, re-dispatches `release.yml` on the tag once when the release run's verify failed and the commit's required checks have since gone green |
 | `red-streak-watchdog` | an hourly schedule, and by hand | opens a GitHub issue once `e2e` or `main-builds` has failed 3 consecutive completed runs on `main`, closes it once that workflow is green again; does not gate anything |
 | `main-builds` | changes under `client/`, `crates/`, `packaging/` or the web image's own files on every push to `main`, excluding a release commit's own files; and by hand, with a boolean per side | a Fedora COPR snapshot, an Android artifact, `latest` on the live server image, `latest` on the web image after a client change, and continuous TestFlight unless the repo variable `CONTINUOUS_TESTFLIGHT` is `false`, in which case iOS builds only from a client release in `release`, or when this is run by hand; never a version bump, changelog or GitHub Release |
 | `flatpak-ci` | changes to the flatpak manifest or its vendored shared-modules, on pull requests and every push to `main`; and by hand | builds the flatpak for real, installs it, and checks a headless launch does not fail with a missing shared library, the failure class `release.yml` cannot catch before a `client-v*` tag |
@@ -517,7 +517,7 @@ workflow_run cannot close this gap.
 It fires only when a named workflow completes for the event that triggered it, and none of `server-ci`, `client-ci`, `client-ios-ci`, `hygiene` or `licenses` trigger on a tag push at all, by design, so that a ref that already ran CI on `main` does not run it again.
 A tag push therefore raises no `workflow_run` event for any of them, which rules out the one mechanism that otherwise looks like the obvious fit.
 
-The gate resolves the caller's `ref` (a tag on the release-please path, `github.sha` on the tag-push path) to a commit SHA once, then polls `GET /repos/{owner}/{repo}/commits/{sha}/check-runs` for that SHA and requires each listed check-run name to show `status: completed` and `conclusion: success`, retrying for up to 70 minutes before failing on a timeout.
+The gate resolves the caller's `ref` (a tag on the release-please path, `github.sha` on the tag-push path) to a commit SHA once, then polls `GET /repos/{owner}/{repo}/commits/{sha}/check-runs` for that SHA and requires each listed check-run name to show `status: completed` and `conclusion: success`, retrying for up to 180 minutes before failing on a timeout.
 A check run is attached to the commit rather than to the event that produced it, so this answers both paths uniformly: the SHA a tag points at is normally already on `main` and already carries the check runs its original push or PR produced, so re-pushing a tag to the same SHA still finds them and still republishes, which is the documented re-publish capability above.
 A required name **absent** from the response is treated the same as one that failed, never as a pass, so a commit that never went through CI at all (never pushed to `main`, never opened as a PR) times out and fails closed instead of silently succeeding on an empty result - unless something is still queued for that commit, in which case it keeps waiting past the grace period rather than giving up on a slow runner.
 A `cancelled` check is pinned as a hard failure too, on purpose: see client-ios-ci.yml's own header on the concurrency group that used to cancel it on every push to `main`.
@@ -576,7 +576,7 @@ It now carries the same `cancel-in-progress: ${{ github.ref != 'refs/heads/main'
 
 **Superseded on 2026-08-11 by the stronger fix `release.yml` itself already used: all six required-check workflows (`hygiene`, `server-ci`, `client-ci`, `client-ios-ci`, `licenses`, `schema-ci`) now key their concurrency group per commit on `main`** (`group: <name>-${{ github.ref == 'refs/heads/main' && github.sha || github.ref }}`), keeping the ref-keyed group with cancellation on PR branches.
 The conditional `cancel-in-progress` closed only the cancelled-while-running mechanism; a run still *queued* behind a pending one in the same ref-keyed group was still replaced outright, the separate rule the release.yml incident above proved `cancel-in-progress` cannot reach.
-During a merge burst that left required checks silently missing on the middle commit, and `verify-release-checks` treats an absent required check the same as a failed one, so a release cut from that commit times out and fails 70 minutes later with nothing naming the cause.
+During a merge burst that left required checks silently missing on the middle commit, and `verify-release-checks` treats an absent required check the same as a failed one, so a release cut from that commit times out and fails 180 minutes later with nothing naming the cause.
 Per-commit groups on `main` mean distinct pushes are never in one group, so no push's checks can be dropped by a newer push; the cost is concurrent runs during a burst, which these workflows tolerate by design (every job is read-only against the repo).
 The other unconditionally-`true` workflows (`compose-smoke`, `audio-ci`, `push-relay-contract`, `perf`, `e2e`) were checked too and are not required checks in either `required_checks` string above, so a cancellation there cannot block a release the way `schema-ci`'s could; `main-builds.yml`'s own `cancel-in-progress: true` is unrelated to this release pipeline entirely and is documented as deliberate in its own section below.
 
@@ -589,6 +589,26 @@ The SHA-keyed group stops a run from being silently cancelled, but nothing befor
 A push-triggered check cannot close this on its own, because the push that should have cut the tag is the same one that did not - there is no later event to hang a check on.
 `release-tag-watchdog.yml` runs on a 15-minute schedule instead (plus `workflow_dispatch`) and asks a plain question of git history: for each package, does the current manifest version have a matching `<component>-v<version>` tag, and if not, how long has the manifest read that version?
 `scripts/check-release-tag-lag.sh` does the check itself, pulled out so `scripts/lib/test_check_release_tag_lag.py` can drive it against a real temp git repo rather than the live one; a missing tag inside a 15-minute grace window is normal (the same run that merges a release PR usually tags it within its own run) and a missing tag past it is reported with `::error::`, naming the tag, the version, and how long it has been missing.
+
+### The watchdog re-dispatches a release that verify timed out on
+
+`verify-release-checks.sh` waits up to 180 minutes (10800 seconds; the job ceiling is 195).
+The audit of 2026-09-29 measured the Linux queue p90 per day: 5 to 15 minutes on ordinary days, 45 minutes on 09-23 and 76 minutes on 09-25, with a single worst wait of 151 minutes.
+Adding the 13-minute run of the slowest required check gives 164 minutes for the worst wait seen, so 180 passes every measured day, including the busiest, with margin.
+The old 70 minutes failed that day, and client 0.84.0 to 0.86.0 lost their builds.
+It fails closed as before: a failed check or an absent one with nothing running still ends the wait immediately.
+
+A queue worse than that still leaves a release with no builds, so the `redispatch` job of `release-tag-watchdog.yml` recovers it.
+`scripts/redispatch-stalled-release.py` takes each component's current manifest tag and dispatches `gh workflow run release.yml --ref <tag>` only when all of this holds:
+
+- every release run for the tag's commit has completed, and at least one has a `verify-<component>-ci` job that failed, was cancelled or timed out, and none has one that succeeded;
+- every name in that component's `required_checks` now shows `success` on the commit;
+- the tag's commit is under 72 hours old;
+- no `workflow_dispatch` run with the tag as its ref exists, whatever its outcome.
+
+The last condition is the idempotency: GitHub's run history is the record, so a second hourly run, or a person who already dispatched by hand, finds it and does nothing.
+A tag whose verify succeeded is never touched, even if a later build job failed; that is a different problem from a queue.
+`scripts/lib/test_redispatch_stalled_release.py` covers the decision.
 
 ### server-image and server-image-merge
 

@@ -12,7 +12,7 @@
 # Behaviour is unchanged from the inline version: same three env inputs
 # (GH_TOKEN, REF, REQUIRED_CHECKS), same GITHUB_REPOSITORY read from the
 # environment. The three timing constants are now overridable so a test can
-# run the real loop without a real 4200-second deadline.
+# run the real loop without a real three-hour deadline.
 
 set -euo pipefail
 
@@ -20,7 +20,7 @@ set -euo pipefail
 : "${GITHUB_REPOSITORY:?}"
 : "${REF:?}"
 : "${REQUIRED_CHECKS:?}"
-DEADLINE_SECONDS="${DEADLINE_SECONDS:-4200}"
+DEADLINE_SECONDS="${DEADLINE_SECONDS:-10800}"
 CREATION_GRACE_SECONDS="${CREATION_GRACE_SECONDS:-300}"
 POLL_INTERVAL_SECONDS="${POLL_INTERVAL_SECONDS:-30}"
 
