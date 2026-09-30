@@ -14,6 +14,7 @@ class Role {
     required this.permissions,
     required this.isEveryone,
     this.mentionable = false,
+    this.hoist = false,
     required this.createdAt,
     this.managedBotId,
     this.position = 0,
@@ -35,6 +36,10 @@ class Role {
   /// with no permission of their own. Defaults false; a member holding
   /// `Perm.mentionEveryone` can still wake it regardless.
   final bool mentionable;
+
+  /// Whether the member pane lists this role's members under their own
+  /// heading. Defaults false, also on a server older than the field.
+  final bool hoist;
 
   /// Unix milliseconds.
   final int createdAt;
@@ -60,6 +65,7 @@ class Role {
         permissions: json['permissions'] as int,
         isEveryone: json['is_everyone'] as bool,
         mentionable: json['mentionable'] as bool? ?? false,
+        hoist: json['hoist'] as bool? ?? false,
         createdAt: json['created_at'] as int,
         managedBotId: json['managed_bot_id'] as String?,
         position: json['position'] as int? ?? 0,

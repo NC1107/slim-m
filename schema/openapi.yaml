@@ -7698,6 +7698,14 @@ components:
             made against the id. Nothing stops two roles sharing a name, so a
             client deciding "does this member hold that role" by name would
             answer yes for both of them.
+        hoisted_role_id:
+          type: [string, "null"]
+          format: uuid
+          description: The hoisted role this member is listed under in the member pane, or null when none of theirs is hoisted. Always one of `role_ids`.
+        hoisted_role_position:
+          type: [integer, "null"]
+          format: int64
+          description: That role's hierarchy position, so section order is exact without `GET /roles`, which needs MANAGE_ROLES.
         timed_out_until:
           type: [integer, "null"]
           format: int64
@@ -9776,7 +9784,7 @@ components:
 
     Role:
       type: object
-      required: [id, name, permissions, is_everyone, mentionable, created_at]
+      required: [id, name, permissions, is_everyone, mentionable, hoist, created_at]
       properties:
         id:
           type: string
@@ -9797,6 +9805,9 @@ components:
         mentionable:
           type: boolean
           description: Whether any member may wake this role with `@[Role Name]` with no permission of their own. Defaults false; MENTION_EVERYONE overrides it.
+        hoist:
+          type: boolean
+          description: Whether the member pane lists this role's members under their own heading. Defaults false.
         created_at:
           type: integer
           format: int64
@@ -9885,6 +9896,8 @@ components:
           format: int64
           description: Checked the same way `CreateRoleRequest.permissions` is.
         mentionable:
+          type: boolean
+        hoist:
           type: boolean
 
     ReorderRolesRequest:

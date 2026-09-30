@@ -13,6 +13,7 @@ import 'package:slimm_api/api.dart' as api;
 import 'package:slimm_design_system/design_system.dart';
 
 import '../../providers/admin_providers.dart';
+import '../../providers/member_presence.dart';
 import '../../providers/providers.dart';
 import '../../widgets/confirm_dialog.dart';
 import '../../widgets/role_color.dart';
@@ -66,6 +67,19 @@ class _RoleDisplayTabState extends ConsumerState<RoleDisplayTab>
           .updateRole(roleId: widget.role.id, mentionable: value),
     );
     if (ok && mounted) ref.invalidate(rolesProvider);
+  }
+
+  Future<void> _setHoist(bool value) async {
+    final ok = await guard(
+      whatFailed: 'update the member list',
+      action: () => ref
+          .read(apiProvider)
+          .updateRole(roleId: widget.role.id, hoist: value),
+    );
+    if (!ok || !mounted) return;
+    ref.invalidate(rolesProvider);
+    ref.invalidate(membersProvider);
+    ref.invalidate(channelMembersProvider);
   }
 
   Future<void> _delete() async {
@@ -164,6 +178,33 @@ class _RoleDisplayTabState extends ConsumerState<RoleDisplayTab>
               ),
             ],
           ),
+        if (!role.isEveryone) ...[
+          const SizedBox(height: AppSpacing.s12),
+          SettingsSectionCard(
+            title: 'Member list',
+            description:
+                'Give this role its own heading in the member pane, above '
+                'Online.',
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      'Display role members separately',
+                      style: AppText.ui.copyWith(color: tokens.textPrimary),
+                    ),
+                  ),
+                  AppToggle(
+                    value: role.hoist,
+                    onChanged: _setHoist,
+                    semanticLabel: 'Display role members separately',
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ],
         if (actionError case final error?) ...[
           const SizedBox(height: AppSpacing.s12),
           AppErrorState(message: error, onDismiss: clearActionError),

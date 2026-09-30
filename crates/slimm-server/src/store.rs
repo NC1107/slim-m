@@ -87,6 +87,7 @@ mod removals;
 mod reports;
 mod role_bots;
 mod role_hierarchy;
+mod role_hoist;
 mod role_mentions;
 mod role_reorder;
 mod roles;

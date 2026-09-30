@@ -37,8 +37,8 @@ extension SlimmApiRoles on SlimmApi {
     return Role.fromJson(json as Map<String, dynamic>);
   }
 
-  /// Renames a role, changes its permissions, and/or its `mentionable`
-  /// flag. Requires MANAGE_ROLES. Every field is optional; a field left null
+  /// Renames a role, changes its permissions, and/or its `mentionable` or
+  /// `hoist` flag. Requires MANAGE_ROLES. Every field is optional; a field left null
   /// is unchanged. Refused if a permissions change would leave the
   /// deployment with no administrator.
   Future<Role> updateRole({
@@ -46,6 +46,7 @@ extension SlimmApiRoles on SlimmApi {
     String? name,
     int? permissions,
     bool? mentionable,
+    bool? hoist,
   }) async {
     final json = await _send(
       'PATCH',
@@ -54,6 +55,7 @@ extension SlimmApiRoles on SlimmApi {
         if (name != null) 'name': name,
         if (permissions != null) 'permissions': permissions,
         if (mentionable != null) 'mentionable': mentionable,
+        if (hoist != null) 'hoist': hoist,
       },
     );
     return Role.fromJson(json as Map<String, dynamic>);
@@ -128,9 +130,7 @@ extension SlimmApiRoles on SlimmApi {
   /// MANAGE_ROLES in this channel specifically, the same gate
   /// [setChannelOverwrite] uses, and refuses a channel the caller cannot
   /// manage identically to one that does not exist.
-  Future<List<ChannelOverwrite>> getChannelOverwrites(
-    String channelId,
-  ) async {
+  Future<List<ChannelOverwrite>> getChannelOverwrites(String channelId) async {
     final json = await _send('GET', '/channels/$channelId/overwrites');
     return ((json as Map<String, dynamic>)['overwrites'] as List<dynamic>)
         .map((o) => ChannelOverwrite.fromJson(o as Map<String, dynamic>))

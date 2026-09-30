@@ -73,6 +73,8 @@ pub(super) struct RoleDto {
     /// Whether any member may wake this role with `@[Role Name]` with no
     /// permission of their own; see `crate::store::Role::mentionable`.
     mentionable: bool,
+    /// Whether the member pane lists this role's members under their own heading.
+    hoist: bool,
     created_at: i64,
     /// See [`Role::managed_bot_id`].
     managed_bot_id: Option<String>,
@@ -94,6 +96,7 @@ impl RoleDto {
             permissions: role.permissions.bits(),
             is_everyone: role.is_everyone,
             mentionable: role.mentionable,
+            hoist: role.hoist,
             created_at: role.created_at,
             managed_bot_id: role.managed_bot_id.map(|id| id.to_string()),
             position: role.position,
@@ -125,6 +128,7 @@ struct UpdateRoleRequest {
     name: Option<String>,
     permissions: Option<i64>,
     mentionable: Option<bool>,
+    hoist: Option<bool>,
 }
 
 // --- Handlers: role CRUD ---
@@ -205,7 +209,7 @@ async fn update(
         .permissions
         .map(|bits| grantable(caller_permissions, bits))
         .transpose()?;
-    if name.is_none() && permissions.is_none() && req.mentionable.is_none() {
+    if name.is_none() && permissions.is_none() && req.mentionable.is_none() && req.hoist.is_none() {
         return Err(ApiError::BadRequest("nothing to update"));
     }
 
@@ -217,12 +221,17 @@ async fn update(
         )?;
     }
 
-    match state
+    let updated = state
         .store
         .update_role(role_id, name, permissions, req.mentionable)
-        .await
-    {
+        .await;
+    // A second write, as on create; hoist cannot remove an administrator so it needs no guard.
+    if let (Ok(Some(_)), Some(hoist)) = (&updated, req.hoist) {
+        state.store.set_role_hoist(role_id, hoist).await?;
+    }
+    match updated {
         Ok(Some(role)) => {
+            let role = state.store.role(role.id).await?.ok_or(ApiError::Internal)?;
             state.hub.publish(Event::RoleChanged { role_id });
             let member_count = state.store.member_count_for_role(&role).await?;
             Ok(Json(RoleDto::new(role, member_count)))

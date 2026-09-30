@@ -101,7 +101,8 @@ final presenceSeedProvider = FutureProvider.autoDispose.family<void, String?>((
 /// redemption - never a restore, which is its own event below), was timed
 /// out (their badge belongs on screen), had a timeout lifted, was removed
 /// (they belong off it), was restored (they belong back on it), or had a
-/// role granted or revoked (their role badges are wrong until refetched).
+/// role granted or revoked (their role badges are wrong until refetched), or a
+/// role was edited (its name, order or hoist flag places members in the pane).
 ///
 /// One provider for all of these because every one of them is explicit and
 /// exact: unlike the join this used to infer from a presence frame or a
@@ -113,7 +114,8 @@ final memberModerationWatcherProvider = Provider.autoDispose<void>((ref) {
         event is api.MemberTimeoutChanged ||
         event is api.MemberRemoved ||
         event is api.MemberRestored ||
-        event is api.MemberRoleChanged) {
+        event is api.MemberRoleChanged ||
+        event is api.RoleChanged) {
       ref.invalidate(membersProvider);
       // A role change can also change who may view a channel at all.
       ref.invalidate(channelMembersProvider);

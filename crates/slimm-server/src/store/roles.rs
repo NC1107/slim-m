@@ -43,6 +43,8 @@ pub struct Role {
     /// reorders it - and every other role's position only ever comes from an
     /// explicit reorder or the column's own `DEFAULT 0` at creation.
     pub position: i64,
+    /// Whether the member pane gives this role's members their own section.
+    pub hoist: bool,
 }
 
 /// Why a role mutation was refused.
@@ -219,7 +221,7 @@ impl Store {
                       is_everyone AS "is_everyone!: bool",
                       mentionable AS "mentionable!: bool", created_at AS "created_at!",
                       managed_bot_id AS "managed_bot_id: UserId",
-                      position AS "position!: i64"
+                      position AS "position!: i64", hoist AS "hoist!: bool"
                FROM roles ORDER BY position DESC, created_at"#
         )
         .fetch_all(&self.pool)
@@ -236,7 +238,7 @@ impl Store {
                       is_everyone AS "is_everyone!: bool",
                       mentionable AS "mentionable!: bool", created_at AS "created_at!",
                       managed_bot_id AS "managed_bot_id: UserId",
-                      position AS "position!: i64"
+                      position AS "position!: i64", hoist AS "hoist!: bool"
                FROM roles WHERE id = ?"#,
             role_id
         )
