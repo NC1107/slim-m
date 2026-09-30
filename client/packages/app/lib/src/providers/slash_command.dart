@@ -28,6 +28,10 @@ final slashCommandProvider = FutureProvider.autoDispose<List<api.SlashCommand>>(
 /// `/` trigger at offset zero), so this matches from the start: the first
 /// token after `/` is the keyword, case-insensitive, and everything after the
 /// first run of whitespace is the argument string handed to the module as-is.
+///
+/// A keyword offered by two different modules matches nothing: the server now
+/// refuses to enable a second one, so this only guards a deployment that
+/// already had the clash, where running an arbitrary one would be worse.
 (api.SlashCommand, String)? matchSlashCommand(
   List<api.SlashCommand> commands,
   String text,
@@ -40,8 +44,12 @@ final slashCommandProvider = FutureProvider.autoDispose<List<api.SlashCommand>>(
       .toLowerCase();
   if (name.isEmpty) return null;
   final args = match == null ? '' : body.substring(match.start).trim();
-  for (final command in commands) {
-    if (command.name.toLowerCase() == name) return (command, args);
+  final matches = commands
+      .where((command) => command.name.toLowerCase() == name)
+      .toList();
+  if (matches.isEmpty) return null;
+  if (matches.any((command) => command.moduleId != matches.first.moduleId)) {
+    return null;
   }
-  return null;
+  return (matches.first, args);
 }

@@ -13,6 +13,7 @@
 
 mod capabilities;
 mod fetch;
+mod keywords;
 mod manifest;
 mod sources;
 mod ssrf;
@@ -44,6 +45,7 @@ use crate::store::{
 
 use capabilities::{approvable_host_capabilities, carried_host_capabilities};
 use fetch::{FetchError, fetch_first};
+use keywords::ensure_slash_keywords_free;
 use manifest::{IndexEntry, Manifest, ManifestError, parse_index, parse_manifest, validate_slug};
 use sources::SourceQuery;
 use wire::{IndexEntryDto, InstalledModuleDto, ManifestDto};
@@ -327,6 +329,14 @@ async fn install(
         Some(requested) => approvable_host_capabilities(&manifest, requested)?,
         None => carried_host_capabilities(&state, &manifest).await?,
     };
+    if state.store.installed_module(&id).await?.is_some_and(|m| m.enabled) {
+        let keywords = manifest
+            .extension_points
+            .iter()
+            .filter(|e| e.kind == "slash-command")
+            .map(|e| e.name.as_str());
+        ensure_slash_keywords_free(&state, &id, keywords).await?;
+    }
     let artifact = fetch_artifact(dock, &resolved.bases, &manifest).await?;
 
     let permissions: Vec<ModulePermissionSpec> = manifest
@@ -460,6 +470,15 @@ async fn apply_enabled(
     id: &str,
     enabled: bool,
 ) -> Result<Json<InstalledModuleDto>, ApiError> {
+    if enabled {
+        let module = state
+            .store
+            .installed_module(id)
+            .await?
+            .ok_or(ApiError::NotFound("module not installed"))?;
+        let keywords = keywords::slash_keywords(&module.extension_points);
+        ensure_slash_keywords_free(state, id, keywords).await?;
+    }
     if !state.store.set_module_enabled(id, enabled).await? {
         return Err(ApiError::NotFound("module not installed"));
     }

@@ -49,6 +49,15 @@ void main() {
     test('returns null when no commands are installed', () {
       expect(matchSlashCommand(const [], '/roll 2d6'), isNull);
     });
+
+    test('matches nothing when two modules offer the same keyword', () {
+      const other = api.SlashCommand(
+        moduleId: 'other-dice',
+        command: 'roll',
+        name: 'Roll',
+      );
+      expect(matchSlashCommand(const [_roll, other], '/roll 2d6'), isNull);
+    });
   });
 
   group('command autocomplete', () {

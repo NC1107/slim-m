@@ -6696,6 +6696,12 @@ paths:
       operationId: enableDockModule
       tags: [space]
       summary: Enable an installed module. Requires MANAGE_SERVER.
+      description: >
+        Refused with 409 when another enabled module already provides one of
+        this module's slash command keywords (compared case-insensitively),
+        because a composer would otherwise run whichever was listed first.
+        Disable the other module first. Installing a new version of an already
+        enabled module is refused the same way.
       responses:
         "200":
           description: The module after enabling.
@@ -6707,6 +6713,8 @@ paths:
           $ref: "#/components/responses/Unauthorized"
         "403":
           $ref: "#/components/responses/Forbidden"
+        "409":
+          $ref: "#/components/responses/Conflict"
         "404":
           $ref: "#/components/responses/NotFound"
         "429":
