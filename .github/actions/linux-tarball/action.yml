@@ -10,6 +10,10 @@ inputs:
   version:
     description: client/pubspec.yaml version, used in the tarball name
     required: true
+  spotify_client_id:
+    description: Spotify app id for rich presence; empty keeps the feature off
+    required: false
+    default: ''
 
 runs:
   using: composite
@@ -25,7 +29,7 @@ runs:
     - name: build linux release
       shell: bash
       env:
-        SLIMM_SPOTIFY_CLIENT_ID: ${{ vars.SLIMM_SPOTIFY_CLIENT_ID }}
+        SLIMM_SPOTIFY_CLIENT_ID: ${{ inputs.spotify_client_id }}
       working-directory: client/packages/app
       run: |
         flutter config --enable-linux-desktop
