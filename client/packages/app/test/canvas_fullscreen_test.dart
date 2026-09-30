@@ -83,7 +83,7 @@ void main() {
 
       expect(
         tester.widget<CanvasSurface>(find.byType(CanvasSurface)).tool,
-        CanvasTool.select,
+        CanvasTool.pan,
         reason: 'a one-finger drag would otherwise still place a note',
       );
 

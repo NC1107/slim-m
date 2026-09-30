@@ -170,8 +170,11 @@ void main() {
       await tester.sendEventToBinding(pointer.up());
       await tester.pump();
 
-      expect(ends, 1,
-          reason: 'the pointer finally lifting must not flush a second time');
+      expect(
+        ends,
+        1,
+        reason: 'the pointer finally lifting must not flush a second time',
+      );
     },
   );
 
@@ -186,7 +189,7 @@ void main() {
           home: CanvasSurface(
             document: document,
             ink: const Color(0xFFE86A5C),
-            tool: CanvasTool.select,
+            tool: CanvasTool.pan,
             onStroke: (_) {},
             onSelectEnd: () => ends++,
           ),
@@ -376,56 +379,55 @@ void main() {
   );
 
   testWidgets(
-      'the cursor shows grabbing while panning, and the prior tool cursor after',
-      (
-    tester,
-  ) async {
-    final document = CanvasDocument();
-    addTearDown(document.dispose);
-    await tester.pumpWidget(
-      MaterialApp(
-        home: CanvasSurface(
-          document: document,
-          ink: const Color(0xFFE86A5C),
-          onStroke: (_) {},
+    'the cursor shows grabbing while panning, and the prior tool cursor after',
+    (tester) async {
+      final document = CanvasDocument();
+      addTearDown(document.dispose);
+      await tester.pumpWidget(
+        MaterialApp(
+          home: CanvasSurface(
+            document: document,
+            ink: const Color(0xFFE86A5C),
+            onStroke: (_) {},
+          ),
         ),
-      ),
-    );
-    await tester.pump();
+      );
+      await tester.pump();
 
-    const pointerId = 1;
-    final pointer = TestPointer(pointerId, PointerDeviceKind.mouse);
-    await tester.sendEventToBinding(pointer.hover(const Offset(50, 50)));
-    await tester.pump();
-    expect(
-      RendererBinding.instance.mouseTracker.debugDeviceActiveCursor(
-        pointerId,
-      ),
-      SystemMouseCursors.precise,
-      reason: 'the pen tool cursor before any grab starts',
-    );
+      const pointerId = 1;
+      final pointer = TestPointer(pointerId, PointerDeviceKind.mouse);
+      await tester.sendEventToBinding(pointer.hover(const Offset(50, 50)));
+      await tester.pump();
+      expect(
+        RendererBinding.instance.mouseTracker.debugDeviceActiveCursor(
+          pointerId,
+        ),
+        SystemMouseCursors.precise,
+        reason: 'the pen tool cursor before any grab starts',
+      );
 
-    await tester.sendEventToBinding(
-      pointer.down(const Offset(50, 50), buttons: kMiddleMouseButton),
-    );
-    await tester.sendEventToBinding(pointer.move(const Offset(80, 80)));
-    await tester.pump();
-    expect(
-      RendererBinding.instance.mouseTracker.debugDeviceActiveCursor(
-        pointerId,
-      ),
-      SystemMouseCursors.grabbing,
-    );
+      await tester.sendEventToBinding(
+        pointer.down(const Offset(50, 50), buttons: kMiddleMouseButton),
+      );
+      await tester.sendEventToBinding(pointer.move(const Offset(80, 80)));
+      await tester.pump();
+      expect(
+        RendererBinding.instance.mouseTracker.debugDeviceActiveCursor(
+          pointerId,
+        ),
+        SystemMouseCursors.grabbing,
+      );
 
-    await tester.sendEventToBinding(pointer.up());
-    await tester.sendEventToBinding(pointer.hover(const Offset(80, 80)));
-    await tester.pump();
-    expect(
-      RendererBinding.instance.mouseTracker.debugDeviceActiveCursor(
-        pointerId,
-      ),
-      SystemMouseCursors.precise,
-      reason: 'the tool cursor returns once the grab ends',
-    );
-  });
+      await tester.sendEventToBinding(pointer.up());
+      await tester.sendEventToBinding(pointer.hover(const Offset(80, 80)));
+      await tester.pump();
+      expect(
+        RendererBinding.instance.mouseTracker.debugDeviceActiveCursor(
+          pointerId,
+        ),
+        SystemMouseCursors.precise,
+        reason: 'the tool cursor returns once the grab ends',
+      );
+    },
+  );
 }

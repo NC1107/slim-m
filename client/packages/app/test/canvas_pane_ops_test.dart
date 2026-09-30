@@ -284,7 +284,7 @@ void main() {
       await pumpCanvasPane(tester, container);
       await tester.pumpAndSettle();
 
-      await tester.tap(find.bySemanticsLabel('Move'));
+      await tester.tap(find.bySemanticsLabel('Pan'));
       await tester.pump();
 
       final start = screenFor(tester, const Offset(15, 15));
@@ -318,7 +318,7 @@ void main() {
       await pumpCanvasPane(tester, container);
       await tester.pumpAndSettle();
 
-      await tester.tap(find.bySemanticsLabel('Move'));
+      await tester.tap(find.bySemanticsLabel('Pan'));
       await tester.pump();
 
       final start = screenFor(tester, const Offset(15, 15));
@@ -346,7 +346,7 @@ void main() {
       await pumpCanvasPane(tester, container);
       await tester.pumpAndSettle();
 
-      await tester.tap(find.bySemanticsLabel('Move'));
+      await tester.tap(find.bySemanticsLabel('Pan'));
       await tester.pump();
 
       final start = screenFor(tester, const Offset(15, 15));
@@ -380,7 +380,7 @@ void main() {
       await pumpCanvasPane(tester, container);
       await tester.pumpAndSettle();
 
-      await tester.tap(find.bySemanticsLabel('Move'));
+      await tester.tap(find.bySemanticsLabel('Pan'));
       await tester.pump();
       final gesture = await tester.startGesture(
         screenFor(tester, const Offset(15, 15)),
@@ -427,7 +427,7 @@ void main() {
     await pumpCanvasPane(tester, container);
     await tester.pumpAndSettle();
 
-    await tester.tap(find.bySemanticsLabel('Move'));
+    await tester.tap(find.bySemanticsLabel('Pan'));
     await tester.pump();
 
     final start = screenFor(tester, const Offset(15, 15));

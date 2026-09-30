@@ -153,7 +153,7 @@ void main() {
   ) async {
     final fixture = await _pump(tester);
 
-    await tester.tap(find.bySemanticsLabel('Move'));
+    await tester.tap(find.bySemanticsLabel('Pan'));
     await tester.pump();
     final tap = await tester.startGesture(
       screenFor(tester, const Offset(200, 120)),

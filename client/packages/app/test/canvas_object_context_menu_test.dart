@@ -61,7 +61,7 @@ class _Harness {
           canManage: canManage,
           selfId: selfId,
           requests: requests,
-          tool: CanvasTool.select,
+          tool: CanvasTool.pan,
           onToolChanged: toolChanges.add,
           onBringToFront: bringToFront.add,
           onSendToBack: sendToBack.add,
@@ -96,7 +96,7 @@ void main() {
       expect(find.text('Send to back'), findsOneWidget);
       expect(find.text('Delete'), findsOneWidget);
       expect(document.selectedObjectId.value, 'a');
-      expect(harness.toolChanges, [CanvasTool.select]);
+      expect(harness.toolChanges, [CanvasTool.pan]);
     },
   );
 
@@ -398,7 +398,7 @@ void main() {
 
     expect(find.text('Bring to front'), findsOneWidget);
     expect(document.selectedObjectId.value, 'a');
-    expect(harness.toolChanges, [CanvasTool.select]);
+    expect(harness.toolChanges, [CanvasTool.pan]);
   });
 
   testWidgets('the same request twice in a row reopens the menu both times', (

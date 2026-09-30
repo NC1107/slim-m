@@ -57,7 +57,7 @@ const _here = VoiceParticipant(
 /// control - the same two-tap sequence a real touch does.
 Future<void> _sendToBack(WidgetTester tester) async {
   // Tile controls only answer under the select tool; under the pen the tile lets ink through.
-  await tester.tap(find.bySemanticsLabel('Move'));
+  await tester.tap(find.bySemanticsLabel('Pan'));
   await tester.pump();
   await tester.tap(find.byKey(const ValueKey('camera:user-noor')));
   await tester.pump();

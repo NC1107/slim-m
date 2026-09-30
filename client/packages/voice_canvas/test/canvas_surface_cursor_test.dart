@@ -65,7 +65,7 @@ void main() {
     final document = CanvasDocument();
     addTearDown(document.dispose);
     expect(
-      await _cursorAfter(tester, document, tool: CanvasTool.select),
+      await _cursorAfter(tester, document, tool: CanvasTool.pan),
       SystemMouseCursors.grab,
     );
   });
@@ -79,7 +79,7 @@ void main() {
       await _cursorAfter(
         tester,
         document,
-        tool: CanvasTool.select,
+        tool: CanvasTool.pan,
         enabled: false,
       ),
       SystemMouseCursors.basic,

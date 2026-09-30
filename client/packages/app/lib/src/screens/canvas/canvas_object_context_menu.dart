@@ -273,7 +273,7 @@ class _CanvasObjectContextMenuState extends State<CanvasObjectContextMenu> {
   /// mouse drag-select cancels this recognizer at the first move past slop
   /// the same way any long press does.
   void _onLongPressStart(LongPressStartDetails details) {
-    if (widget.tool != CanvasTool.select) return;
+    if (widget.tool != CanvasTool.pan) return;
     final world = _toWorld(details.localPosition);
     final id = _hitTest(world);
     if (id != null) {
@@ -285,7 +285,7 @@ class _CanvasObjectContextMenuState extends State<CanvasObjectContextMenu> {
 
   void _openFor(String id, {required Offset? pointerGlobal}) {
     widget.document.selectedObjectId.value = id;
-    widget.onToolChanged(CanvasTool.select);
+    widget.onToolChanged(CanvasTool.pan);
     setState(() {
       _target = id;
       _emptySpaceWorld = null;

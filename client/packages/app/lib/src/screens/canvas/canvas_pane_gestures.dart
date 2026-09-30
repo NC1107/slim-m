@@ -11,8 +11,37 @@ extension _CanvasPaneGestures on _CanvasPaneState {
   /// handles do not linger over a selection nothing can act on any more
   /// while the pen or eraser is active.
   void _onToolChanged(CanvasTool tool) {
-    if (tool != CanvasTool.select) _document.selectedObjectId.value = null;
+    if (tool != CanvasTool.pan) _document.selectedObjectId.value = null;
     _refresh(() => _tool = tool);
+  }
+
+  CanvasTool get _defaultTool =>
+      canvasDefaultTool(compact: AppTouchTargets.of(context));
+
+  /// Arms the tool whose key [event] is, unless its button is absent or disabled, or a text field is taking the key.
+  KeyEventResult _onToolKey(
+    KeyEvent event, {
+    required bool canDraw,
+    required bool fullscreen,
+  }) {
+    final keyboard = HardwareKeyboard.instance;
+    if (event is! KeyDownEvent || fullscreen) return KeyEventResult.ignored;
+    if (keyboard.isControlPressed ||
+        keyboard.isMetaPressed ||
+        keyboard.isAltPressed) {
+      return KeyEventResult.ignored;
+    }
+    final focus = FocusManager.instance.primaryFocus?.context;
+    if (focus?.findAncestorWidgetOfExactType<EditableText>() != null) {
+      return KeyEventResult.ignored;
+    }
+    for (final tool in canvasToolOrder) {
+      if (tool.shortcutKey != event.logicalKey) continue;
+      if (!tool.isAvailable(canDraw: canDraw)) return KeyEventResult.ignored;
+      _onToolChanged(tool);
+      return KeyEventResult.handled;
+    }
+    return KeyEventResult.ignored;
   }
 
   /// Opens the note sheet, and places the note only once it comes back with
@@ -69,7 +98,7 @@ extension _CanvasPaneGestures on _CanvasPaneState {
   void _selectPlaced(String objectId) {
     if (!_mounted) return;
     _document.selectedObjectId.value = objectId;
-    _refresh(() => _tool = CanvasTool.select);
+    _refresh(() => _tool = CanvasTool.pan);
   }
 
   void _onSelectStart(Offset world) {

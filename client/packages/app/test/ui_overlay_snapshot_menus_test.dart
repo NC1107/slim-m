@@ -153,7 +153,7 @@ Future<void> _pumpCanvasObjectMenu(WidgetTester tester, Size window) async {
               canManage: true,
               selfId: 'me',
               requests: CanvasObjectMenuRequests(),
-              tool: CanvasTool.select,
+              tool: CanvasTool.pan,
               onToolChanged: (_) {},
               onBringToFront: (_) {},
               onSendToBack: (_) {},

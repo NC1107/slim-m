@@ -220,7 +220,7 @@ void main() {
           cursors: cursors,
           fullscreen: true,
           // What entering actually arms, so the capture shows the real mode rather than a pen the dock no longer offers a way to change.
-          tool: CanvasTool.select,
+          tool: CanvasTool.pan,
         );
       });
     }

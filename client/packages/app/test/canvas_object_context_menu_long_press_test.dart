@@ -60,9 +60,7 @@ void main() {
       final document = CanvasDocument()
         ..applyPlaced(_shape('a', authorId: 'me'));
       addTearDown(document.dispose);
-      await tester.pumpWidget(
-        _build(document: document, tool: CanvasTool.select),
-      );
+      await tester.pumpWidget(_build(document: document, tool: CanvasTool.pan));
 
       await tester.longPressAt(const Offset(120, 120));
       await tester.pumpAndSettle();
@@ -80,9 +78,7 @@ void main() {
     (tester) async {
       final document = CanvasDocument();
       addTearDown(document.dispose);
-      await tester.pumpWidget(
-        _build(document: document, tool: CanvasTool.select),
-      );
+      await tester.pumpWidget(_build(document: document, tool: CanvasTool.pan));
 
       await tester.longPressAt(const Offset(200, 200));
       await tester.pumpAndSettle();

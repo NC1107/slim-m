@@ -210,7 +210,7 @@ void main() {
         home: CanvasSurface(
           document: document,
           ink: const Color(0xFFE86A5C),
-          tool: CanvasTool.select,
+          tool: CanvasTool.pan,
           onStroke: (_) => strokes++,
           onSelectStart: starts.add,
           onSelectDrag: drags.add,
@@ -234,37 +234,36 @@ void main() {
   });
 
   testWidgets(
-      'note and shape tools each place once per tap, at the pointer-down point, no drag needed',
-      (
-    tester,
-  ) async {
-    final document = CanvasDocument();
-    addTearDown(document.dispose);
-    final notes = <Offset>[];
-    final shapes = <Offset>[];
-    await tester.pumpWidget(
-      MaterialApp(
-        home: CanvasSurface(
-          document: document,
-          ink: const Color(0xFFE86A5C),
-          tool: CanvasTool.note,
-          onStroke: (_) {},
-          onNotePlace: notes.add,
-          onShapePlace: (world, _) => shapes.add(world),
+    'note and shape tools each place once per tap, at the pointer-down point, no drag needed',
+    (tester) async {
+      final document = CanvasDocument();
+      addTearDown(document.dispose);
+      final notes = <Offset>[];
+      final shapes = <Offset>[];
+      await tester.pumpWidget(
+        MaterialApp(
+          home: CanvasSurface(
+            document: document,
+            ink: const Color(0xFFE86A5C),
+            tool: CanvasTool.note,
+            onStroke: (_) {},
+            onNotePlace: notes.add,
+            onShapePlace: (world, _) => shapes.add(world),
+          ),
         ),
-      ),
-    );
-    await tester.pump();
+      );
+      await tester.pump();
 
-    final gesture = await tester.startGesture(const Offset(20, 20));
-    await gesture.moveTo(const Offset(60, 40));
-    expect(notes, isEmpty, reason: 'not yet - the pointer is still down');
-    await gesture.up();
-    await tester.pump();
+      final gesture = await tester.startGesture(const Offset(20, 20));
+      await gesture.moveTo(const Offset(60, 40));
+      expect(notes, isEmpty, reason: 'not yet - the pointer is still down');
+      await gesture.up();
+      await tester.pump();
 
-    expect(notes, [const Offset(20, 20)]);
-    expect(shapes, isEmpty, reason: 'the shape tool was never selected');
-  });
+      expect(notes, [const Offset(20, 20)]);
+      expect(shapes, isEmpty, reason: 'the shape tool was never selected');
+    },
+  );
 
   /// Panning and zooming this surface are two-pointer-only (see
   /// `_scaleUpdate`'s own pointer-count guard), so a two-finger pinch always

@@ -32,10 +32,7 @@ void main() {
     await gesture.up();
     await tester.pump();
 
-    expect(reported, [
-      const Offset(20, 20),
-      const Offset(60, 40),
-    ]);
+    expect(reported, [const Offset(20, 20), const Offset(60, 40)]);
   });
 
   testWidgets('onDraftEnded fires once the pointer lifts', (tester) async {
@@ -87,12 +84,11 @@ void main() {
       await tester.pump();
 
       expect(
-        strokes,
-        [
-          [const Offset(20, 20)],
-        ],
-        reason: 'a tap with no move must still leave a dot',
-      );
+          strokes,
+          [
+            [const Offset(20, 20)],
+          ],
+          reason: 'a tap with no move must still leave a dot');
       expect(
         ended,
         1,
@@ -180,36 +176,35 @@ void main() {
   /// for the app-layer half of this: nothing is sent until the note sheet
   /// submits, so there is nothing on the shared canvas to preview in the
   /// first place.
-  testWidgets(
-    'the note and shape tools never report a draft point either',
-    (tester) async {
-      for (final tool in [CanvasTool.note, CanvasTool.shape]) {
-        final document = CanvasDocument();
-        addTearDown(document.dispose);
-        var points = 0;
-        var ended = 0;
-        await tester.pumpWidget(
-          MaterialApp(
-            home: CanvasSurface(
-              document: document,
-              ink: const Color(0xFFE86A5C),
-              tool: tool,
-              onStroke: (_) {},
-              onDraftPoint: (_) => points++,
-              onDraftEnded: () => ended++,
-            ),
+  testWidgets('the note and shape tools never report a draft point either', (
+    tester,
+  ) async {
+    for (final tool in [CanvasTool.note, CanvasTool.shape]) {
+      final document = CanvasDocument();
+      addTearDown(document.dispose);
+      var points = 0;
+      var ended = 0;
+      await tester.pumpWidget(
+        MaterialApp(
+          home: CanvasSurface(
+            document: document,
+            ink: const Color(0xFFE86A5C),
+            tool: tool,
+            onStroke: (_) {},
+            onDraftPoint: (_) => points++,
+            onDraftEnded: () => ended++,
           ),
-        );
-        await tester.pump();
+        ),
+      );
+      await tester.pump();
 
-        final gesture = await tester.startGesture(const Offset(20, 20));
-        await gesture.moveTo(const Offset(60, 40));
-        await gesture.up();
-        await tester.pump();
+      final gesture = await tester.startGesture(const Offset(20, 20));
+      await gesture.moveTo(const Offset(60, 40));
+      await gesture.up();
+      await tester.pump();
 
-        expect(points, 0, reason: 'kind: $tool');
-        expect(ended, 0, reason: 'kind: $tool');
-      }
-    },
-  );
+      expect(points, 0, reason: 'kind: $tool');
+      expect(ended, 0, reason: 'kind: $tool');
+    }
+  });
 }

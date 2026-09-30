@@ -216,8 +216,8 @@ abstract final class AppIcons {
   static const IconData shapeLine = LucideIcons.minus300;
   static const IconData shapeArrow = LucideIcons.arrowUpRight300;
 
-  /// The canvas's select-and-drag tool, for repositioning a placed object.
-  static const IconData select = LucideIcons.move300;
+  /// The canvas's pan tool; a hand, because the four-way arrows read as "move this object".
+  static const IconData pan = LucideIcons.hand300;
 
   /// The canvas's z-order actions, for a selected image overlapping another.
   static const IconData bringToFront = LucideIcons.bringToFront300;

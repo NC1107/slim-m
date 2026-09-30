@@ -112,7 +112,7 @@ def move_converges_and_persists(a, b, admin_api, channel_id, room_id):
           "every call participant gets one on the canvas unconditionally")
 
     # The pen is armed on open and a drag over a tile draws with it now; moving is the Move tool's job.
-    a.click(L.SELECT_TOOL)
+    a.click(L.PAN_TOOL)
     _drag_tile(a, ALICE_SELF_LABEL, *_DRAG_ONE)
     slot_1 = _wait_for_slot(admin_api, channel_id, alice_id)
     print(f"  first drag committed to the server: ({slot_1['x']:.0f}, "
