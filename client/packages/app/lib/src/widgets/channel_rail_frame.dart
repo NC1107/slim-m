@@ -398,77 +398,69 @@ class RailUserFooter extends ConsumerWidget {
             horizontal: AppSpacing.s8,
             vertical: AppSpacing.s4,
           ),
-          // The Column keeps the row's height unbounded: without it the status menu opened off the top of the window in presence_visibility_test.
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              LayoutBuilder(
-                builder: (context, constraints) {
-                  final controls = [
-                    ...railVoiceToggleButtons(
-                      voice: voice,
-                      voiceController: voiceController,
-                    ),
-                    if (inCallElsewhere)
-                      railLeaveCallButton(voiceController.leave),
-                    railSettingsButton(context),
-                  ];
-                  return Row(
-                    children: [
-                      PresenceMenuButton(presence: presence),
-                      const SizedBox(width: 9),
-                      // At ChannelRail.compactWidth the controls win, scaled down if a notch inset leaves too little; the presence dot still says who and how.
-                      if (constraints.maxWidth < _footerNameMinWidth)
-                        Expanded(
-                          child: FittedBox(
-                            fit: BoxFit.scaleDown,
-                            alignment: Alignment.centerRight,
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: controls,
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              final controls = [
+                ...railVoiceToggleButtons(
+                  voice: voice,
+                  voiceController: voiceController,
+                ),
+                if (inCallElsewhere) railLeaveCallButton(voiceController.leave),
+                railSettingsButton(context),
+              ];
+              return Row(
+                children: [
+                  PresenceMenuButton(presence: presence),
+                  const SizedBox(width: 9),
+                  // At ChannelRail.compactWidth the controls win, scaled down if a notch inset leaves too little; the presence dot still says who and how.
+                  if (constraints.maxWidth < _footerNameMinWidth)
+                    Expanded(
+                      child: FittedBox(
+                        fit: BoxFit.scaleDown,
+                        alignment: Alignment.centerRight,
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: controls,
+                        ),
+                      ),
+                    )
+                  else if (inCallElsewhere)
+                    Expanded(
+                      child: RailCallSummary(
+                        channelId: callChannelId,
+                        connectedAt: voice.connectedAt,
+                        screenSharing: voice.screenSharing,
+                      ),
+                    )
+                  else
+                    Expanded(
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            me.valueOrNull?.displayName ?? '',
+                            overflow: TextOverflow.ellipsis,
+                            style: AppText.ui.copyWith(
+                              color: tokens.textPrimary,
+                              fontWeight: AppWeights.medium,
+                              height: 1.25,
                             ),
                           ),
-                        )
-                      else if (inCallElsewhere)
-                        Expanded(
-                          child: RailCallSummary(
-                            channelId: callChannelId,
-                            connectedAt: voice.connectedAt,
-                            screenSharing: voice.screenSharing,
+                          Text(
+                            secondLine,
+                            overflow: TextOverflow.ellipsis,
+                            style: AppText.micro.copyWith(
+                              color: tokens.textSecondary,
+                            ),
                           ),
-                        )
-                      else
-                        Expanded(
-                          child: Column(
-                            mainAxisSize: MainAxisSize.min,
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                me.valueOrNull?.displayName ?? '',
-                                overflow: TextOverflow.ellipsis,
-                                style: AppText.ui.copyWith(
-                                  color: tokens.textPrimary,
-                                  fontWeight: AppWeights.medium,
-                                  height: 1.25,
-                                ),
-                              ),
-                              Text(
-                                secondLine,
-                                overflow: TextOverflow.ellipsis,
-                                style: AppText.micro.copyWith(
-                                  color: tokens.textSecondary,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      if (constraints.maxWidth >= _footerNameMinWidth)
-                        ...controls,
-                    ],
-                  );
-                },
-              ),
-            ],
+                        ],
+                      ),
+                    ),
+                  if (constraints.maxWidth >= _footerNameMinWidth) ...controls,
+                ],
+              );
+            },
           ),
         ),
       ),
