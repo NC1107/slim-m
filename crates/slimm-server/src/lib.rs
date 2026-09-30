@@ -13,6 +13,7 @@ pub mod cors;
 pub mod db;
 pub mod emoji;
 pub mod ephemeral;
+mod forward_backfill;
 mod forward_events;
 pub mod http;
 pub mod hub;
@@ -111,6 +112,7 @@ pub async fn run() -> anyhow::Result<()> {
         .with_total_ceiling(config.max_total_attachment_bytes);
     sweeps::spawn_attachment_sweep(store.clone(), media.clone());
     sweeps::spawn_canvas_op_sweep(store.clone());
+    forward_backfill::spawn_forward_backfill(store.clone(), media.clone());
     let auth = auth::Auth::new(config.hash_concurrency)?;
     let hub = hub::Hub::new();
     let limiter = ratelimit::RateLimiter::with_trusted_hops(config.trust_proxy_hops);

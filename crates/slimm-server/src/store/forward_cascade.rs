@@ -12,10 +12,13 @@ use sqlx::{QueryBuilder, Sqlite, Transaction};
 
 use super::attachments::release_message_attachments;
 use super::message_ops::insert_message_op;
+use super::{Store, now_ms};
 use crate::ids::{ChannelId, MessageId, UserId};
 
 /// Bounds one lookup's bound-variable count, well under SQLite's limit.
 const ORIGIN_CHUNK: usize = 500;
+/// Bounds one backfill transaction; each copy costs an op insert.
+const BACKFILL_BATCH: i64 = 200;
 
 /// A live copy of a message that is going away.
 #[derive(Debug, Clone, Copy)]
@@ -175,6 +178,26 @@ async fn delete_copy(
     }))
 }
 
+/// Deals with each of `copies`, inside the caller's transaction.
+async fn apply_to_copies(
+    tx: &mut Transaction<'_, Sqlite>,
+    copies: &[Copy],
+    actor_id: Option<UserId>,
+    now: i64,
+) -> Result<ForwardCascade, sqlx::Error> {
+    let mut cascade = ForwardCascade::default();
+    for copy in copies {
+        if copy.has_note {
+            cascade
+                .detached
+                .push(detach_forward(tx, copy, actor_id, now).await?);
+        } else if let Some(gone) = delete_copy(tx, copy, actor_id, now).await? {
+            cascade.deleted.push(gone);
+        }
+    }
+    Ok(cascade)
+}
+
 /// Deals with every live copy of `origins` inside the caller's transaction.
 pub(super) async fn cascade_to_copies(
     tx: &mut Transaction<'_, Sqlite>,
@@ -182,15 +205,29 @@ pub(super) async fn cascade_to_copies(
     actor_id: Option<UserId>,
     now: i64,
 ) -> Result<ForwardCascade, sqlx::Error> {
-    let mut cascade = ForwardCascade::default();
-    for copy in live_copies_of(tx, origins).await? {
-        if copy.has_note {
-            cascade
-                .detached
-                .push(detach_forward(tx, &copy, actor_id, now).await?);
-        } else if let Some(gone) = delete_copy(tx, &copy, actor_id, now).await? {
-            cascade.deleted.push(gone);
+    let copies = live_copies_of(tx, origins).await?;
+    apply_to_copies(tx, &copies, actor_id, now).await
+}
+
+impl Store {
+    /// Deals with every copy whose original was deleted before copies followed
+    /// their originals, in bounded batches so the write lock is never held long.
+    ///
+    /// Idempotent: a handled copy is deleted or marked removed, so it no longer
+    /// matches and a second run finds nothing. Publishes nothing; the ops it
+    /// writes reach clients through sync.
+    pub async fn backfill_orphaned_forwards(&self) -> anyhow::Result<ForwardCascade> {
+        let mut total = ForwardCascade::default();
+        loop {
+            let mut tx = self.begin_write().await?;
+            let copies = orphaned_copies(&mut tx, BACKFILL_BATCH).await?;
+            let batch = apply_to_copies(&mut tx, &copies, None, now_ms()).await?;
+            tx.commit().await?;
+            if batch.deleted.is_empty() && batch.detached.is_empty() {
+                return Ok(total);
+            }
+            total.deleted.extend(batch.deleted);
+            total.detached.extend(batch.detached);
         }
     }
-    Ok(cascade)
 }
