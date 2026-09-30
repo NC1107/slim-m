@@ -127,13 +127,13 @@ It does not see cover art, other apps' windows, or anything while the switch is 
 The worker thread starts on the first `current` call and stops by itself fifteen seconds after the Dart side stops asking, so turning the switch off ends all reads.
 The WinRT code is its own CMake library because the runner builds with exceptions off and warnings as errors.
 
-
 ### macOS Now Playing: decision, not built
 
 There is no public API that reports what another app is playing.
 
 - **`MediaRemote` (the framework behind Control Center)** is private.
-  Apple restricted it for third-party processes in macOS 15.4, and what still works does so by borrowing a platform binary's identity.
+  Developers report that since macOS 15.4 the `mediaremoted` daemon only serves Apple-entitled processes, so third-party calls return nothing or fail, and the workaround in use spawns the system `/usr/bin/perl` to borrow its identity.
+  This comes from third-party reports, not an Apple statement: [feedback-assistant/reports#637](https://github.com/feedback-assistant/reports/issues/637), [LyricFever#94](https://github.com/aviwad/LyricFever/issues/94) and [ungive/mediaremote-adapter](https://github.com/ungive/mediaremote-adapter), read 2026-09-30.
   Using it would put a private-API dependency that can break on any point release in a client we ship, so it is refused.
 - **`MPNowPlayingInfoCenter`** is public but only describes this app's own playback, so it cannot work for this.
 - **Scripting Music and Spotify** (`NSAppleScript` or ScriptingBridge) is public and supported.
@@ -147,6 +147,8 @@ There is no public API that reports what another app is playing.
 **Decision: do not build it yet.**
 The sandbox exception is a distribution question (store review tends to reject it) that the owner has not answered, there is no Mac here to run even one prompt, and Spotify account linking covers Spotify on a Mac without any of this.
 What would be left is Apple Music alone.
+One lead worth checking first: the players post public distributed notifications (`com.apple.Music.playerInfo`, `com.spotify.client.PlaybackStateChanged`) that would need no automation prompt.
+That is from one third-party project and is untested here, including whether a sandboxed app receives them.
 
 When the owner decides, the work is small: a `current` handler in the macOS runner answering the same `slimm/now_playing` channel the Windows source uses (`ChannelNowPlayingSource` needs no change), the entitlement, the usage string, and a row in `createNowPlayingSource`.
 It must stay off by default and be closed by hiding like every other feed.
