@@ -1,6 +1,7 @@
 package top.npcserver.slimm
 
 import android.content.pm.ActivityInfo
+import android.content.res.Configuration
 import android.os.Bundle
 import android.view.WindowManager
 import io.flutter.embedding.android.FlutterFragmentActivity
@@ -14,6 +15,8 @@ import io.flutter.plugin.common.MethodChannel
  * `DialogFragment` to and throws at call time against a plain `Activity`.
  */
 class MainActivity : FlutterFragmentActivity() {
+    private val pictureInPicture = PictureInPictureBridge(this)
+
     /**
      * Locks phones to portrait and leaves tablets alone.
      *
@@ -37,6 +40,7 @@ class MainActivity : FlutterFragmentActivity() {
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
         ClipboardImageChannel(applicationContext).attach(flutterEngine.dartExecutor.binaryMessenger)
+        pictureInPicture.attach(flutterEngine.dartExecutor.binaryMessenger)
         MethodChannel(flutterEngine.dartExecutor.binaryMessenger, APP_LOCK_WINDOW_CHANNEL)
             .setMethodCallHandler { call, result ->
                 when (call.method) {
@@ -47,6 +51,16 @@ class MainActivity : FlutterFragmentActivity() {
                     else -> result.notImplemented()
                 }
             }
+    }
+
+    override fun onUserLeaveHint() {
+        super.onUserLeaveHint()
+        pictureInPicture.onUserLeaveHint()
+    }
+
+    override fun onPictureInPictureModeChanged(isInPictureInPictureMode: Boolean, newConfig: Configuration) {
+        super.onPictureInPictureModeChanged(isInPictureInPictureMode, newConfig)
+        pictureInPicture.onModeChanged(isInPictureInPictureMode)
     }
 
     /**

@@ -1,6 +1,6 @@
 # 0040 - Mini-player, desktop pop-out and phone picture-in-picture
 
-Status: accepted (part 1 built; parts 2 and 3 are follow-up cards)
+Status: accepted (parts 1 and 3 built for Android; pop-out and iOS PiP are follow-ups)
 Date: 2026-09-28
 
 ## The ask
@@ -107,7 +107,15 @@ A browser popup (`window.open` with a size) can hold a second page, but it canno
 Recommendation: no pop-out on web at first, and say so in the UI by not offering the button.
 The browser's own picture-in-picture for a `<video>` is a separate, cheap option that needs the track attached to a video element.
 
-### 3. Phone picture-in-picture (follow-up)
+### 3. Phone picture-in-picture (Android built, iOS follow-up)
+
+**What shipped for Android.**
+No plugin: `PictureInPictureBridge.kt` is about 60 lines, and `floating` and `simple_pip_mode` would each add a dependency for the same two platform calls.
+Dart reports eligibility (a connected call with a remote share or camera, the mini-player's own pick) over `top.npcserver.slimm/picture_in_picture`.
+Android 12 and later enter through auto-enter, earlier versions through `onUserLeaveHint`.
+While the OS shows the window, `PictureInPictureGate` hides the routed app (still mounted, so state survives) and fills the view with the feed.
+A hold on video interest keeps the track subscribed, because the voice canvas would otherwise cull a tile it believes is off screen.
+Not built: the OS window's own remote actions (mute, hang up), which need a `RemoteAction` and a broadcast receiver.
 
 OS PiP for video when the app is backgrounded during a call or stream.
 

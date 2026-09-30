@@ -38,6 +38,7 @@ import '../../providers/blocks_controller.dart';
 import '../../providers/canvas_self_presence.dart';
 import '../../providers/channel_permissions.dart';
 import '../../providers/providers.dart';
+import '../../providers/picture_in_picture.dart';
 import '../../providers/voice_controller.dart';
 import '../../providers/voice_flags.dart';
 import '../../widgets/participant_call_menu.dart';
@@ -234,9 +235,7 @@ class _CanvasPaneState extends ConsumerState<CanvasPane> {
               .screenShareViewFor,
           tileOverrides: _tileOverrides,
           onCommitTile: (key, rect) => unawaited(_slotSync.commit(key, rect)),
-          onVideoInterest: ref
-              .read(voiceControllerProvider.notifier)
-              .setVideoInterest,
+          onVideoInterest: ref.read(videoInterestRelayProvider).declare,
           activityLog: _activityLog,
           selfBubbleHidden: selfPresence.hidden,
           onToggleSelfBubbleHidden: _onToggleSelfBubbleHidden,
