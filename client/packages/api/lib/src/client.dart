@@ -38,6 +38,7 @@ part 'client_push.dart';
 part 'client_roles.dart';
 part 'client_space.dart';
 part 'client_threads.dart';
+part 'client_totp.dart';
 part 'client_transport.dart';
 part 'client_users.dart';
 part 'client_voice.dart';

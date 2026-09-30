@@ -28,6 +28,7 @@ import '../providers/admin_providers.dart';
 import '../providers/member_presence.dart' show membersProvider;
 import '../providers/providers.dart';
 import 'member_profile_sections.dart';
+import 'clear_totp_sheet.dart';
 import 'reset_code_sheet.dart';
 import 'run_guarded.dart';
 
@@ -159,6 +160,12 @@ class _MemberModerateViewState extends ConsumerState<MemberModerateView>
         if (widget.canIssueReset) ...[
           const AppMenuLabel('ACCOUNT'),
           ResetCodeMenuItem(
+            host: widget.host,
+            subjectId: widget.profile.id,
+            subjectName: widget.profile.displayName,
+            onDone: widget.onDone,
+          ),
+          ClearTotpMenuItem(
             host: widget.host,
             subjectId: widget.profile.id,
             subjectName: widget.profile.displayName,

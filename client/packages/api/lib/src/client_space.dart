@@ -19,22 +19,54 @@ enum JoinPolicy {
       value == 'open' ? JoinPolicy.open : JoinPolicy.invite;
 }
 
+/// Deployment-wide settings, as `/space/settings` reports them.
+///
+/// Declared here rather than in `models_totp.dart` because [JoinPolicy] is
+/// declared here, and that file is a separate library which cannot see it.
+class SpaceSettings {
+  const SpaceSettings({required this.joinPolicy, required this.totpPolicy});
+
+  final JoinPolicy joinPolicy;
+  final TotpPolicy totpPolicy;
+
+  /// `totp_policy` is absent from a server older than decision 0048, which
+  /// reads as [TotpPolicy.optional] rather than failing the whole settings load
+  /// over a field the rest of the screen does not need.
+  factory SpaceSettings.fromJson(Map<String, dynamic> json) => SpaceSettings(
+        joinPolicy: JoinPolicy.parse(json['join_policy'] as String),
+        totpPolicy: TotpPolicy.parse(
+          json['totp_policy'] as String? ?? TotpPolicy.optional.wire,
+        ),
+      );
+}
+
 /// Deployment-wide settings. Both calls require MANAGE_SERVER.
 extension SlimmApiSpace on SlimmApi {
-  Future<JoinPolicy> spaceJoinPolicy() async {
+  Future<SpaceSettings> spaceSettings() async {
     final json = await _send('GET', '/space/settings');
-    final map = json as Map<String, dynamic>;
-    return JoinPolicy.parse(map['join_policy'] as String);
+    return SpaceSettings.fromJson(json as Map<String, dynamic>);
   }
 
-  Future<JoinPolicy> setSpaceJoinPolicy(JoinPolicy policy) async {
+  /// Writes the join policy, and the second-factor policy when [totpPolicy] is
+  /// given.
+  ///
+  /// `totp_policy` is omitted rather than echoed back when the caller does not
+  /// mean to change it: the server leaves an absent field alone, so a screen
+  /// that only knows about the join policy cannot reset the operator's other
+  /// choice by round-tripping a stale value.
+  Future<SpaceSettings> setSpaceSettings({
+    required JoinPolicy joinPolicy,
+    TotpPolicy? totpPolicy,
+  }) async {
     final json = await _send(
       'PATCH',
       '/space/settings',
-      body: {'join_policy': policy.wire},
+      body: {
+        'join_policy': joinPolicy.wire,
+        if (totpPolicy != null) 'totp_policy': totpPolicy.wire,
+      },
     );
-    final map = json as Map<String, dynamic>;
-    return JoinPolicy.parse(map['join_policy'] as String);
+    return SpaceSettings.fromJson(json as Map<String, dynamic>);
   }
 
   Future<SpaceAnalytics> spaceAnalytics() async {

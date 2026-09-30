@@ -44,17 +44,28 @@ extension SlimmApiAuth on SlimmApi {
     return tokens;
   }
 
-  Future<TokenPair> login({
+  /// Verifies a password, and either opens a session or reports that a second
+  /// factor is still owed.
+  ///
+  /// The two outcomes are a sealed [SignInOutcome] rather than a nullable token
+  /// pair, so a caller cannot forget the challenge case and sail on as if it
+  /// were signed in. The server says which by answering 200 or 202; the
+  /// password check and its timing-equalising decoy hash are identical either
+  /// way, so whether an account has a factor is not learnable without the
+  /// password.
+  Future<SignInOutcome> login({
     required String username,
     required String password,
     required String deviceName,
     String? clientKind,
     String? clientVersion,
   }) async {
+    var status = 0;
     final json = await _send(
       'POST',
       '/auth/login',
       authenticated: false,
+      onStatus: (code) => status = code,
       body: {
         'username': username,
         'password': password,
@@ -63,9 +74,13 @@ extension SlimmApiAuth on SlimmApi {
         if (clientVersion != null) 'client_version': clientVersion,
       },
     );
-    final tokens = TokenPair.fromJson(json as Map<String, dynamic>);
+    final map = json as Map<String, dynamic>;
+    if (status == 202) {
+      return SignInChallenged(TotpChallenge.fromJson(map));
+    }
+    final tokens = TokenPair.fromJson(map);
     session.set(tokens);
-    return tokens;
+    return SignedIn(tokens);
   }
 
   /// Rotates the session. Callers rarely need this directly; an unauthorized

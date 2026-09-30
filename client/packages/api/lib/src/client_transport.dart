@@ -37,6 +37,7 @@ extension SlimmApiTransport on SlimmApi {
     bool authenticated = true,
     bool expectNoContent = false,
     bool isRetry = false,
+    void Function(int status)? onStatus,
   }) async {
     final uri = _requestUri(path, query);
     final request = http.Request(method, uri);
@@ -78,10 +79,13 @@ extension SlimmApiTransport on SlimmApi {
         query: query,
         authenticated: authenticated,
         expectNoContent: expectNoContent,
+        onStatus: onStatus,
         isRetry: true,
       );
     }
 
+    // Sign-in is the one call with two *successful* outcomes; see `SlimmApiAuth.login`.
+    onStatus?.call(response.statusCode);
     if (response.statusCode == 204 ||
         (expectNoContent && response.statusCode < 300)) {
       return null;
