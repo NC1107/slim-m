@@ -20,6 +20,9 @@ SHOTS="$WORK/shots"
 WEB_PORT=8356
 API_PORT=8095
 LK_CONTAINER=slimm-e2e-lk
+# The version prod runs, so the run tests what ships rather than whatever is latest.
+LIVEKIT_VERSION="${LIVEKIT_VERSION:-v1.10.1}"
+TARGET_DIR="${CARGO_TARGET_DIR:-$ROOT/target}"
 KEEP=0
 [[ "${1:-}" == "--keep" ]] && KEEP=1
 
@@ -77,7 +80,7 @@ echo "== SFU =="
 docker rm -f "$LK_CONTAINER" >/dev/null 2>&1 || true
 docker run -d --name "$LK_CONTAINER" --rm \
   -p 7880:7880 -p 7881:7881 -p 50000-50050:50000-50050/udp \
-  livekit/livekit-server --dev --bind 0.0.0.0 >/dev/null
+  "livekit/livekit-server:$LIVEKIT_VERSION" --dev --bind 0.0.0.0 >/dev/null
 for _ in $(seq 30); do
   curl -sf http://localhost:7880 >/dev/null 2>&1 && break; sleep 1
 done
@@ -90,7 +93,7 @@ SLIMM_CORS_ALLOWED_ORIGINS="http://localhost:$WEB_PORT" \
 SLIMM_LIVEKIT_URL=ws://localhost:7880 \
 SLIMM_LIVEKIT_API_KEY=$LIVEKIT_API_KEY \
 SLIMM_LIVEKIT_API_SECRET=$LIVEKIT_API_SECRET \
-  "$ROOT/target/release/slimm-server" > "$WORK/server.log" 2>&1 &
+  "$TARGET_DIR/release/slimm-server" > "$WORK/server.log" 2>&1 &
 API_PID=$!
 for _ in $(seq 60); do
   [[ "$(curl -s http://localhost:$API_PORT/healthz 2>/dev/null)" == "ok" ]] && break

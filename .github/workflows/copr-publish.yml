@@ -80,8 +80,19 @@ jobs:
           sed -i "s/^Release:.*/Release:        ${SNAPSHOT_RELEASE}%{?dist}/" ~/rpmbuild/SPECS/slim-m-client.spec
           rpmbuild -bs ~/rpmbuild/SPECS/slim-m-client.spec >/dev/null
           srpm=$(ls ~/rpmbuild/SRPMS/slim-m-client-*.src.rpm)
-          if copr-cli build nc1107/slim-m "$srpm" --nowait; then
-            echo "submitted slim-m-client ${VER}-${SNAPSHOT_RELEASE} snapshot to COPR (nc1107/slim-m)"
-          else
-            echo "::warning::COPR submit failed for slim-m-client ${VER}-${SNAPSHOT_RELEASE}. TestFlight and the live server are unaffected; rebuild by hand with 'copr-cli build nc1107/slim-m <srpm>'."
-          fi
+          # Auth failures are permanent, so only the rest is retried; a persistent failure must go red.
+          for attempt in 1 2 3; do
+            if out=$(copr-cli build nc1107/slim-m "$srpm" --nowait 2>&1); then
+              echo "$out"
+              echo "submitted slim-m-client ${VER}-${SNAPSHOT_RELEASE} snapshot to COPR (nc1107/slim-m)"
+              exit 0
+            fi
+            echo "$out"
+            if echo "$out" | grep -qiE 'unauthori[sz]ed|expired|invalid (api )?(login|token)|authentication|forbidden'; then
+              echo "::error::COPR rejected the credentials for slim-m-client ${VER}-${SNAPSHOT_RELEASE}. Renew COPR_CONFIG; retrying cannot help."
+              exit 1
+            fi
+            [ "$attempt" -lt 3 ] && sleep $((attempt * 30))
+          done
+          echo "::error::COPR submit failed three times for slim-m-client ${VER}-${SNAPSHOT_RELEASE}. Rebuild by hand with 'copr-cli build nc1107/slim-m <srpm>'."
+          exit 1
