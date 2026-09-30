@@ -10,6 +10,8 @@ export 'src/call_lifecycle_channel.dart';
 export 'src/call_notifications.dart';
 export 'src/device_push_keys.dart';
 export 'src/fcm_token_channel.dart';
+export 'src/game_allowlist.dart';
+export 'src/game_source.dart';
 export 'src/host_platform.dart';
 export 'src/install_format.dart';
 export 'src/key_store.dart';

@@ -40,7 +40,7 @@ This record fixes the privacy model, where activity comes from, the wire shape a
 | Windows SMTC (`GlobalSystemMediaTransportControls`) | none | Windows 10+ desktop, any app that registers a media session | Built, see the amendment below. A runner method channel, no account. |
 | macOS Now Playing | none | macOS | Not built, see the amendment below. The only supported route is scripting Music and Spotify, and it needs an owner decision first. |
 | Spotify Web API | an OAuth app registered by the owner | any platform incl. phones | Later. Only the Spotify account, needs a token store and a refresh path. |
-| Game detection | none | desktop | Later, opt-in, allowlist only. |
+| Game detection | none | desktop | Built, see the amendment below. Opt-in, allowlist only. |
 
 Why MPRIS first: it needs no account linking and reads exactly what the person is already playing, on the machine the owner develops on.
 A phone has no equivalent, which is what Spotify linking would cover later.
@@ -52,7 +52,7 @@ Polling was chosen over subscribing to `PropertiesChanged` because a few seconds
 The package is `dbus` (pub.dev, BSD-3-Clause, already resolved transitively at 0.7.14), which is on `deny.toml`'s allowlist.
 It is imported only through a conditional import so web builds never compile it, and the source is absent (not shown dead) on other platforms.
 
-### Game detection (later)
+### Game detection (the plan; "Game detection" below records what shipped)
 
 A process-name allowlist shipped with the client, matched only when the "playing" switch is on.
 The person can see the list, and nothing outside it is ever reported or logged.
@@ -152,3 +152,20 @@ That is from one third-party project and is untested here, including whether a s
 
 When the owner decides, the work is small: a `current` handler in the macOS runner answering the same `slimm/now_playing` channel the Windows source uses (`ChannelNowPlayingSource` needs no change), the entitlement, the usage string, and a row in `createNowPlayingSource`.
 It must stay off by default and be closed by hiding like every other feed.
+
+### Game detection
+
+Its own switch (`slimm.presence.share_game`), separate from listening and off by default.
+The allowlist is `gameAllowlist` in `client/packages/platform/lib/src/game_allowlist.dart`: a short starter list that ships in the client and is shown in full under the switch in Settings.
+It lives in code so adding a game is a reviewed change, not a runtime setting, and there is deliberately no way for the person to add an arbitrary process yet.
+A source is a probe (process names, Steam's `RunningAppID`) plus `pickRunningGame`, which returns only an allowlisted title.
+A program that is not on the list is matched against nothing, stored nowhere and never logged.
+
+- Steam's own answer wins: `registry.vdf` on Linux and macOS, `HKCU\Software\Valve\Steam` `RunningAppID` on Windows.
+  An app id that is not on the list is ignored, so Steam does not widen what is reported.
+- Processes come from `/proc/*/comm` on Linux (truncated to 15 characters, which the matcher allows for), `tasklist` on Windows and `ps` on macOS.
+- It polls every 15 seconds, and only while the switch is on and the person is not hidden.
+- What it cannot see: window titles, file names, what a game is doing, or any program off the list.
+  Steam-only titles need a `steamAppId` in their entry.
+- Wire kind is `playing`, title is the list's friendly name, capped like every other activity.
+- When both feeds report, listening wins, since it is first in `activityFeedsProvider`.
