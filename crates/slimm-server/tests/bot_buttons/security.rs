@@ -131,11 +131,13 @@ async fn invisible_characters_and_disguised_links_are_refused() {
     let w = world().await;
     let hidden_label =
         json!([{ "buttons": [{ "label": "Hit\u{202E}", "style": "primary", "custom_id": "a" }] }]);
+    let arabic_mark =
+        json!([{ "buttons": [{ "label": "Hit\u{061C}", "style": "primary", "custom_id": "a" }] }]);
     let hidden_id =
         json!([{ "buttons": [{ "label": "Hit", "style": "primary", "custom_id": "a\u{200B}b" }] }]);
     let userinfo = json!([{ "buttons": [{ "label": "docs.example.com", "style": "link", "url": "https://docs.example.com@evil.example/x" }] }]);
     let no_host = json!([{ "buttons": [{ "label": "x", "style": "link", "url": "https:///x" }] }]);
-    for bad in [hidden_label, hidden_id, userinfo, no_host] {
+    for bad in [hidden_label, arabic_mark, hidden_id, userinfo, no_host] {
         let (status, _) = post_with(&w, &w.bot.1, bad).await;
         assert_eq!(status, StatusCode::BAD_REQUEST);
     }

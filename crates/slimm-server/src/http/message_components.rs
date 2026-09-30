@@ -42,7 +42,7 @@ pub(super) async fn honored_for_send(
     if !state.store.is_bot(caller).await? {
         return Err(ApiError::Forbidden);
     }
-    components::validate(raw, super::auth::is_disallowed_label_char).map_err(ApiError::BadRequest)
+    components::validate(raw, super::hidden_chars::is_hidden_char).map_err(ApiError::BadRequest)
 }
 
 /// Stores `rows` when `fresh`, then reads back what the message really has, so
@@ -90,7 +90,7 @@ async fn set_components(
         .as_deref()
         .map(|raw| parse_uuid(raw).map(InteractionId))
         .transpose()?;
-    let rows = components::validate(req.components, super::auth::is_disallowed_label_char)
+    let rows = components::validate(req.components, super::hidden_chars::is_hidden_char)
         .map_err(ApiError::BadRequest)?;
     let needed = Permissions::VIEW_CHANNEL.union(Permissions::SEND_MESSAGES);
     if !state.store.is_bot(ctx.user_id).await?
