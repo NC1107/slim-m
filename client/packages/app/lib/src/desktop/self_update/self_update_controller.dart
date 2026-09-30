@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// Drives one self-update from the UI: download and verify, install into the
 /// per-user layout, and keep the outcome where the persistent error banner and
-/// the title-bar menu read it. Only the per-user Linux and Windows layouts apply.
+/// the title-bar menu read it. Only the per-user Linux, Windows and macOS layouts apply.
 library;
 
 import 'dart:async';
@@ -11,6 +11,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:http/http.dart' as http;
 import 'package:slimm_platform/platform.dart';
 
+import '../relaunch.dart';
 import 'linux_install.dart' show Unpack;
 import 'self_update.dart';
 import 'self_update_failure.dart';
@@ -25,16 +26,23 @@ typedef FetchUpdate =
       required http.Client client,
     });
 
+Future<void> _relaunchAndExit() async {
+  await spawnRelaunch();
+  exit(0);
+}
+
 /// The install this process runs from when it may replace itself, else null.
 SelfUpdateTarget? selfApplyTarget({
   InstallFormat? format,
   String? resolvedExecutable,
   String? os,
+  String? home,
 }) {
   if ((format ?? currentInstallFormat()) != InstallFormat.tarball) return null;
   final target = installTargetFor(
     resolvedExecutable ?? Platform.resolvedExecutable,
     os ?? Platform.operatingSystem,
+    home: home,
   );
   return target != null && target.isWritable ? target : null;
 }
@@ -64,14 +72,17 @@ class SelfUpdateController {
     FetchUpdate fetch = fetchVerifiedUpdate,
     Unpack? unpack,
     http.Client Function() newClient = http.Client.new,
+    Future<void> Function() restart = _relaunchAndExit,
   }) : _fetch = fetch,
        _unpack = unpack,
-       _newClient = newClient;
+       _newClient = newClient,
+       _restart = restart;
 
   final Ref ref;
   final FetchUpdate _fetch;
   final Unpack? _unpack;
   final http.Client Function() _newClient;
+  final Future<void> Function() _restart;
 
   /// Installs the newest verified release and returns its version, or null
   /// when there was nothing to install or it failed; a failure is left in
@@ -122,14 +133,20 @@ class SelfUpdateController {
   Future<void> confirmStart({
     String? resolvedExecutable,
     String? os,
+    String? home,
     Duration settle = const Duration(seconds: 20),
   }) async {
     if (resolvedExecutable == null && !isDesktopHost) return;
     final target = installTargetFor(
       resolvedExecutable ?? Platform.resolvedExecutable,
       os ?? Platform.operatingSystem,
+      home: home,
     );
     if (target == null) return;
+    if (target.rollBackIfStuck()) {
+      await _restart();
+      return;
+    }
     final failed = target.takeRollbackNotice();
     if (failed != null) {
       ref.read(selfUpdateFailureProvider.notifier).state = SelfUpdateFailure(
