@@ -7618,8 +7618,7 @@ components:
           minLength: 1
           maxLength: 64
         invite_code:
-          # The OpenAPI 3.0 `nullable` keyword, alone in this 3.1 file: a 3.1
-          # null union fails the oasdiff gate. Why that is safe: docs/ci.md.
+          # OpenAPI 3.0 `nullable`, alone in this 3.1 file because a 3.1 null union fails the oasdiff gate (docs/ci.md).
           type: string
           nullable: true
           description: >

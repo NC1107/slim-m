@@ -1,11 +1,7 @@
 # SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 name: copr-catch-up
 
-# The Linux client reaches `dnf upgrade` only through COPR, and main-builds.yml's
-# copr job is a single push-triggered path that a merge storm cancels. This
-# submits the client when COPR's newest live build is behind client/pubspec.yaml,
-# and does nothing otherwise, so any missed submit heals on the next trigger.
-# Triggers and the concurrency choice are argued in docs/ci.md.
+# Submits the client to COPR when its newest live build is behind client/pubspec.yaml; see docs/ci.md.
 on:
   workflow_run:
     workflows: [main-builds]

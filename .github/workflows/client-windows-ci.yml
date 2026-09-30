@@ -1,14 +1,6 @@
 # SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 name: client-windows-ci
-#
-# Compile-only, and deliberately not a required check yet: this is the first
-# CI job that has ever built a Windows target for this client, and
-# docs/os_backlog/windows_backlog.md's own record of what is confirmed versus
-# suspected on this platform has almost nothing behind it - a green run here
-# proves the native plugin graph links, not that the app runs, looks right,
-# or that the tray/window-shell features decision 0012 designed actually
-# work on a real Windows desktop. See that file before promoting this to a
-# required check or building anything further on top of a green run here.
+# Compile-only and not required: a green run proves the plugin graph links, not that the app works on Windows (docs/ci.md).
 on:
   push:
     branches: [main]
@@ -16,9 +8,7 @@ on:
       - "client/**"
       - "packaging/windows/**"
       - ".github/workflows/client-windows-ci.yml"
-      # A release-please version bump touches these three and nothing else.
-      # It never moves client/pubspec.lock, so a genuine dependency change
-      # still triggers a full run through the lock file.
+      # A release-please bump touches these three only; a real dependency change still runs through the lock file.
       - "!client/CHANGELOG.md"
       - "!client/pubspec.yaml"
       - "!client/packages/app/pubspec.yaml"
@@ -57,12 +47,7 @@ jobs:
         working-directory: client
         run: flutter pub get --enforce-lockfile
 
-      # Debug rather than release: this job exists to catch a link failure
-      # in the native plugin graph (window_manager, tray_manager,
-      # screen_retriever, flutter_webrtc, livekit_client, sqlite3_flutter_libs
-      # and the rest generated_plugin_registrant.cc now names for Windows),
-      # not to produce a shippable artifact - release packaging is Phase 9
-      # work nothing in docs/ROADMAP.md schedules for this platform yet.
+      # Debug build: this job catches native plugin link failures, not shippable artifacts; release packaging is unscheduled.
       - name: windows compiles
         working-directory: client/packages/app
         run: flutter build windows --debug

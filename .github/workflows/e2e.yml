@@ -1,27 +1,6 @@
 # SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 name: e2e
-#
-# scripts/e2e.sh stands up a real LiveKit SFU, the release server binary and a
-# real web build, then drives two isolated headless browsers through
-# onboarding, messaging, moderation, screen share and a two-party voice call,
-# checking each scenario against the server or the SFU. See docs/e2e.md.
-#
-# Runs on every push to main, on a nightly schedule for slower drift (a renamed
-# label, a restructured screen), on workflow_dispatch for an ad hoc run, and on
-# a pull request only when it touches a path that can break what the harness
-# drives: voice and calls, the rtc and api packages, the server's auth, ws, hub
-# and voice code, the canvas, the image, or the harness itself.
-#
-# The pull_request trigger exists because #653 moved the canvas into voice
-# channels, the harness kept driving a text channel, and fourteen scenarios went
-# red on every commit for two days while every per-area workflow stayed green.
-# It is narrowed to those paths because at ~20 minutes it saturated the
-# account's runners on every PR push and starved the required checks; a change
-# outside them is still covered by the push to main and the nightly run.
-#
-# Still advisory rather than required: browser automation can be flaky for
-# reasons unrelated to the change under test, and a red check nobody trusts
-# teaches people to ignore CI. See docs/ci.md.
+# Advisory real-browser end to end run against a real LiveKit SFU; triggers and why it is not required: docs/ci.md.
 on:
   push:
     branches: [main]
@@ -93,9 +72,7 @@ jobs:
         with:
           python-version: "3.14"
 
-      # The harness's only third-party import; the rest of scripts/lib is stdlib.
-      # Pinned and wheel-only so no sdist setup script runs, same reason the
-      # actions above are pinned to commit shas.
+      # The harness's only third-party import, pinned and wheel-only so no sdist setup script runs.
       - name: python dependencies
         run: "pip install --only-binary :all: websocket-client==1.9.0"
 

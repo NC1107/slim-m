@@ -1,10 +1,7 @@
 # SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 name: copr-publish
 
-# Called from main-builds.yml's own copr job, pulled out into its own file
-# once that workflow reached the 500-line hard ceiling; see docs/ci.md.
-# A reusable workflow rather than a composite action, since this needs its
-# own container image (fedora:44) a composite action cannot declare.
+# Reusable workflow called from main-builds and copr-catch-up, since it needs its own fedora:44 container; see docs/ci.md.
 on:
   workflow_call:
     secrets:

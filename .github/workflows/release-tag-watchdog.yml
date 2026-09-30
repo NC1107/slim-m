@@ -1,15 +1,7 @@
 # SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 name: release-tag-watchdog
 
-# Nothing else notices a release-please manifest bumping to a new version on
-# main with no tag ever following it - the exact silent failure the
-# release-${{ github.ref }} concurrency group produced on 2026-08-06 (a run
-# cancelled while pending behind another, zero jobs run, nothing anywhere
-# says so). A push-triggered check cannot close this gap, because the push
-# that should have cut the tag is the same one that did not, so this runs on
-# a schedule instead and asks the git history a plain question a cancelled
-# run cannot have lied to. See CLAUDE.md's "A release can succeed and still
-# ship no store build" entry and docs/ci.md's release section.
+# Catches a release-please manifest bump on main that no tag ever followed, which no push-triggered check can; see docs/ci.md.
 
 on:
   schedule:
@@ -19,17 +11,7 @@ on:
 # Granted per job, so nothing is inherited.
 permissions: {}
 
-# No concurrency group at all, and that is the whole point rather than an
-# omission. This workflow was written on 2026-08-06 to catch a release run
-# cancelled while pending, and it shipped carrying that same bug: a
-# `cancel-in-progress: true` group over a short cron means a run that
-# takes longer than its own interval - which is every run while GitHub's
-# runners are slow, exactly when a release is most likely to go wrong - is
-# cancelled by the next one and reported as a failure. Three consecutive
-# runs failed that way within an hour of it landing. Worse than the noise:
-# a cancelled run never asked the question, so the silent failure this
-# exists to catch could pass underneath it unseen. The job is read-only and
-# idempotent, so two of it overlapping costs nothing worth preventing.
+# No concurrency group on purpose: a cancel-in-progress group over a short cron cancels the run that would catch a stuck release; docs/ci.md.
 
 jobs:
   check:

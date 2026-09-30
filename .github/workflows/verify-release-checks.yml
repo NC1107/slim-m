@@ -1,60 +1,7 @@
 # SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 name: verify-release-checks
 
-# Called twice from release.yml, once per component, so every publish job (a
-# GHCR push, a cosign signature, a GitHub Release asset, a Play or TestFlight
-# upload) requires this exact commit's own CI to have completed and succeeded
-# first, on both trigger paths: a release-please merge to main and a hand-
-# pushed server-v*/client-v* tag. Before this existed, the tag path published
-# unconditionally with no test workflow ever having run on that ref, straight
-# to a production deployment that auto-updates from the moving `latest` tag.
-#
-# workflow_run cannot do this: it fires only when a *named* workflow completes
-# for the event that triggered it, and none of server-ci, client-ci,
-# client-ios-ci, hygiene or licenses trigger on a tag push at all (deliberately,
-# to avoid re-running CI on a ref that already ran it on main). A tag push
-# raises no workflow_run event for any of them, so that mechanism cannot gate
-# the one path most in need of gating.
-#
-# A check run is attached to the commit, not to the event that produced it, so
-# polling the commits check-runs API answers both paths uniformly: the commit
-# a tag points at is normally already on main and already carries whatever
-# check runs its original push or PR produced, so re-pushing a tag to the same
-# SHA still finds them and still publishes. A required name absent from the
-# response is treated as a failure rather than a pass, so a commit that never
-# went through CI at all (never pushed to main, never opened as a PR) times
-# out and fails closed instead of silently passing an empty result.
-#
-# The deadline covers queueing, not running. `client-ios-ci` takes about
-# thirteen minutes on a macOS runner and those runners queue: client 0.23.0
-# timed out at the old thirty-minute ceiling with the iOS check still pending,
-# and that same check succeeded minutes later, so re-running the release
-# passed unchanged. A release that fails because a runner was busy is a
-# release somebody has to notice and re-run by hand, which is the failure this
-# gate exists to make impossible rather than merely visible.
-#
-# Which commit is verified is the caller's decision and is not github.sha on
-# the release-please path. release-please acts on the repository's current
-# state through the API, while github.sha is whatever commit started the run;
-# those are normally the same and diverge whenever a release merge lands while
-# an earlier run is still going. When they diverge, github.sha is the wrong
-# commit in the worst possible way: it belongs to unrelated work, so a
-# path-filtered workflow correctly never ran on it, this gate waits for a
-# check that cannot exist, times out, and every publish job behind it is
-# skipped while the tag, the GitHub release and the changelog all look
-# perfectly correct. That is what happened to server 0.23.0 on 2026-08-01.
-# The release commit itself always carries the checks, because it edits the
-# version files each component's CI is path-filtered on.
-#
-# The names below are matched exactly, so a job renamed in server-ci.yml or
-# client-ci.yml without the matching edit here blocks every release. That is
-# the safe direction to fail, and the absence grace period exists so it says
-# which name it could not find rather than sitting for the full deadline.
-#
-# The polling loop itself lives in scripts/verify-release-checks.sh, not
-# inline here, because all three bugs above shipped with nothing testing
-# this logic. scripts/lib/test_verify_release_checks.py drives that script
-# against a fake `gh`; see its own header for what it covers.
+# Gates every publish job on this commit's own CI having succeeded, for both the release-please and the by-hand tag path; docs/ci.md.
 
 on:
   workflow_call:
@@ -88,8 +35,7 @@ permissions:
 jobs:
   verify:
     runs-on: ubuntu-latest
-    # Ceiling over the script's 180-minute deadline (10800s), which is sized to
-    # the worst measured Linux queue plus a run; see docs/ci.md.
+    # Ceiling over the script's 180-minute deadline (10800s); see docs/ci.md.
     timeout-minutes: 195
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7

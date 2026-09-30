@@ -23,12 +23,10 @@ analyzer:
 include: package:flutter_lints/flutter.yaml
 
 linter:
-  # Rules can be added or disabled here; the list is at https://dart.dev/lints.
-  # A single line or file can instead use `// ignore:` / `// ignore_for_file:`.
+  # Rules are added or disabled here; per-line `// ignore:` also works.
   rules:
     - unawaited_futures
-    # avoid_print: false  # Uncomment to disable the `avoid_print` rule
-    # prefer_single_quotes: true  # Uncomment to enable the `prefer_single_quotes` rule
+    # Uncomment `avoid_print` or `prefer_single_quotes` here to change those rules.
 
 # Additional information about this file can be found at
 # https://dart.dev/guides/language/analysis-options

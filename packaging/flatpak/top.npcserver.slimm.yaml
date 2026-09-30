@@ -66,16 +66,9 @@ finish-args:
   - --talk-name=org.kde.StatusNotifierWatcher
 
 modules:
-  # tray_manager links libayatana-appindicator3 directly (not dlopen'd), and
-  # the runtime carries none of this stack. flathub/shared-modules' own
-  # module, vendored rather than a git submodule since this repo has no other.
+  # tray_manager links libayatana-appindicator3 directly; vendored flathub/shared-modules module, not a submodule.
   - shared-modules/libayatana-appindicator/libayatana-appindicator-gtk3.json
-  # media_kit_video links libmpv directly; libass is libmpv's own subtitle dep.
-  # No buildsystem key: autotools by default, whose own libdir default is a
-  # plain '<prefix>/lib' with no lib64/multiarch detection, unlike cmake and
-  # meson below. Confirmed against real CI logs, not assumed: this and
-  # libdbusmenu (also autotools) both install to /app/lib/pkgconfig with no
-  # libdir override. See packaging/flatpak/README.md's fifth defect.
+  # media_kit_video links libmpv, libass is its subtitle dep; autotools, so no libdir override (packaging/flatpak/README.md, fifth defect).
   - name: libass
     config-opts:
       - --disable-static
@@ -91,8 +84,7 @@ modules:
         url: https://github.com/libass/libass.git
         tag: 0.17.5
         commit: 4a05d8127f525943ebf45fdc6497c9e665947f0d
-  # mpv links libplacebo unconditionally since 0.37; built GL-only (Vulkan
-  # disabled) since media_kit_video only ever drives mpv's plain GL output.
+  # libplacebo is built GL-only since media_kit_video only drives mpv's GL output.
   - name: libplacebo
     buildsystem: meson
     build-options:
@@ -116,8 +108,7 @@ modules:
         url: https://github.com/haasn/libplacebo.git
         tag: v7.360.1
         commit: cee9b076f2c63104ccfd497fa79c39a867293ec4
-  # libmpv only, no CLI player; audio/video backends stay 'auto' to pick up
-  # whatever the runtime/SDK already carry (GL, VAAPI, PulseAudio, ALSA).
+  # libmpv only, no CLI player; backends stay 'auto' to pick up what the runtime carries.
   - name: mpv
     buildsystem: meson
     build-options:

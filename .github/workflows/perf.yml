@@ -1,8 +1,7 @@
 # SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 name: perf
 
-# Path-gated to server and perf-scaffolding changes. Actions cannot path-filter
-# the `release` event, so the release job below is not; see docs/ci.md.
+# Path-gated to server and perf changes, except the release job, since the release event cannot be filtered (docs/ci.md).
 on:
   pull_request:
     paths:
@@ -26,8 +25,7 @@ env:
   SQLX_OFFLINE: "true"
 
 jobs:
-  # Fast compile-only gate on every pull request: proves the benchmarks still
-  # build without paying for a full measurement run on each push.
+  # Compile-only gate on every pull request, without a full measurement run per push.
   compile-gate:
     if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
@@ -37,8 +35,7 @@ jobs:
       - name: compile benches (no run)
         run: cargo bench --locked -p slimm-server --no-run
 
-  # Real benchmarks on a published release, uploaded for hand-curation into
-  # perf/baselines/. Deliberately not environment-gated; see docs/ci.md.
+  # Real benchmarks on a published release, for hand-curation into perf/baselines/; see docs/ci.md.
   benchmark:
     if: github.event_name == 'release' && !startsWith(github.event.release.tag_name, 'schema-v')
     runs-on: ubuntu-latest
