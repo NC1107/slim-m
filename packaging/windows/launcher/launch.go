@@ -1,0 +1,95 @@
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
+
+// The launcher stays dumb on purpose (docs/decisions/0041): read the `current`
+// pointer, start that version's folder, and count starts so a version that
+// never comes up cleanly is replaced by `previous`. The file names are shared
+// with client/packages/app/lib/src/desktop/self_update/windows_layout.dart.
+package main
+
+import (
+	"errors"
+	"os"
+	"path/filepath"
+	"strconv"
+	"strings"
+)
+
+const (
+	appExecutable   = "slimm_app.exe"
+	versionPrefix   = "app-"
+	maxFailedStarts = 2
+)
+
+func read(root, name string) string {
+	data, err := os.ReadFile(filepath.Join(root, name))
+	if err != nil {
+		return ""
+	}
+	return strings.TrimSpace(string(data))
+}
+
+// write goes through a temp file and a replacing rename, so a reader sees the
+// old content or the new, never a partial file.
+func write(root, name, content string) error {
+	temp := filepath.Join(root, "."+name+".launcher")
+	if err := os.WriteFile(temp, []byte(content), 0o644); err != nil {
+		return err
+	}
+	return os.Rename(temp, filepath.Join(root, name))
+}
+
+func remove(root string, names ...string) {
+	for _, name := range names {
+		_ = os.Remove(filepath.Join(root, name))
+	}
+}
+
+func versionDir(root, version string) string {
+	return filepath.Join(root, versionPrefix+version)
+}
+
+func isComplete(root, version string) bool {
+	if version == "" {
+		return false
+	}
+	_, err := os.Stat(filepath.Join(versionDir(root, version), appExecutable))
+	return err == nil
+}
+
+// choose returns the version folder to start, after applying the start count
+// and any rollback it calls for.
+func choose(root string) (string, error) {
+	current := read(root, "current")
+	if current == "" {
+		return "", errors.New("slim-m has no current version")
+	}
+	if !isComplete(root, current) {
+		return rollBack(root, current)
+	}
+	if read(root, "pending") != current {
+		return versionDir(root, current), nil
+	}
+	tries, _ := strconv.Atoi(read(root, "pending.tries"))
+	if tries >= maxFailedStarts && isComplete(root, read(root, "previous")) {
+		return rollBack(root, current)
+	}
+	if err := write(root, "pending.tries", strconv.Itoa(tries+1)); err != nil {
+		return "", err
+	}
+	return versionDir(root, current), nil
+}
+
+// rollBack makes `previous` current again and leaves a `rolled-back` marker
+// for the app to report once it is up.
+func rollBack(root, failed string) (string, error) {
+	previous := read(root, "previous")
+	if !isComplete(root, previous) {
+		return "", errors.New("slim-m version " + failed + " cannot start and there is no earlier version to go back to")
+	}
+	if err := write(root, "current", previous); err != nil {
+		return "", err
+	}
+	_ = write(root, "rolled-back", failed)
+	remove(root, "pending", "pending.tries", "previous")
+	return versionDir(root, previous), nil
+}

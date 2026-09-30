@@ -1,7 +1,7 @@
 # 0041 - Per-user installs and signed self-update
 
 Date: 2026-09-28
-Status: proposed; the design, the CI signing, the verified download and the Linux tarball applier are built, the Windows and macOS appliers are carded and not started
+Status: proposed; the design, the CI signing, the verified download and the Linux and Windows appliers are built, the macOS applier is carded and not started
 
 ## Context
 
@@ -133,3 +133,12 @@ The launcher counts starts in `pending.tries` while a `pending` marker names its
 The app clears `pending` and prunes everything but `current` and `previous` after it has stayed up for twenty seconds, and reports a `rolled-back` marker in the persistent error banner.
 A tarball that is not in this layout, or whose root is not writable, keeps the notifier behaviour.
 
+## Windows applier as built
+
+The layout root is `%LOCALAPPDATA%\slim-m`, holding `app-<version>` folders, the `slim-m.exe` launcher, and `current` and `previous` as small files that each hold a version number.
+The launcher is a Go program in `packaging/windows/launcher`, built with the zip in `desktop-clients.yml`; a symlink is not an option because creating one needs elevation or developer mode.
+The updater unzips into an `app-<version>` folder, writes the new pointer through a temp file and a replacing rename, and restarts through the launcher.
+The pending-start marker, the third-start rollback, the twenty-second settle and the prune work as on Linux, with the launcher counting starts.
+`install.cmd` in the zip is the first install, so no new distribution channel exists.
+Only a layout with the launcher and `current` beside an `app-<version>` folder self-updates: a bare extracted zip, `Program Files` and a packaged MSIX keep the release-page notifier.
+The launcher is not replaced by updates; a fix to it needs another run of `install.cmd`.

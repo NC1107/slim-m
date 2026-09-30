@@ -64,7 +64,7 @@ Future<void> runStartupUpdates(
       return;
     }
     if (update.format == InstallFormat.tarball &&
-        (selfApplies ?? selfApplyLayout() != null)) {
+        (selfApplies ?? selfApplyTarget() != null)) {
       await _installInPlace(container, version, update, relaunch);
       return;
     }

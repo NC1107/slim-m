@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// Drives one self-update from the UI: download and verify, install into the
 /// per-user layout, and keep the outcome where the persistent error banner and
-/// the title-bar menu read it. Only the Linux tarball layout applies today.
+/// the title-bar menu read it. Only the per-user Linux and Windows layouts apply.
 library;
 
 import 'dart:async';
@@ -11,10 +11,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:http/http.dart' as http;
 import 'package:slimm_platform/platform.dart';
 
-import 'linux_install.dart';
-import 'linux_layout.dart';
+import 'linux_install.dart' show Unpack;
 import 'self_update.dart';
 import 'self_update_failure.dart';
+import 'self_update_target.dart';
 
 /// Fetch step, injectable so tests need no network.
 typedef FetchUpdate =
@@ -25,21 +25,23 @@ typedef FetchUpdate =
       required http.Client client,
     });
 
-/// The layout this process runs from when it may replace itself, else null.
-LinuxInstallLayout? selfApplyLayout({
+/// The install this process runs from when it may replace itself, else null.
+SelfUpdateTarget? selfApplyTarget({
   InstallFormat? format,
   String? resolvedExecutable,
+  String? os,
 }) {
   if ((format ?? currentInstallFormat()) != InstallFormat.tarball) return null;
-  final layout = detectLinuxLayout(
+  final target = installTargetFor(
     resolvedExecutable ?? Platform.resolvedExecutable,
+    os ?? Platform.operatingSystem,
   );
-  return layout != null && layoutIsWritable(layout) ? layout : null;
+  return target != null && target.isWritable ? target : null;
 }
 
 /// Whether this process may replace itself; overridable in tests.
 final selfApplyAvailableProvider = Provider<bool>(
-  (ref) => selfApplyLayout() != null,
+  (ref) => selfApplyTarget() != null,
 );
 
 /// The version installed and waiting for a restart, or null.
@@ -60,7 +62,7 @@ class SelfUpdateController {
   SelfUpdateController(
     this.ref, {
     FetchUpdate fetch = fetchVerifiedUpdate,
-    Unpack unpack = unpackWithTar,
+    Unpack? unpack,
     http.Client Function() newClient = http.Client.new,
   }) : _fetch = fetch,
        _unpack = unpack,
@@ -68,7 +70,7 @@ class SelfUpdateController {
 
   final Ref ref;
   final FetchUpdate _fetch;
-  final Unpack _unpack;
+  final Unpack? _unpack;
   final http.Client Function() _newClient;
 
   /// Installs the newest verified release and returns its version, or null
@@ -78,18 +80,19 @@ class SelfUpdateController {
     required String currentVersion,
     InstallFormat? format,
     String? resolvedExecutable,
+    String? os,
   }) async {
     if (ref.read(selfUpdateInstallingProvider)) return null;
     ref.read(selfUpdateInstallingProvider.notifier).state = true;
     ref.read(selfUpdateFailureProvider.notifier).state = null;
     final client = _newClient();
     try {
-      final installFormat = format ?? currentInstallFormat();
-      final layout = selfApplyLayout(
-        format: installFormat,
+      final target = selfApplyTarget(
+        format: format,
         resolvedExecutable: resolvedExecutable,
+        os: os,
       );
-      if (layout == null) {
+      if (target == null) {
         throw const SelfUpdateFailure(
           SelfUpdateFailureKind.unsupportedInstall,
           'This install is updated by its package manager, not by slim-m.',
@@ -97,17 +100,12 @@ class SelfUpdateController {
       }
       final update = await _fetch(
         currentVersion: currentVersion,
-        platformKey: 'linux-x64',
-        stagingDir: layout.stagingDir,
+        platformKey: target.platformKey,
+        stagingDir: target.stagingDir,
         client: client,
       );
       if (update == null) return null;
-      await installLinuxUpdate(
-        update: update,
-        format: installFormat,
-        layout: layout,
-        unpack: _unpack,
-      );
+      await target.install(update, unpack: _unpack);
       ref.read(stagedUpdateVersionProvider.notifier).state = update.version;
       return update.version;
     } on SelfUpdateFailure catch (failure) {
@@ -123,14 +121,16 @@ class SelfUpdateController {
   /// [settle] of staying up mark this launch clean so old versions are pruned.
   Future<void> confirmStart({
     String? resolvedExecutable,
+    String? os,
     Duration settle = const Duration(seconds: 20),
   }) async {
     if (resolvedExecutable == null && !isDesktopHost) return;
-    final layout = detectLinuxLayout(
+    final target = installTargetFor(
       resolvedExecutable ?? Platform.resolvedExecutable,
+      os ?? Platform.operatingSystem,
     );
-    if (layout == null) return;
-    final failed = takeRollbackNotice(layout);
+    if (target == null) return;
+    final failed = target.takeRollbackNotice();
     if (failed != null) {
       ref.read(selfUpdateFailureProvider.notifier).state = SelfUpdateFailure(
         SelfUpdateFailureKind.rolledBack,
@@ -139,6 +139,6 @@ class SelfUpdateController {
       );
     }
     await Future<void>.delayed(settle);
-    confirmCleanStart(layout);
+    target.confirmCleanStart();
   }
 }

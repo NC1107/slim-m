@@ -91,6 +91,7 @@ class _FakeSelfUpdate extends SelfUpdateController {
     required String currentVersion,
     InstallFormat? format,
     String? resolvedExecutable,
+    String? os,
   }) async {
     onInstall?.call(currentVersion);
     if (fail) {

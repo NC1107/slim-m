@@ -72,12 +72,25 @@ jobs:
         working-directory: client/packages/app
         run: flutter build windows --release
 
+      # The launcher is what makes "which version runs" data instead of a path (decision 0041); the runner image's Go builds it.
+      - name: test and build the launcher
+        shell: pwsh
+        working-directory: packaging/windows/launcher
+        run: |
+          go vet ./...
+          go test ./...
+          go build -ldflags "-H=windowsgui -s -w" -o slim-m.exe .
+
       - name: archive the release bundle
         shell: pwsh
         env:
           TAG: ${{ inputs.tag || github.ref_name }}
         run: |
           $version = $env:TAG -replace "^client-v", ""
+          $release = "client/packages/app/build/windows/x64/runner/Release"
+          Move-Item packaging/windows/launcher/slim-m.exe $release
+          Copy-Item packaging/windows/install.ps1, packaging/windows/install.cmd, packaging/windows/README.md $release
+          Set-Content -Path "$release/VERSION" -Value $version -NoNewline
           Compress-Archive -Path client/packages/app/build/windows/x64/runner/Release/* -DestinationPath "slim-m-client-$version-windows-x64.zip"
 
       - name: attach to the github release
