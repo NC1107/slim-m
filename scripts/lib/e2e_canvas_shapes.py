@@ -29,9 +29,22 @@ from e2e_canvas import (
 )
 
 # A fraction of the surface's own live size, not a fixed pixel offset - see this module's own doc for why.
-_NOTE_POINT = (0.15, 0.85)
-_SHAPE_POINT = (0.55, 0.85)
+_NOTE_POINT = (0.15, 0.5)
+_SHAPE_POINT = (0.55, 0.5)
 _MOVE_TEST_POINT = (0.85, 0.15)
+_DOCK_TOP_MARGIN = 40  # half the tools row plus the card's padding and a gap
+
+
+def assert_clear_of_dock(client, point):
+    """Points stay in the top half: the dock stacks to three rows at this window's pane width.
+    A tap under the floating dock lands on the dock, not the canvas, and
+    reads later as a note field or a shape that never appeared.
+    """
+    tools = next((n for n in client.nodes() if n["t"].startswith(L.ERASER_TOOL)), None)
+    if tools and point[1] >= tools["y"] - _DOCK_TOP_MARGIN:
+        raise AssertionError(
+            f"{client.name}: the tap at y={point[1]:.0f} is under the dock "
+            f"(its tools row is at y={tools['y']:.0f})")
 
 
 def place_note_and_see_it_live(a, b, admin_api, channel_id):
@@ -40,6 +53,7 @@ def place_note_and_see_it_live(a, b, admin_api, channel_id):
     """
     point = at_frac(a.canvas_rect(), *_NOTE_POINT)
     a.click(L.NOTE_TOOL)
+    assert_clear_of_dock(a, point)
     a.gestures(True)
     a.drag([point])
     a.gestures(False)
@@ -62,6 +76,7 @@ def place_shape_and_see_it_live(a, b, admin_api, channel_id):
     """
     point = at_frac(a.canvas_rect(), *_SHAPE_POINT)
     a.click(L.SHAPE_TOOL)
+    assert_clear_of_dock(a, point)
     a.gestures(True)
     a.drag([point])
     a.gestures(False)
