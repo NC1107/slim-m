@@ -34,6 +34,7 @@ mod auth;
 mod bot_commands;
 mod bot_ui;
 mod bots;
+pub mod build_id;
 mod canvas;
 mod canvas_media_slots;
 mod canvas_ops;
@@ -286,6 +287,10 @@ async fn healthz(State(state): State<AppState>) -> Result<&'static str, StatusEr
 struct Version {
     name: &'static str,
     version: &'static str,
+    /// Short git SHA of the build, so two deploys of one version differ.
+    /// Absent when the build was not given one, never a placeholder.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    build_id: Option<String>,
     protocol: u32,
     push_enabled: bool,
     /// Whether creating an account here needs an invite code. Onboarding
@@ -397,6 +402,7 @@ async fn version(
     Ok(Json(Version {
         name: "slim-m",
         version: env!("CARGO_PKG_VERSION"),
+        build_id: build_id::current(),
         protocol: PROTOCOL_VERSION,
         push_enabled: state.push.is_enabled(),
         invite_required: state.store.join_policy().await? == JoinPolicy::Invite,

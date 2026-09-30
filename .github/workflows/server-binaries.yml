@@ -51,6 +51,8 @@ jobs:
           target: ${{ matrix.target }}
 
       - name: build static binary
+        env:
+          SLIMM_BUILD_ID: ${{ github.sha }}
         run: cargo build --locked --release --target ${{ matrix.target }} --bin slimm-server
 
       - name: stage binary

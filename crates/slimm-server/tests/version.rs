@@ -174,3 +174,20 @@ async fn version_reads_a_blank_floor_as_no_floor() {
 
     unsafe { std::env::remove_var("SLIMM_MIN_CLIENT_VERSION") };
 }
+
+/// The build id is baked in at compile time, so this asserts the wire agrees
+/// with whatever this build was given: present and short when it was set,
+/// absent (never null or a placeholder) when it was not.
+#[tokio::test]
+async fn version_reports_the_build_id_this_build_was_given() {
+    let (store, _guard) = new_store().await;
+    let body = get_version(app(store, PushSender::disabled(), GifSearch::disabled())).await;
+
+    match slimm_server::http::build_id::from_raw(option_env!("SLIMM_BUILD_ID")) {
+        Some(id) => assert_eq!(body["build_id"], id.as_str()),
+        None => assert!(
+            body.get("build_id").is_none(),
+            "unset must be absent: {body}"
+        ),
+    }
+}

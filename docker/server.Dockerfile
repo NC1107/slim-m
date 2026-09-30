@@ -19,6 +19,8 @@ RUN apk add --no-cache musl-dev
 ENV SQLX_OFFLINE=true
 WORKDIR /build
 COPY . .
+# Reported by /version; empty leaves the field off. Declared late so it only busts the build layer.
+ARG SLIMM_BUILD_ID=
 RUN cargo build --locked --release --bin slimm-server \
     && mkdir -p /out/data \
     && cp target/release/slimm-server /out/slimm-server

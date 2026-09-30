@@ -31,6 +31,7 @@ class Version {
     this.capabilities,
     this.identity,
     this.minClientVersion,
+    this.buildId,
   });
 
   final String name;
@@ -82,6 +83,10 @@ class Version {
   /// see decision 0025.
   final String? minClientVersion;
 
+  /// Short git SHA the server was built from. Null for a build without one or
+  /// a server older than this field.
+  final String? buildId;
+
   /// Whether this server offers reporting and blocking at all.
   SafetyTools get safetyTools => capabilities == null
       ? SafetyTools.unknown
@@ -121,5 +126,6 @@ class Version {
             ? null
             : ServerIdentity.fromJson(json['identity'] as Map<String, dynamic>),
         minClientVersion: json['min_client_version'] as String?,
+        buildId: json['build_id'] as String?,
       );
 }
