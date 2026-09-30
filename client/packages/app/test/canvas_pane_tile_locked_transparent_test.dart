@@ -65,7 +65,7 @@ void main() {
     await tester.tap(find.bySemanticsLabel('Shape'));
     await tester.pump();
     var gesture = await tester.startGesture(
-      screenFor(tester, const Offset(500, 500)),
+      screenFor(tester, const Offset(500, 380)),
     );
     await gesture.up();
     await tester.pumpAndSettle();
@@ -76,7 +76,7 @@ void main() {
     // Drag the shape from its own centre onto the tile's own centre.
     final tileCenter = tester.getCenter(find.byKey(_tileKey));
     gesture = await tester.startGesture(
-      screenFor(tester, const Offset(500, 500)),
+      screenFor(tester, const Offset(500, 380)),
     );
     await gesture.moveTo(tileCenter);
     await gesture.up();

@@ -40,7 +40,6 @@ void main() {
       'Eraser',
       'Undo',
       'More canvas actions',
-      'Close canvas',
     ]) {
       expect(
         find.bySemanticsLabel(label),
@@ -60,13 +59,7 @@ void main() {
       wrapCanvasToolsRow(buildCanvasToolsRow(canManage: true, canUndo: true)),
     );
 
-    for (final tooltip in [
-      'Pen',
-      'Note',
-      'Undo',
-      'More canvas actions',
-      'Close canvas',
-    ]) {
+    for (final tooltip in ['Pen', 'Note', 'Undo', 'More canvas actions']) {
       expect(
         find.byTooltip(tooltip),
         findsOneWidget,

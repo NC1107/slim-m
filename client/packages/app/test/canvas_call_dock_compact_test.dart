@@ -63,7 +63,7 @@ void main() {
       'without shrinking either row below the touch floor', (tester) async {
     final s = await _pumpCallAndCanvas(tester, width: 390);
 
-    expect(s.container.read(bottomDockReservationProvider), 115);
+    expect(s.container.read(bottomDockReservationProvider), 123);
 
     await teardown(tester, s.container, s.db);
   });

@@ -73,7 +73,7 @@ void main() {
     await tester.pump();
     expect(container.read(canvasOpenProvider), 'c1');
 
-    await tester.tap(find.bySemanticsLabel('Open canvas'));
+    await tester.tap(find.bySemanticsLabel('Close canvas'));
     await tester.pump();
     expect(container.read(canvasOpenProvider), isNull);
   });

@@ -39,7 +39,7 @@ void main() {
     await tester.pump();
     expect(container.read(canvasOpenProvider), 'c1');
 
-    await tester.tap(find.bySemanticsLabel('Open canvas'));
+    await tester.tap(find.bySemanticsLabel('Close canvas'));
     await tester.pump();
     expect(container.read(canvasOpenProvider), isNull);
   });
@@ -91,7 +91,7 @@ void main() {
         tester.widget<FloatingDockCard>(find.byType(FloatingDockCard)).rows,
         hasLength(1),
         reason:
-            'mic, camera, share, leave and the toggle all fit at 320 '
+            'mic, camera, share, leave, the divider and the toggle all fit at 320 '
             'with the camera off; folding here would be needless crowding '
             'in the other direction',
       );
@@ -140,8 +140,8 @@ void main() {
     'the fold threshold is exact: one pixel narrower than what the camera-off '
     'row needs folds it, one pixel is not enough to avoid needing to',
     (tester) async {
-      // 5 controls at 52dp (44dp plus AppFocusRing's 8dp), 4 gaps of 8dp, plus the card's 24dp padding and 2dp border: 260+32+24+2.
-      const exact = 318.0;
+      // 5 controls at 52dp (44dp plus AppFocusRing's 8dp), 4 gaps of 8dp, plus the card's 24dp padding and 2dp border: 260+32+1+24+2, the 1 being what the divider before leave adds over a plain gap.
+      const exact = 319.0;
       await pumpVoiceCallDock(
         tester,
         _connected,

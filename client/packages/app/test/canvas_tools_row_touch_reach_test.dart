@@ -27,7 +27,7 @@ void main() {
       await tester.pumpWidget(
         wrapCanvasToolsRow(
           buildCanvasToolsRow(onToolChanged: (tool) => chosen = tool),
-          width: 320,
+          width: 270,
           touch: true,
         ),
       );
@@ -61,7 +61,7 @@ void main() {
     'reveal',
     (tester) async {
       await tester.pumpWidget(
-        wrapCanvasToolsRow(buildCanvasToolsRow(), width: 320, touch: true),
+        wrapCanvasToolsRow(buildCanvasToolsRow(), width: 270, touch: true),
       );
       await tester.pumpAndSettle();
       expect(find.byKey(canvasToolsLeadingFadeKey), findsNothing);

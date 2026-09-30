@@ -17,15 +17,13 @@
 /// reads that off `voiceControllerProvider` for the presence layer, and
 /// passes the same answer here.
 ///
-/// **Primary versus secondary, decided rather than guessed.** The four call
-/// controls (mic, camera, share, leave) are drawn first and never scroll -
-/// they are the controls a hand reaches for without looking, and a call
-/// nobody can mute or leave is the one failure this dock must never produce.
-/// The canvas's five tools keep their own proven scroll-and-fade strip
-/// (`CanvasToolsRow`) rather than folding behind a menu, the same "every
-/// tool a same-level, one-tap button" reasoning decision 0004 already
-/// settled; undo, the overflow menu and close are pinned outside that scroll
-/// so they are never the thing clipped.
+/// **One order, always (decision 0047): tools, edit, call, leave.** The call
+/// controls never scroll - a call nobody can mute or leave is the one failure
+/// this dock must never produce - and leave sits alone after a divider at the
+/// far edge. The canvas toggle sits after share in the call group, so it is in
+/// the same slot whether the canvas is open or not. The canvas's five tools
+/// keep their own scroll-and-fade strip (decision 0004), which only scrolls
+/// when even the hugged width does not fit.
 ///
 /// **Phone width stacks two rows in one card; a wide pane draws one.** Both
 /// rows already fit their own width alone (four or five 44dp controls, or a
@@ -48,10 +46,12 @@ import 'package:slimm_design_system/design_system.dart';
 import 'package:slimm_rtc/rtc.dart';
 import 'package:slimm_voice_canvas/voice_canvas.dart';
 
+import '../call_leave_button.dart';
 import '../voice_call_controls.dart';
 import '../../providers/voice_controller.dart';
 import '../../providers/voice_flags.dart';
 import '../../widgets/floating_dock_card.dart';
+import 'canvas_dock_toggle.dart';
 import 'canvas_pen_style.dart';
 import 'canvas_tools_row.dart';
 
@@ -177,44 +177,71 @@ class CanvasCallDock extends StatelessWidget {
     final call = this.call;
     final canvas = this.canvas;
     if (call == null) {
-      return FloatingDockCard(rows: [_ToolsRow(canvas: canvas!)]);
+      return FloatingDockCard(
+        rows: [
+          Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Flexible(child: _ToolsRow(canvas: canvas!)),
+              ..._toggleAfterGap(canvas),
+            ],
+          ),
+        ],
+      );
     }
-    final callRow = CallControls(
-      controller: call.controller,
-      voice: call.voice,
-    );
+    final leave = CallLeaveButton(controller: call.controller);
     if (canvas == null) {
-      return FloatingDockCard(rows: [callRow]);
+      return FloatingDockCard(rows: [_callRow(call)], trailing: leave);
     }
-    final tokens = Theme.of(context).extension<AppTokens>()!;
     return LayoutBuilder(
       builder: (context, constraints) {
         final oneRow = constraints.maxWidth >= kCompactWidth;
         return FloatingDockCard(
+          trailing: leave,
           rows: oneRow
               ? [
                   Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      callRow,
-                      const SizedBox(width: AppSpacing.s8),
-                      SizedBox(
-                        height: AppSpacing.s24,
-                        child: VerticalDivider(
-                          width: 1,
-                          thickness: 1,
-                          color: tokens.borderSubtle,
-                        ),
-                      ),
-                      const SizedBox(width: AppSpacing.s8),
                       Flexible(child: _ToolsRow(canvas: canvas)),
+                      const SizedBox(width: AppSpacing.s8),
+                      const DockVerticalDivider(),
+                      const SizedBox(width: AppSpacing.s8),
+                      _callRow(call, toggle: _toggle(canvas)),
                     ],
                   ),
                 ]
-              : [Center(child: callRow), _ToolsRow(canvas: canvas)],
+              : [
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Flexible(child: _ToolsRow(canvas: canvas)),
+                      ..._toggleAfterGap(canvas),
+                    ],
+                  ),
+                  _callRow(call),
+                ],
         );
       },
     );
+  }
+
+  static Widget _callRow(CallDockData call, {Widget? toggle}) => CallControls(
+    controller: call.controller,
+    voice: call.voice,
+    showLeave: false,
+    extraControl: toggle,
+  );
+
+  static Widget? _toggle(CanvasDockData canvas) => canvas.fullscreen
+      ? null
+      : CanvasDockToggle(open: true, onPressed: canvas.onClose);
+
+  static List<Widget> _toggleAfterGap(CanvasDockData canvas) {
+    final toggle = _toggle(canvas);
+    return [
+      if (toggle != null) ...[const SizedBox(width: AppSpacing.s8), toggle],
+    ];
   }
 }
 
@@ -256,7 +283,6 @@ class _ToolsRow extends StatelessWidget {
           onShapeKindChanged: canvas.onShapeKindChanged,
           pen: canvas.pen,
           onPenChanged: canvas.onPenChanged,
-          onClose: canvas.onClose,
           hasSelfBubble: canvas.hasSelfBubble,
           selfBubbleHidden: canvas.selfBubbleHidden,
           onToggleSelfBubbleHidden: canvas.onToggleSelfBubbleHidden,

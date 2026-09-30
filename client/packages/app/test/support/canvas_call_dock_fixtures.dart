@@ -46,6 +46,9 @@ pumpCanvasCallDock(
   CanvasDockData? canvas,
   double width = 800,
   bool? touch,
+  bool hug = false,
+  Brightness brightness = Brightness.dark,
+  Key? boundaryKey,
 }) async {
   final session = withCall ? FakeSession() : null;
   final container = ProviderContainer(
@@ -70,18 +73,26 @@ pumpCanvasCallDock(
   await tester.pumpWidget(
     UncontrolledProviderScope(
       container: container,
-      child: MaterialApp(
-        theme: buildTheme(Brightness.dark, AppTokens.dark),
-        home: Scaffold(
-          // Bottom-aligned: see `canvas_tools_row_fixtures.dart`'s own doc for why this dock needs to sit there.
-          body: Align(
-            alignment: Alignment.bottomCenter,
-            child: SizedBox(
-              width: width,
-              // A bare SizedBox does not force touch density; see the same doc.
-              child: touch == null
-                  ? dock
-                  : AppTouchTargets(enabled: touch, child: dock),
+      child: RepaintBoundary(
+        key: boundaryKey,
+        child: MaterialApp(
+          theme: buildTheme(
+            brightness,
+            brightness == Brightness.dark ? AppTokens.dark : AppTokens.light,
+          ),
+          home: Scaffold(
+            // Bottom-aligned: see `canvas_tools_row_fixtures.dart`'s own doc for why this dock needs to sit there.
+            body: Align(
+              alignment: Alignment.bottomCenter,
+              child: ConstrainedBox(
+                constraints: hug
+                    ? BoxConstraints(maxWidth: width)
+                    : BoxConstraints.tightFor(width: width),
+                // A bare SizedBox does not force touch density; see the same doc.
+                child: touch == null
+                    ? dock
+                    : AppTouchTargets(enabled: touch, child: dock),
+              ),
             ),
           ),
         ),
@@ -110,7 +121,6 @@ CanvasDockData buildCanvasDockData({
   VoidCallback? onToggleFullscreen,
 }) {
   final row = buildCanvasToolsRow(
-    onClose: onClose,
     activityLogOpen: activityLogOpen,
     onUndo: onUndo,
     canUndo: canUndo,
@@ -142,7 +152,7 @@ CanvasDockData buildCanvasDockData({
     onShapeKindChanged: row.onShapeKindChanged,
     pen: row.pen,
     onPenChanged: row.onPenChanged,
-    onClose: row.onClose,
+    onClose: onClose ?? () {},
     hasSelfBubble: row.hasSelfBubble,
     selfBubbleHidden: row.selfBubbleHidden,
     onToggleSelfBubbleHidden: row.onToggleSelfBubbleHidden,

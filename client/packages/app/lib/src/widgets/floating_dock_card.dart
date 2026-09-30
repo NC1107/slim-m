@@ -86,14 +86,26 @@ import 'package:slimm_design_system/design_system.dart';
 /// single [Column] here keeps the divider between them in one place instead
 /// of every caller redrawing it.
 class FloatingDockCard extends StatelessWidget {
-  const FloatingDockCard({super.key, required this.rows});
+  const FloatingDockCard({super.key, required this.rows, this.trailing});
 
   final List<Widget> rows;
+
+  /// Sits at the end of the last row, after a divider, so the far edge of
+  /// the card is always the same control (leave, in a call).
+  final Widget? trailing;
 
   @override
   Widget build(BuildContext context) {
     final tokens = Theme.of(context).extension<AppTokens>()!;
     final divided = <Widget>[];
+    final trailing = this.trailing;
+    final rows = [
+      for (var i = 0; i < this.rows.length; i++)
+        if (trailing != null && i == this.rows.length - 1)
+          _withTrailing(this.rows[i], trailing)
+        else
+          this.rows[i],
+    ];
     for (var i = 0; i < rows.length; i++) {
       if (i > 0) {
         divided.add(
@@ -122,8 +134,38 @@ class FloatingDockCard extends StatelessWidget {
           border: Border.all(color: tokens.borderSubtle),
           boxShadow: AppShadows.canvasTile,
         ),
-        child: Column(mainAxisSize: MainAxisSize.min, children: divided),
+        child: AnimatedSize(
+          duration: AppMotion.reducedSize(context, AppMotion.base),
+          curve: AppMotion.entrance,
+          child: Column(mainAxisSize: MainAxisSize.min, children: divided),
+        ),
       ),
     );
   }
+
+  static Widget _withTrailing(Widget row, Widget trailing) => Row(
+    mainAxisSize: MainAxisSize.min,
+    children: [
+      Flexible(child: row),
+      const SizedBox(width: AppSpacing.s4),
+      const DockVerticalDivider(),
+      const SizedBox(width: AppSpacing.s4),
+      trailing,
+    ],
+  );
+}
+
+/// The 1x24 hairline between groups of controls in one row.
+class DockVerticalDivider extends StatelessWidget {
+  const DockVerticalDivider({super.key});
+
+  @override
+  Widget build(BuildContext context) => SizedBox(
+    height: AppSpacing.s24,
+    child: VerticalDivider(
+      width: 1,
+      thickness: 1,
+      color: Theme.of(context).extension<AppTokens>()!.borderSubtle,
+    ),
+  );
 }
