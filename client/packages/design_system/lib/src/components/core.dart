@@ -10,6 +10,7 @@ export 'core/brand_lattice.dart';
 export 'core/brand_mark.dart';
 export 'core/breathing_halo.dart';
 export 'core/button.dart';
+export 'core/control_with_options.dart';
 export 'core/icon_button.dart';
 export 'core/kbd.dart';
 export 'core/speaking_ring.dart';

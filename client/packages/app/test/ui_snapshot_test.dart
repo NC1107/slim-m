@@ -392,6 +392,7 @@ void main() {
 
     // Every other voice and DM-call state: registered from voice_snapshot_scenarios.dart, for this file's own line budget.
     registerVoiceCallVariants(theme, renderSurface);
+    registerVoiceShareOptions(theme, renderSurface);
     registerVoiceJoinPreview(theme, renderSurface);
     registerVoiceRejoin(theme, renderSurface);
     registerWhoIsHere(theme, renderSurface);

@@ -51,6 +51,7 @@ import '../providers/voice_settings_controller.dart'
     show voiceSettingsControllerProvider;
 import '../widgets/audio_output_sheet.dart';
 import '../widgets/camera_source_sheet.dart';
+import '../widgets/control_options_menu.dart';
 import '../widgets/screen_source_sheet.dart';
 import 'call_dock_button.dart';
 
@@ -126,6 +127,9 @@ class _CallControlsState extends ConsumerState<CallControls> {
   @override
   Widget build(BuildContext context) {
     final voice = widget.voice;
+    final shareOptions = _shareOptions(context);
+    final pairedAtTouch =
+        shareOptions.isNotEmpty && AppTouchTargets.of(context);
     // mainAxisSize.min: this row sizes to its own content now that it has no
     // full-width bar to fill, so whatever floating card embeds it - alone or
     // beside a canvas's own controls - can size itself to match.
@@ -177,29 +181,24 @@ class _CallControlsState extends ConsumerState<CallControls> {
             },
           ),
         ],
-        const SizedBox(width: AppSpacing.s8),
-        CallDockButton(
-          icon: AppIcons.screenShare,
-          tooltip: _shareTooltip(
-            voice,
-            canSwitch: widget.controller.screenShareNeedsSource,
-          ),
+        // At touch density the pair's leading half sits flush right in its hit box, so the gap before it is widened to keep the row's rhythm.
+        SizedBox(width: pairedAtTouch ? AppSpacing.s16 : AppSpacing.s8),
+        ControlOptionsMenu(
           active: voice.screenSharing,
-          // Pending is its own look, never the active one: the lit
-          // button over a share nobody could see was the whole bug.
-          pending: voice.awaitingBroadcast,
-          onPressed: () {
-            if (_shareRequestInFlight) return;
-            unawaited(_share(context));
-          },
-          // report 2's own "change source" route: only while sharing, on a platform with a source to switch between.
-          onLongPress:
-              voice.screenSharing && widget.controller.screenShareNeedsSource
-              ? () {
-                  if (_shareRequestInFlight) return;
-                  unawaited(_changeSource(context));
-                }
-              : null,
+          optionsLabel: 'Screen share options',
+          options: shareOptions,
+          child: CallDockButton(
+            icon: AppIcons.screenShare,
+            tooltip: _shareTooltip(voice),
+            active: voice.screenSharing,
+            // Pending is its own look, never the active one: the lit
+            // button over a share nobody could see was the whole bug.
+            pending: voice.awaitingBroadcast,
+            onPressed: () {
+              if (_shareRequestInFlight) return;
+              unawaited(_share(context));
+            },
+          ),
         ),
         const SizedBox(width: AppSpacing.s8),
         CallDockButton(
@@ -219,8 +218,8 @@ class _CallControlsState extends ConsumerState<CallControls> {
     );
   }
 
-  /// Mirrors each button's own [onPressed]/[onLongPress] above, so a
-  /// shortcut can never do something the matching button could not.
+  /// Mirrors each button's own `onPressed` above, so a shortcut can never do
+  /// something the matching button could not.
   Map<ShortcutActivator, VoidCallback> _shortcutBindings(BuildContext context) {
     final muteKey = activatorFor(AppAction.toggleMuteCall);
     final cameraKey = activatorFor(AppAction.toggleCameraCall);
@@ -239,19 +238,43 @@ class _CallControlsState extends ConsumerState<CallControls> {
     };
   }
 
-  /// [canSwitch] names the long-press route while sharing: a hidden gesture
-  /// nobody is told about is not a way to change source.
-  static String _shareTooltip(VoiceFlags voice, {required bool canSwitch}) {
+  static String _shareTooltip(VoiceFlags voice) {
     final shortcut = _shortcutSuffix(AppAction.toggleShareCall);
     if (voice.screenSharing) {
-      return canSwitch
-          ? 'Stop sharing (hold to change source$shortcut)'
-          : 'Stop sharing$shortcut';
+      return 'Stop sharing$shortcut';
     }
     if (voice.awaitingBroadcast) {
       return 'Waiting for you to start the broadcast. Tap to cancel.';
     }
     return 'Share a screen$shortcut';
+  }
+
+  /// Only while sharing on a platform with a source to switch between; every
+  /// entry mirrors something a press or a shortcut could already do.
+  List<ControlOption> _shareOptions(BuildContext context) {
+    if (!widget.voice.screenSharing ||
+        !widget.controller.screenShareNeedsSource) {
+      return const [];
+    }
+    return [
+      ControlOption(
+        label: 'Switch screen...',
+        icon: AppIcons.screenShareSwitch,
+        onSelected: () {
+          if (_shareRequestInFlight) return;
+          unawaited(_changeSource(context));
+        },
+      ),
+      ControlOption(
+        label: 'Stop sharing',
+        icon: AppIcons.screenShareStop,
+        tone: AppMenuItemTone.danger,
+        onSelected: () {
+          if (_shareRequestInFlight) return;
+          unawaited(_share(context));
+        },
+      ),
+    ];
   }
 
   /// `' (Ctrl+Shift+S)'`, or empty on mobile/touch or once unbound - a hint
@@ -269,9 +292,9 @@ class _CallControlsState extends ConsumerState<CallControls> {
     final voice = widget.voice;
     // Cancelling a request that never became a broadcast goes down the same
     // path as stopping a live one, which is also what ends the recording.
-    // A live share stops here too - [_changeSource] is the long-press route
-    // to switching source instead, so this bare tap never has to guess
-    // which of the two a person meant.
+    // A live share stops here too - [_changeSource] is the options menu's
+    // route to switching source, so this bare tap never has to guess which
+    // of the two a person meant.
     if (voice.screenSharing || voice.awaitingBroadcast) {
       await widget.controller.setScreenShare(false);
       return;
@@ -281,9 +304,9 @@ class _CallControlsState extends ConsumerState<CallControls> {
 
   /// Report 2 in the backlog channel, in the owner's own words: "after
   /// choosing a screen share screen there is never an option to choose a
-  /// different one while in the same call" - reached by a long press (or a
-  /// right-click) on the share button while it is already active, since a
-  /// bare tap there is already spoken for by stop. Stops the running share
+  /// different one while in the same call" - reached from the share button's
+  /// options caret (or a long press) while it is active, since a bare tap
+  /// there is already spoken for by stop. Stops the running share
   /// outright before asking for a new source, rather than trusting
   /// [VoiceSession.setScreenShareEnabled] to hot-swap a capture already in
   /// flight - the same two-step "stop, then start" a person switching
