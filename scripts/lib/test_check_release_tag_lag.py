@@ -33,10 +33,12 @@ class CheckReleaseTagLagTest(unittest.TestCase):
             ["git", *args], cwd=self.repo, check=True,
             capture_output=True, text=True)
 
-    def _commit_manifest(self, name, version, at_epoch):
-        (self.repo / name).write_text(
-            json.dumps({"crates/slimm-server": version}
-                       if "server" in name else {"client": version}))
+    def _commit_manifest(self, name, version, at_epoch, schema=None):
+        body = ({"crates/slimm-server": version}
+                if "server" in name else {"client": version})
+        if schema is not None:
+            body["."] = schema
+        (self.repo / name).write_text(json.dumps(body))
         self._git("add", name)
         env_args = [
             f"GIT_AUTHOR_DATE=@{at_epoch} +0000",
@@ -109,6 +111,23 @@ class CheckReleaseTagLagTest(unittest.TestCase):
         result = self._run(now_epoch=1000 + 901, grace_seconds=900)
         self.assertEqual(result.returncode, 1)
         self.assertIn("server-v0.33.1 was never cut", result.stdout)
+
+    def test_a_missing_schema_tag_is_reported_on_its_own(self):
+        self._commit_manifest(".release-please-manifest.server.json",
+                               "0.76.0", 1000, schema="0.76.0")
+        self._tag("server-v0.76.0")
+        result = self._run(now_epoch=1000 + 901, grace_seconds=900)
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("schema-v0.76.0 was never cut", result.stdout)
+        self.assertNotIn("server-v0.76.0 was never cut", result.stdout)
+
+    def test_a_present_schema_tag_is_fine(self):
+        self._commit_manifest(".release-please-manifest.server.json",
+                               "0.76.0", 1000, schema="0.76.0")
+        self._tag("server-v0.76.0")
+        self._tag("schema-v0.76.0")
+        result = self._run(now_epoch=1000 + 901, grace_seconds=900)
+        self.assertEqual(result.returncode, 0)
 
 
 def _env():

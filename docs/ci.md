@@ -479,7 +479,7 @@ What was checked, not assumed:
 
 Known limit: the manifest already reads `.` = 0.74.0 with no `schema-v0.74.0` tag, so the first release after this lands still walks the window once and anchors from then on.
 Pushing `schema-v0.74.0` at the `server-v0.74.0` commit anchors it immediately; that is a new tag, not a moved one.
-`release-tag-watchdog` checks the server and client manifests only, so a missing schema tag is not reported.
+`release-tag-watchdog` also checks the schema tag against the `.` key of the server manifest, so a missing `schema-v<version>` is reported like a missing server or client tag.
 
 That same `skip-github-release` history is why the server config carries `commit-search-depth`.
 release-please bounds its walk back through main by the releases it can find, and a package that publishes no release gives it nothing to find: the run logs `looking for tagName: schema-v<version>`, then `could not find release`, and walks to the default depth of 500 merge commits every time.

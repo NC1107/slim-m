@@ -23,10 +23,15 @@ NOW_EPOCH="${NOW_EPOCH:-$(date +%s)}"
 stuck=0
 
 check_package() {
-  local manifest="$1" prefix="$2"
+  local manifest="$1" prefix="$2" key="${3:-}"
   [[ -f "$manifest" ]] || return 0
   local version
-  version="$(jq -r 'to_entries[0].value' "$manifest")"
+  if [[ -n "$key" ]]; then
+    version="$(jq -r --arg key "$key" '.[$key] // empty' "$manifest")"
+    [[ -n "$version" ]] || return 0
+  else
+    version="$(jq -r 'to_entries[0].value' "$manifest")"
+  fi
   local tag="${prefix}-v${version}"
   if git rev-parse -q --verify "refs/tags/${tag}" >/dev/null; then
     return 0
@@ -48,5 +53,7 @@ check_package() {
 
 check_package .release-please-manifest.server.json server
 check_package .release-please-manifest.client.json client
+# The schema package shares the server manifest under the repo-root key.
+check_package .release-please-manifest.server.json schema .
 
 exit "$stuck"
