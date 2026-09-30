@@ -30,6 +30,15 @@ api.PresenceActivity activityFromNowPlaying(NowPlaying playing) {
   );
 }
 
+/// The platform's game source, or null where there is none. Overridden in
+/// tests with a fake.
+final gameSourceProvider = Provider<GameSource?>((ref) => createGameSource());
+
+api.PresenceActivity activityFromGame(RunningGame game) => api.PresenceActivity(
+  kind: api.ActivityKind.playing,
+  title: capActivityText(game.name),
+);
+
 String capActivityText(String text) =>
     String.fromCharCodes(text.runes.take(api.PresenceActivity.maxTextChars));
 
@@ -73,10 +82,24 @@ final _listeningFeed = ActivityFeed(
       ),
 );
 
+final _gameFeed = ActivityFeed(
+  label: 'Show the game I am playing',
+  description:
+      'Checks what is running against the list of games below and nothing '
+      'else. A program that is not on the list is never reported, stored or '
+      'logged. It clears when the game quits.',
+  enabled: shareGameProvider,
+  available: gameSourceProvider.select((source) => source != null),
+  open: (ref) => ref
+      .read(gameSourceProvider)!
+      .watch()
+      .map((game) => game == null ? null : activityFromGame(game)),
+);
+
 /// In priority order: when two sources both report something, the first
 /// one is what others see.
 final activityFeedsProvider = Provider<List<ActivityFeed>>(
-  (ref) => [_listeningFeed],
+  (ref) => [_listeningFeed, _gameFeed],
 );
 
 /// Feeds this device can actually run, for Settings.
