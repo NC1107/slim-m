@@ -474,6 +474,24 @@ Every `run` call is held to resource limits, taken from the manifest's `runtime.
 | `wall_ms` | 1000 | wall-clock deadline; a command is a synchronous request-response, not a background job |
 | `fuel` | 50,000,000 | roughly one unit per executed instruction, so this bounds a runaway loop |
 
+What the default fuel buys for text processing depends on how many times the module walks the input, not on how big the input is.
+Measured on a release wasm built with `wasm32-unknown-unknown` (`opt-level = "s"`), ASCII input, default 50,000,000 fuel, the largest input that still completes is roughly:
+
+| passes over the input | `.chars().count()` | `.chars().filter(..).count()` | `.chars().filter(..).map(..).collect::<String>()` |
+| --- | --- | --- | --- |
+| 1 | 14.1 MB | 950 KB | 580 KB |
+| 3 | 6.4 MB | 320 KB | 195 KB |
+| 8 | 2.7 MB | 120 KB | 73 KB |
+
+Each row counts the UTF-8 validation of the input as one pass, so a module that parses its request is never at zero.
+A pass that decodes characters and does a little work per character costs on the order of 50 fuel per input byte, and one that also builds a new string costs on the order of 90.
+Non-ASCII text costs more per byte, and a different toolchain or optimisation level will move all of these numbers, so treat them as an order of magnitude and measure your own module.
+
+The `code-block-runner` route accepts request bodies up to 256 KB, about three times what a few such passes can cover under the default.
+A module that walks the input more than a couple of times should raise `runtime.limits.fuel` in its manifest rather than expect the default to reach the body limit.
+The host caps a manifest at 2,000,000,000 fuel (`MAX_FUEL`), 40 times the default.
+`wall_ms` is capped at 10,000 (`MAX_WALL_MS`) and `memory_mb` at 256 (`MAX_MEMORY_MB`); fuel and wall-clock are independent limits and either one ends the run, so a large fuel budget also needs a wall deadline the run can finish inside.
+
 Set them higher in the manifest if your module genuinely needs it (Game of Life uses 64 MB / 2 s), but a shared row that rides fan-out is capped well below whatever a module can produce, so enormous output is truncated regardless.
 
 `capabilities` a module declares (`message.post`, `kv.store`, ...) are stored on install but **not yet enforced or granted**.
