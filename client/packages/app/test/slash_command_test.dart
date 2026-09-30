@@ -57,6 +57,8 @@ void main() {
         name: 'Roll',
       );
       expect(matchSlashCommand(const [_roll, other], '/roll 2d6'), isNull);
+      expect(clashingSlashKeyword(const [_roll, other], '/roll 2d6'), 'roll');
+      expect(clashingSlashKeyword(const [_roll], '/roll 2d6'), isNull);
     });
   });
 

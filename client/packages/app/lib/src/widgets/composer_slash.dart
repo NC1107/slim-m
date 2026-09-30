@@ -84,6 +84,13 @@ Future<bool> runComposedCommand({
 }) async {
   // An app wins its own keyword, so it is matched before the command run.
   final app = matchApp(apps, controller.text);
+  final clash = clashingSlashKeyword(commands, controller.text);
+  if (app == null && clash != null) {
+    fail(
+      'Two modules both provide /$clash, so it will not run. Disable one in the Dock.',
+    );
+    return true;
+  }
   final match = matchSlashCommand(commands, controller.text);
   if (app == null && match == null) return false;
   if (hasStagedFile) {
