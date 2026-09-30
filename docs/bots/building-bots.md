@@ -129,7 +129,7 @@ This is deployment-wide, not gated on `VIEW_CHANNEL`: every connected session re
 It carries only the id; call `GET /members` (or wait for your own roster cache to catch up) for the display name before you greet them.
 
 This is the event a greeter bot listens for.
-Post your welcome message from the handler rather than inferring a join from someone's first message or a presence frame - see `examples/bot-greeter` in [slim-bots](https://github.com/Slim-m-org/slim-bots).
+Post your welcome message from the handler rather than inferring a join from someone's first message or a presence frame - see `bots/greeter` in [slim-bots](https://github.com/Slim-m-org/slim-bots).
 
 ## Sending a message
 
@@ -302,11 +302,11 @@ That only applies to the token the bot still holds. If you revoked the bot's tok
 
 ## The templates
 
-[`bot-ping`](https://github.com/Slim-m-org/slim-bots/tree/main/bot-ping) in [slim-bots](https://github.com/Slim-m-org/slim-bots) is a working bot in one file: it answers `!ping` with `pong`.
+[`bots/ping`](https://github.com/Slim-m-org/slim-bots/tree/main/bots/ping) in [slim-bots](https://github.com/Slim-m-org/slim-bots) is a working bot in one file: it answers `!ping` with `pong`.
 
 ```bash
 pip install websockets
-SLIMM_URL=https://your.space SLIMM_BOT_TOKEN=slimbot_... python3 bot-ping/bot.py
+SLIMM_URL=https://your.space SLIMM_BOT_TOKEN=slimbot_... python3 bots/ping/bot.py
 ```
 
 It does the five things above and nothing else, so it is short enough to read in one sitting.
