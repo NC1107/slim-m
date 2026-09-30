@@ -1,0 +1,62 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT c.user_id AS \"user_id!: UserId\", c.device_name,\n                      c.client_kind, c.client_version,\n                      f.secret, f.last_step, f.failed_attempts, f.locked_until\n               FROM totp_challenges c\n               JOIN user_totp_factors f ON f.user_id = c.user_id\n               WHERE c.challenge_hash = ? AND c.used_at IS NULL AND c.expires_at > ?\n                 AND f.confirmed_at IS NOT NULL",
+  "describe": {
+    "columns": [
+      {
+        "name": "user_id!: UserId",
+        "ordinal": 0,
+        "type_info": "Blob"
+      },
+      {
+        "name": "device_name",
+        "ordinal": 1,
+        "type_info": "Text"
+      },
+      {
+        "name": "client_kind",
+        "ordinal": 2,
+        "type_info": "Text"
+      },
+      {
+        "name": "client_version",
+        "ordinal": 3,
+        "type_info": "Text"
+      },
+      {
+        "name": "secret",
+        "ordinal": 4,
+        "type_info": "Text"
+      },
+      {
+        "name": "last_step",
+        "ordinal": 5,
+        "type_info": "Integer"
+      },
+      {
+        "name": "failed_attempts",
+        "ordinal": 6,
+        "type_info": "Integer"
+      },
+      {
+        "name": "locked_until",
+        "ordinal": 7,
+        "type_info": "Integer"
+      }
+    ],
+    "parameters": {
+      "Right": 2
+    },
+    "nullable": [
+      false,
+      false,
+      true,
+      true,
+      false,
+      true,
+      false,
+      true
+    ]
+  },
+  "hash": "1a361b9e557497ff19aba206682c4a064c1e8306023507df490f321982c96ee8"
+}

@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "UPDATE totp_challenges SET used_at = ?\n             WHERE challenge_hash = ? AND used_at IS NULL AND expires_at > ?",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 3
+    },
+    "nullable": []
+  },
+  "hash": "29e959399d558383b360b021802cb7719bc16d32d1201db5f97358299e816170"
+}

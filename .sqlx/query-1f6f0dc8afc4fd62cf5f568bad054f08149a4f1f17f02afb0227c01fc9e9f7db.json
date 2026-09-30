@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "UPDATE totp_recovery_codes SET used_at = ?\n         WHERE code_hash = ? AND user_id = ? AND used_at IS NULL",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 3
+    },
+    "nullable": []
+  },
+  "hash": "1f6f0dc8afc4fd62cf5f568bad054f08149a4f1f17f02afb0227c01fc9e9f7db"
+}

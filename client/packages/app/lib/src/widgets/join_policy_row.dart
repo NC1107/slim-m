@@ -18,8 +18,10 @@ import '../providers/providers.dart';
 import 'run_guarded.dart';
 import 'settings_select_row.dart';
 
-final joinPolicyProvider = FutureProvider.autoDispose<api.JoinPolicy>(
-  (ref) => ref.watch(apiProvider).spaceJoinPolicy(),
+/// One read for the whole `/space/settings` object, shared with
+/// [TotpPolicyRow], so two rows on the same screen do not each fetch it.
+final spaceSettingsProvider = FutureProvider.autoDispose<api.SpaceSettings>(
+  (ref) => ref.watch(apiProvider).spaceSettings(),
 );
 
 const _choices = [
@@ -49,22 +51,22 @@ class _JoinPolicyRowState extends ConsumerState<JoinPolicyRow>
     setState(() => _saving = true);
     final ok = await guard(
       whatFailed: 'change who can join',
-      action: () => ref.read(apiProvider).setSpaceJoinPolicy(policy),
+      action: () => ref.read(apiProvider).setSpaceSettings(joinPolicy: policy),
     );
     if (!mounted) return;
     setState(() => _saving = false);
-    if (ok) ref.invalidate(joinPolicyProvider);
+    if (ok) ref.invalidate(spaceSettingsProvider);
   }
 
   @override
   Widget build(BuildContext context) {
     final tokens = Theme.of(context).extension<AppTokens>()!;
-    final policy = ref.watch(joinPolicyProvider);
+    final settings = ref.watch(spaceSettingsProvider);
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        policy.when(
+        settings.when(
           loading: () => const AppListRow(
             label: 'Who can join',
             leading: Icon(AppIcons.members),
@@ -77,20 +79,21 @@ class _JoinPolicyRowState extends ConsumerState<JoinPolicyRow>
             padding: const EdgeInsets.all(AppSpacing.s8),
             child: AppErrorState(
               message: 'Could not load who can join.',
-              onRetry: () => ref.invalidate(joinPolicyProvider),
+              onRetry: () => ref.invalidate(spaceSettingsProvider),
             ),
           ),
-          data: (current) => AppListRow(
+          data: (loaded) => AppListRow(
             label: 'Who can join',
             leading: const Icon(AppIcons.members),
-            meta: _labelFor(current),
-            semanticLabel: 'Who can join, currently ${_labelFor(current)}',
+            meta: _labelFor(loaded.joinPolicy),
+            semanticLabel:
+                'Who can join, currently ${_labelFor(loaded.joinPolicy)}',
             trailing: Icon(
               AppIcons.chevronRight,
               size: AppSizes.icon16,
               color: tokens.textSecondary,
             ),
-            onTap: _saving ? null : () => _open(context, current),
+            onTap: _saving ? null : () => _open(context, loaded.joinPolicy),
           ),
         ),
         if (actionError != null)

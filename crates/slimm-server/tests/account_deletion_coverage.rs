@@ -143,8 +143,11 @@ const DECISIONS: &[(&str, &str, OnDelete)] = &[
         "user_id",
         OnDelete::Keep("the removal is about them and outlives the account"),
     ),
+    ("totp_challenges", "user_id", OnDelete::Purge),
+    ("totp_recovery_codes", "user_id", OnDelete::Purge),
     ("user_blocks", "blocked_id", OnDelete::Purge),
     ("user_blocks", "blocker_id", OnDelete::Purge),
+    ("user_totp_factors", "user_id", OnDelete::Purge),
     ("user_notes", "author_id", OnDelete::Purge),
     (
         "user_notes",

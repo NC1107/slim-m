@@ -22,6 +22,19 @@ HMAC-SHA256 for the LiveKit access tokens, which are HS256 JWTs.
 They are only ever signed here, never verified, so none of the JWT verification pitfalls (`alg=none`, algorithm confusion) are in play, and a full JWT library would be carrying parsing code this never runs.
 It is the same RustCrypto family as `sha2`, and was already in the tree transitively.
 
+## totp-rs
+
+The RFC 6238 arithmetic for the optional second factor (decision 0048), rather than hand-rolling HOTP truncation over `hmac`.
+
+Default features are empty and only `otpauth` is turned on, for the `otpauth://` provisioning URI an authenticator app scans.
+`gen_secret` is deliberately left off: it would pull a second `rand` into the tree, and the secret is minted from the `rand_core` `OsRng` that already backs every other secret here.
+
+It is held at the 5.x line, and that hold is load-bearing rather than staleness.
+6.0 moved onto `hmac` 0.13 and `crypto-common` 0.2.x, which cannot co-exist with the `crypto-common` 0.2.0-rc.4 that `crypto_box`'s exact pin requires, for the same pre-release reason recorded under `ed25519-dalek` below: a pre-release satisfies nothing outside its own pre-release line.
+Cargo cannot resolve the two at all, so this is a hard conflict rather than a preference.
+5.x rides the `hmac`, `sha1` and `sha2` versions already in the tree and adds only `base32` and `constant_time_eq`.
+Revisit when `crypto_box` reaches a stable 0.10.
+
 ## crypto_box
 
 Anonymous sealed boxes (libsodium `crypto_box_seal`, X25519 plus XSalsa20Poly1305) for the content-free push envelope.
@@ -156,6 +169,13 @@ The Flatpak manifest (`packaging/flatpak/top.npcserver.slimm.yaml`) shipped this
 The portable Linux tarball does not bundle `libmpv.so.2`, and this was decided rather than overlooked: a fresh Ubuntu 24.04 does not start `slimm_app` until `libmpv2` is installed, but Debian and Ubuntu build `libmpv2` under GPL-2+ (its `debian/copyright` lists `GPL-2+` alongside LGPL-2.1+) and it depends on roughly fifty packages including ffmpeg, which are GPL in the same builds. Shipping those next to a PolyForm Noncommercial client is not licence-clean, and an LGPL-only mpv/ffmpeg build would mean compiling and maintaining our own copies for every distribution. Instead the tarball ships a `slim-m` launcher (`packaging/linux/slim-m`) that runs `ldd` over the binary and every plugin, and prints the distro-specific package to install (`libmpv2` on Debian/Ubuntu and openSUSE, `mpv-libs` on Fedora, `mpv` on Arch) before exiting. Checked on the four test VMs against the released 0.87.0 tarball: Ubuntu 24.04 without `libmpv2` prints the message and, once installed, opens the window; openSUSE Tumbleweed and Arch report `libmpv.so.2` as their only missing library, and Fedora already has everything. `libjvm.so` shows as unresolved on every distribution because `libdartjni.so` links it, and is ignored since the app does not use the JVM bridge on Linux.
 
 The web backend is different again: `media_kit` embeds a plain HTML `<video>` element there rather than `libmpv`, and that element cannot carry the app's own bearer-token header the way a native network request can - see `attachment_video_source.dart`'s own doc comment for how each platform actually gets authenticated bytes to the player.
+
+### `qr_flutter`, for the TOTP enrolment QR
+
+The enrolment secret has to be scannable, or every member types 32 base32 characters by hand (decision 0048 keeps the text as well, because on a desktop the text is the normal path).
+
+Chosen because it is the smallest thing that does the job: pure Dart painting over `qr`, no platform channel, no camera, no native build on any of the six targets, and BSD-3-Clause like most of this tree.
+It only *draws* a code; nothing here reads one, so none of the camera-permission and platform-plugin weight of a scanner package comes with it.
 
 ### `local_auth`, for the biometric app lock
 

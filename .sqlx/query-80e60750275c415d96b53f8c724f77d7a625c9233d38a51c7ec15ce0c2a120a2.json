@@ -1,0 +1,44 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT secret, confirmed_at, last_step, failed_attempts, locked_until\n             FROM user_totp_factors WHERE user_id = ?",
+  "describe": {
+    "columns": [
+      {
+        "name": "secret",
+        "ordinal": 0,
+        "type_info": "Text"
+      },
+      {
+        "name": "confirmed_at",
+        "ordinal": 1,
+        "type_info": "Integer"
+      },
+      {
+        "name": "last_step",
+        "ordinal": 2,
+        "type_info": "Integer"
+      },
+      {
+        "name": "failed_attempts",
+        "ordinal": 3,
+        "type_info": "Integer"
+      },
+      {
+        "name": "locked_until",
+        "ordinal": 4,
+        "type_info": "Integer"
+      }
+    ],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": [
+      false,
+      true,
+      true,
+      false,
+      true
+    ]
+  },
+  "hash": "80e60750275c415d96b53f8c724f77d7a625c9233d38a51c7ec15ce0c2a120a2"
+}
