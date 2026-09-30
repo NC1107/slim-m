@@ -6,7 +6,9 @@ use crate::http::error::ApiError;
 use crate::store::ModuleExtensionPoint;
 
 /// The keywords a module's `slash-command` extension points claim.
-pub(super) fn slash_keywords(points: &[ModuleExtensionPoint]) -> impl Iterator<Item = &str> {
+pub(in crate::http) fn slash_keywords(
+    points: &[ModuleExtensionPoint],
+) -> impl Iterator<Item = &str> {
     points
         .iter()
         .filter(|p| p.kind == "slash-command")
@@ -15,7 +17,7 @@ pub(super) fn slash_keywords(points: &[ModuleExtensionPoint]) -> impl Iterator<I
 
 /// Refuses when another enabled module already owns one of `keywords`, because
 /// the client would otherwise run whichever was listed first.
-pub(super) async fn ensure_slash_keywords_free<'a>(
+pub(in crate::http) async fn ensure_slash_keywords_free<'a>(
     state: &AppState,
     module_id: &str,
     keywords: impl Iterator<Item = &'a str>,

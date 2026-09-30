@@ -51,6 +51,7 @@ mod code_runs;
 mod device_client_info;
 mod dms;
 pub mod dock;
+mod dock_lifecycle;
 mod dock_sources;
 pub(crate) mod embeds;
 mod emoji;
