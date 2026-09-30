@@ -24,11 +24,13 @@ runs:
 
     - name: build linux release
       shell: bash
+      env:
+        SLIMM_SPOTIFY_CLIENT_ID: ${{ vars.SLIMM_SPOTIFY_CLIENT_ID }}
       working-directory: client/packages/app
       run: |
         flutter config --enable-linux-desktop
         dart pub get --enforce-lockfile
-        flutter build linux --release
+        flutter build linux --release --dart-define=SLIMM_SPOTIFY_CLIENT_ID="${SLIMM_SPOTIFY_CLIENT_ID}"
 
     - name: stage portable tarball
       shell: bash

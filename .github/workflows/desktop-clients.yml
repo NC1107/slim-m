@@ -72,7 +72,10 @@ jobs:
 
       - name: flutter build windows --release
         working-directory: client/packages/app
-        run: flutter build windows --release
+        shell: bash
+        env:
+          SLIMM_SPOTIFY_CLIENT_ID: ${{ vars.SLIMM_SPOTIFY_CLIENT_ID }}
+        run: flutter build windows --release --dart-define=SLIMM_SPOTIFY_CLIENT_ID="${SLIMM_SPOTIFY_CLIENT_ID}"
 
       # The launcher is what makes "which version runs" data instead of a path (decision 0041); the runner image's Go builds it.
       - name: test and build the launcher
@@ -138,7 +141,9 @@ jobs:
 
       - name: flutter build macos --release
         working-directory: client/packages/app
-        run: flutter build macos --release
+        env:
+          SLIMM_SPOTIFY_CLIENT_ID: ${{ vars.SLIMM_SPOTIFY_CLIENT_ID }}
+        run: flutter build macos --release --dart-define=SLIMM_SPOTIFY_CLIENT_ID="${SLIMM_SPOTIFY_CLIENT_ID}"
 
       - name: archive the app bundle
         # ditto rather than zip: it preserves the bundle's resource forks and symlinks, which a plain zip of a .app can mangle.

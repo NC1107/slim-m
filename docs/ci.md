@@ -838,6 +838,15 @@ It is compiled into the bundle (`--dart-define=SLIMM_WEB_BUILD`), written to `ve
 The Dockerfile fails the build if either rewrite did not match, since a silent miss would serve a stale bundle from a cache.
 The page polls `version.json` and shows a reload pill when the id differs (decision 0025).
 
+### Spotify client id
+
+Linking a Spotify account needs a client id, which is the compile-time define `SLIMM_SPOTIFY_CLIENT_ID`.
+The id is the repository variable of the same name, not a secret, and it is read as `vars.SLIMM_SPOTIFY_CLIENT_ID`.
+Every build a user installs passes it: the Android, iOS and Linux jobs in `release` and `main-builds`, the `linux-tarball` action (so `copr-catch-up` too), `desktop-clients`, and the web image through a build arg.
+The test builds (`client-ci`, `client-ios-ci`, `client-macos-ci`, `client-windows-ci`, `flatpak-ci`) do not, because nothing runs or ships what they produce.
+The release flatpak and rpm repackage the Linux bundle, so they carry whatever that build was given.
+An empty value, which is what a fork pull request or a self-hoster without the variable gets, compiles fine and leaves the feature off.
+
 nginx marks the entry points and `version.json` `no-cache`, `main.dart.js` immutable (it is only requested through its `?v=` URL) and everything else, `canvaskit/` included, revalidating on ETag because its URL carries no version, and answers at `/` and at `/app/`, because the live host's Traefik strips `/app` and a plain `docker run` does not.
 `--pwa-strategy=none` keeps Flutter's service worker from serving an old bundle after a redeploy.
 

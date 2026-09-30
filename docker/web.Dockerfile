@@ -9,6 +9,7 @@
 FROM debian:bookworm-slim@sha256:3783cc01769c7b2b1b83a5c5ad96c815348e28ed7da68e2e3687004faa906251 AS builder
 ARG FLUTTER_VERSION=3.47.0
 ARG SHA=dev
+ARG SLIMM_SPOTIFY_CLIENT_ID=
 RUN apt-get update \
     && apt-get install -y --no-install-recommends ca-certificates curl git unzip xz-utils \
     && rm -rf /var/lib/apt/lists/*
@@ -25,6 +26,7 @@ WORKDIR /build/client/packages/app
 RUN bash tool/fetch_web_assets.sh \
     && flutter build web --release --base-href /app/ --pwa-strategy=none \
         --dart-define=SLIMM_WEB_BUILD="${SHA}" \
+        --dart-define=SLIMM_SPOTIFY_CLIENT_ID="${SLIMM_SPOTIFY_CLIENT_ID}" \
     && sed -i "s|flutter_bootstrap.js|flutter_bootstrap.js?v=${SHA}|" build/web/index.html \
     && sed -i "s|\"main.dart.js\"|\"main.dart.js?v=${SHA}\"|" build/web/flutter_bootstrap.js \
     && printf '{"build":"%s"}\n' "${SHA}" > build/web/version.json \
