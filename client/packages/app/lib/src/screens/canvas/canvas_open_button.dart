@@ -28,7 +28,9 @@ library;
 import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:slimm_design_system/design_system.dart';
+import 'package:slimm_rtc/rtc.dart';
 
+import '../../providers/voice_flags.dart';
 import 'canvas_pane.dart';
 
 class CanvasOpenButton extends ConsumerWidget {
@@ -54,12 +56,18 @@ class CanvasOpenButton extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     if (!isVoice && !isDm) return const SizedBox.shrink();
     final open = ref.watch(canvasOpenProvider) == channelId;
+    // The call dock carries the canvas toggle while this channel's call is live.
+    final voice = ref.watch(voiceFlagsProvider);
+    final inCall =
+        voice.channelId == channelId &&
+        voice.state == VoiceSessionState.connected;
+    if (isVoice && inCall) return const SizedBox.shrink();
     return _button(ref, open);
   }
 
   Widget _button(WidgetRef ref, bool open) => AppIconButton(
     icon: AppIcons.canvas,
-    semanticLabel: 'Open canvas',
+    semanticLabel: open ? 'Close canvas' : 'Open canvas',
     active: open,
     onPressed: () =>
         ref.read(canvasOpenProvider.notifier).state = open ? null : channelId,

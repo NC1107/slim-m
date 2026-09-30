@@ -41,6 +41,8 @@ import '../providers/voice_controller.dart';
 import '../providers/voice_flags.dart';
 import '../widgets/floating_dock_card.dart';
 import 'canvas/canvas_pane.dart';
+import 'call_leave_button.dart';
+import 'canvas/canvas_dock_toggle.dart';
 import 'voice_call_controls.dart';
 
 class VoiceCallDock extends StatefulWidget {
@@ -135,41 +137,31 @@ class _VoiceCallDockState extends State<VoiceCallDock>
   @override
   Widget build(BuildContext context) {
     final channelId = widget.canvasChannelId;
-    final callRow = CallControls(
+    final leave = CallLeaveButton(controller: widget.controller);
+    Widget callRow({Widget? toggle}) => CallControls(
       controller: widget.controller,
       voice: widget.voice,
+      showLeave: false,
+      extraControl: toggle,
     );
     final botRow = widget.botControls;
     final card = channelId == null
-        ? FloatingDockCard(rows: [?botRow, callRow])
+        ? FloatingDockCard(rows: [?botRow, callRow()], trailing: leave)
         : LayoutBuilder(
             builder: (context, constraints) {
               final toggle = _CanvasToggleButton(channelId: channelId);
-              if (_fitsOneRow(
+              final fits = _fitsOneRow(
                 context,
                 constraints.maxWidth,
                 widget.voice.cameraEnabled,
                 widget.controller.supportsAudioOutputSelection,
-              )) {
-                return FloatingDockCard(
-                  rows: [
-                    ?botRow,
-                    Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        callRow,
-                        const SizedBox(width: AppSpacing.s8),
-                        toggle,
-                      ],
-                    ),
-                  ],
-                );
-              }
+              );
               return FloatingDockCard(
+                trailing: leave,
                 rows: [
                   ?botRow,
-                  callRow,
-                  Center(child: toggle),
+                  if (!fits) Center(child: toggle),
+                  callRow(toggle: fits ? toggle : null),
                 ],
               );
             },
@@ -211,16 +203,17 @@ bool _fitsOneRow(
   final controlCount =
       (cameraEnabled ? 5 : 4) + (supportsAudioOutputSelection ? 1 : 0) + 1;
   final cardPadding = AppSpacing.s12 * 2 + 2;
+  // The divider before leave takes the place of one gap: s4, 1dp, s4.
+  const leaveDivider = 1.0;
   final needed =
-      controlCount * button + (controlCount - 1) * AppSpacing.s8 + cardPadding;
+      controlCount * button +
+      (controlCount - 1) * AppSpacing.s8 +
+      leaveDivider +
+      cardPadding;
   return needed <= width;
 }
 
-/// The toggle itself: [CallDockButton]'s own chip, lit while [channelId]'s
-/// canvas is already open (unreachable in practice today, since opening it
-/// swaps this whole screen out for `CanvasPane` - kept anyway, so a future
-/// change that lets the two coexist inherits a toggle that already answers
-/// correctly rather than one that has to be taught to).
+/// The toggle itself: [CanvasDockToggle], lit while [channelId]'s canvas is open.
 class _CanvasToggleButton extends ConsumerWidget {
   const _CanvasToggleButton({required this.channelId});
 
@@ -229,10 +222,8 @@ class _CanvasToggleButton extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final open = ref.watch(canvasOpenProvider) == channelId;
-    return CallDockButton(
-      icon: AppIcons.canvas,
-      tooltip: 'Open canvas',
-      active: open,
+    return CanvasDockToggle(
+      open: open,
       onPressed: () =>
           ref.read(canvasOpenProvider.notifier).state = open ? null : channelId,
     );

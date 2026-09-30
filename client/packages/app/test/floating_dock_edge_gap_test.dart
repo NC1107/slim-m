@@ -55,8 +55,7 @@ void main() {
         AppSpacing.s12,
         reason: 'canvas_pane_body.dart wraps the dock in Padding.all(s12)',
       );
-      expectEdgeGap(tester, dock, GeometryEdge.left, AppSpacing.s12);
-      expectEdgeGap(tester, dock, GeometryEdge.right, AppSpacing.s12);
+      // Left and right are not checked here: the dock hugs its content and is centred (decision 0047), so only the bottom gap is fixed.
     },
   );
 

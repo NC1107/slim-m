@@ -86,7 +86,7 @@ void main() {
   });
 
   testWidgets('showTools false hides the five tools and keeps undo, the '
-      'overflow and close', (tester) async {
+      'overflow', (tester) async {
     await tester.pumpWidget(
       wrapCanvasToolsRow(buildCanvasToolsRow(showTools: false)),
     );
@@ -98,7 +98,6 @@ void main() {
     expect(find.bySemanticsLabel('Pan'), findsNothing);
     expect(find.bySemanticsLabel('Undo'), findsOneWidget);
     expect(find.bySemanticsLabel('More canvas actions'), findsOneWidget);
-    expect(find.bySemanticsLabel('Close canvas'), findsOneWidget);
   });
 
   testWidgets('tapping paste image in the overflow calls onPasteImage', (
@@ -217,18 +216,6 @@ void main() {
     await tester.pump();
 
     expect(undone, 1);
-  });
-
-  testWidgets('tapping close calls onClose', (tester) async {
-    var closed = 0;
-    await tester.pumpWidget(
-      wrapCanvasToolsRow(buildCanvasToolsRow(onClose: () => closed++)),
-    );
-
-    await tester.tap(find.bySemanticsLabel('Close canvas'));
-    await tester.pump();
-
-    expect(closed, 1);
   });
 
   testWidgets('the overflow is always present, but offers no Clear canvas item '

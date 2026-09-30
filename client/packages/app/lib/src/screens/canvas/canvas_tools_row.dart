@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
-/// The canvas's own row of interactive controls: the five tools, undo, the
-/// overflow menu and close - everything that used to live on `CanvasBar`'s
-/// top strip, extracted unchanged in mechanism so it can sit inside
+/// The canvas's own row of interactive controls: the five tools, undo and the
+/// overflow menu (closing is the dock's canvas toggle) - everything that used
+/// to live on `CanvasBar`'s top strip, extracted unchanged in mechanism so it can sit inside
 /// `CanvasCallDock` instead.
 ///
 /// The scroll-and-fade behaviour for the tool cluster is the identical code
@@ -62,7 +62,6 @@ class CanvasToolsRow extends StatefulWidget {
     required this.onShapeKindChanged,
     required this.pen,
     required this.onPenChanged,
-    required this.onClose,
     required this.hasSelfBubble,
     required this.selfBubbleHidden,
     required this.onToggleSelfBubbleHidden,
@@ -122,10 +121,6 @@ class CanvasToolsRow extends StatefulWidget {
 
   final bool activityLogOpen;
   final VoidCallback onToggleActivityLog;
-
-  /// Closes the canvas outright, returning to whatever this channel showed
-  /// before - the dock's own answer to `CanvasBar`'s old "Close canvas".
-  final VoidCallback onClose;
 
   /// Whether the caller is on this channel's call at all - the overflow's
   /// own "Hide/Show my camera bubble" item only appears then, the same "no
@@ -202,12 +197,12 @@ class _CanvasToolsRowState extends State<CanvasToolsRow> {
   Widget build(BuildContext context) {
     final tokens = Theme.of(context).extension<AppTokens>()!;
     return Row(
+      mainAxisSize: MainAxisSize.min,
       children: [
-        if (widget.showTools)
-          Expanded(child: _toolStrip(tokens))
-        else
-          const Spacer(),
-        const SizedBox(width: AppSpacing.s8),
+        if (widget.showTools) ...[
+          Flexible(child: _toolStrip(tokens)),
+          const SizedBox(width: AppSpacing.s8),
+        ],
         AppIconButton(
           icon: AppIcons.undo,
           semanticLabel: 'Undo',
@@ -237,13 +232,6 @@ class _CanvasToolsRowState extends State<CanvasToolsRow> {
           hiddenTiles: widget.hiddenTiles,
           onShowTile: widget.onShowTile,
           onToggleFullscreen: widget.onToggleFullscreen,
-        ),
-        const SizedBox(width: AppSpacing.s4),
-        AppIconButton(
-          icon: AppIcons.dismiss,
-          semanticLabel: 'Close canvas',
-          tooltip: 'Close canvas',
-          onPressed: widget.onClose,
         ),
       ],
     );

@@ -54,6 +54,7 @@ import '../widgets/camera_source_sheet.dart';
 import '../widgets/control_options_menu.dart';
 import '../widgets/screen_source_sheet.dart';
 import 'call_dock_button.dart';
+import 'call_leave_button.dart';
 
 export 'call_dock_button.dart';
 
@@ -62,9 +63,17 @@ class CallControls extends ConsumerStatefulWidget {
     super.key,
     required this.controller,
     required this.voice,
+    this.showLeave = true,
+    this.extraControl,
   });
 
   final VoiceController controller;
+
+  /// False when the surrounding dock draws leave itself, at its far edge.
+  final bool showLeave;
+
+  /// One more control, drawn straight after share - the canvas toggle.
+  final Widget? extraControl;
 
   /// Only the flags half of the call: this row never has any use for the
   /// roster, and typing it this way keeps a future caller from threading it
@@ -138,7 +147,7 @@ class _CallControlsState extends ConsumerState<CallControls> {
       children: [
         CallDockButton(
           icon: voice.microphoneEnabled ? AppIcons.mic : AppIcons.micOff,
-          tooltip: _withShortcut(
+          tooltip: labelWithShortcut(
             voice.microphoneEnabled ? 'Mute' : 'Unmute',
             AppAction.toggleMuteCall,
           ),
@@ -161,7 +170,7 @@ class _CallControlsState extends ConsumerState<CallControls> {
         const SizedBox(width: AppSpacing.s8),
         CallDockButton(
           icon: voice.cameraEnabled ? AppIcons.camera : AppIcons.cameraOff,
-          tooltip: _withShortcut(
+          tooltip: labelWithShortcut(
             voice.cameraEnabled ? 'Turn off camera' : 'Turn on camera',
             AppAction.toggleCameraCall,
           ),
@@ -200,14 +209,14 @@ class _CallControlsState extends ConsumerState<CallControls> {
             },
           ),
         ),
-        const SizedBox(width: AppSpacing.s8),
-        CallDockButton(
-          icon: AppIcons.leaveCall,
-          tooltip: _withShortcut('Leave call', AppAction.leaveCall),
-          active: false,
-          destructive: true,
-          onPressed: widget.controller.leave,
-        ),
+        if (widget.extraControl case final extra?) ...[
+          const SizedBox(width: AppSpacing.s8),
+          extra,
+        ],
+        if (widget.showLeave) ...[
+          const SizedBox(width: AppSpacing.s8),
+          CallLeaveButton(controller: widget.controller),
+        ],
       ],
     );
     if (!isDesktopHost) return row;
@@ -239,7 +248,7 @@ class _CallControlsState extends ConsumerState<CallControls> {
   }
 
   static String _shareTooltip(VoiceFlags voice) {
-    final shortcut = _shortcutSuffix(AppAction.toggleShareCall);
+    final shortcut = shortcutSuffix(AppAction.toggleShareCall);
     if (voice.screenSharing) {
       return 'Stop sharing$shortcut';
     }
@@ -276,17 +285,6 @@ class _CallControlsState extends ConsumerState<CallControls> {
       ),
     ];
   }
-
-  /// `' (Ctrl+Shift+S)'`, or empty on mobile/touch or once unbound - a hint
-  /// naming a shortcut that cannot fire here would be worse than none.
-  static String _shortcutSuffix(AppAction action) {
-    if (!isDesktopHost) return '';
-    final keys = describeAppAction(action);
-    return keys.isEmpty ? '' : ' (${keys.join('+')})';
-  }
-
-  static String _withShortcut(String label, AppAction action) =>
-      '$label${_shortcutSuffix(action)}';
 
   Future<void> _share(BuildContext context) async {
     final voice = widget.voice;
