@@ -29,11 +29,14 @@
 library;
 
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:slimm_design_system/design_system.dart';
 import 'package:slimm_rtc/rtc.dart';
 
+import '../providers/call_could_join.dart';
 import '../providers/call_solo.dart';
 import '../providers/voice_controller.dart';
+import 'call_header_facts.dart';
 import 'call_participant_tiles.dart';
 import 'call_roster_motion.dart';
 import 'fullscreen_video_overlay.dart';
@@ -72,7 +75,7 @@ class CallStageLayout extends StatelessWidget {
   final void Function(BuildContext anchor, VoiceParticipant participant)
   onOpenProfile;
 
-  /// Needed only for the alone-in-call hint's canvas mention below.
+  /// A DM has no member list, so the alone hint is withheld.
   final bool isDm;
 
   /// A tile's own right-click/long-press quick-actions rows, bound to the
@@ -134,6 +137,7 @@ class CallStageLayout extends StatelessWidget {
                       controller: controller,
                       onOpenProfile: onOpenProfile,
                       isDm: isDm,
+                      channelId: voice.channelId,
                       menuItemsBuilder: menuItemsBuilder,
                     ),
             ),
@@ -165,17 +169,9 @@ class _CallHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final tokens = Theme.of(context).extension<AppTokens>()!;
-    final style = AppText.caption.copyWith(color: tokens.textSecondary);
-    return Row(
-      children: [
-        Text('${voice.participants.length} in call', style: style),
-        if (voice.connectedAt != null) ...[
-          Text(' · ', style: style),
-          CallDuration(since: voice.connectedAt!),
-        ],
-      ],
-    );
+    final channelId = voice.channelId;
+    if (channelId == null) return const SizedBox.shrink();
+    return CallHeaderLine(channelId: channelId);
   }
 }
 
@@ -281,6 +277,7 @@ class _ParticipantGrid extends StatelessWidget {
     required this.controller,
     required this.onOpenProfile,
     required this.isDm,
+    required this.channelId,
     this.menuItemsBuilder,
   });
 
@@ -289,6 +286,7 @@ class _ParticipantGrid extends StatelessWidget {
   final void Function(BuildContext anchor, VoiceParticipant participant)
   onOpenProfile;
   final bool isDm;
+  final String? channelId;
   final List<Widget> Function(BuildContext, VoiceParticipant, VoidCallback)?
   menuItemsBuilder;
 
@@ -325,10 +323,11 @@ class _ParticipantGrid extends StatelessWidget {
                       menuItemsBuilder: menuItemsBuilder,
                     ),
                   ),
-                  if (isAloneInCall(participants)) ...[
-                    const SizedBox(height: AppSpacing.s24),
-                    _AloneHint(isDm: isDm),
-                  ],
+                  if (isAloneInCall(participants) && channelId != null && !isDm)
+                    _AloneHint(
+                      channelId: channelId!,
+                      joined: {for (final p in participants) p.identity},
+                    ),
                 ],
               ),
             ),
@@ -339,49 +338,30 @@ class _ParticipantGrid extends StatelessWidget {
   );
 }
 
-/// Shown only while nobody else has joined and nobody is sharing: a calm
-/// wait, not a scary empty room, plus a pointer toward the canvas toggle
-/// already in `VoiceCallDock` - a plain hint, not a second interactive
-/// button, so a solo caller never sees two controls that both open the same
-/// canvas. A DM call already names its own canvas button on `_DmCallBar` at
-/// every width, so the hint here is scoped to a real voice channel.
-class _AloneHint extends StatelessWidget {
-  const _AloneHint({required this.isDm});
+/// One line naming who could join, shown only while you are alone in a voice
+/// channel's call; a DM has no member list to draw from.
+class _AloneHint extends ConsumerWidget {
+  const _AloneHint({required this.channelId, required this.joined});
 
-  final bool isDm;
+  final String channelId;
+  final Set<String> joined;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final tokens = Theme.of(context).extension<AppTokens>()!;
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Text(
-          'Waiting for others to join.',
-          textAlign: TextAlign.center,
-          style: AppText.caption.copyWith(color: tokens.textSecondary),
-        ),
-        if (!isDm) ...[
-          const SizedBox(height: AppSpacing.s8),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(
-                AppIcons.canvas,
-                size: AppSizes.icon16,
-                color: tokens.textSecondary,
-              ),
-              const SizedBox(width: AppSpacing.s4),
-              Flexible(
-                child: Text(
-                  'Open the canvas below while you wait',
-                  style: AppText.caption.copyWith(color: tokens.textSecondary),
-                ),
-              ),
-            ],
-          ),
-        ],
-      ],
+    final names = [
+      for (final m in ref.watch(callCouldJoinProvider(channelId)))
+        if (!joined.contains(m.id)) m.displayName,
+    ];
+    final line = couldJoinLine(names);
+    if (line == null) return const SizedBox.shrink();
+    return Padding(
+      padding: const EdgeInsets.only(top: AppSpacing.s16),
+      child: Text(
+        line,
+        textAlign: TextAlign.center,
+        style: AppText.caption.copyWith(color: tokens.textSecondary),
+      ),
     );
   }
 }
