@@ -44,5 +44,5 @@ runs:
         mkdir -p "stage/${name}" dist
         cp -a "${bundle}/." "stage/${name}/"
         cp LICENSES/LicenseRef-PolyForm-Noncommercial-1.0.0.txt "stage/${name}/LICENSE"
-        cp packaging/linux/README.md packaging/linux/slim-m "stage/${name}/"
+        cp packaging/linux/README.md packaging/linux/slim-m packaging/linux/install.sh "stage/${name}/"
         tar -C stage -czf "dist/${name}-linux-amd64.tar.gz" "${name}"

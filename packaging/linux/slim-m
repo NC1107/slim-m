@@ -45,6 +45,28 @@ missing_libraries() {
   done | sed -n 's/^[[:space:]]*\(.*\) => not found.*/\1/p' | grep -v '^libjvm\.so$' | sort -u
 }
 
+# In the per-user layout (docs/decisions/0041) the updater leaves a `pending` marker
+# and the app clears it once it has run cleanly; a third start that still finds it
+# moves `current` back to `previous` and starts that instead.
+roll_back_if_stuck() {
+  root=$(dirname "$here")
+  name=$(basename "$here")
+  [ -L "$root/current" ] && [ -f "$root/pending" ] || return 0
+  [ "$(cat "$root/pending")" = "$name" ] || return 0
+  tries=$(cat "$root/pending.tries" 2>/dev/null || echo 0)
+  if [ "$tries" -lt 2 ] || [ ! -L "$root/previous" ]; then
+    echo $((tries + 1)) >"$root/pending.tries"
+    return 0
+  fi
+  ln -sfn "$(readlink "$root/previous")" "$root/.current.rollback"
+  mv -T "$root/.current.rollback" "$root/current"
+  echo "$name" >"$root/rolled-back"
+  rm -f "$root/pending" "$root/pending.tries" "$root/previous"
+  exec "$root/current/slim-m" "$@"
+}
+
+roll_back_if_stuck "$@"
+
 missing=$(missing_libraries)
 if [ -n "$missing" ]; then
   echo "slim-m cannot start: this system is missing shared libraries." >&2

@@ -240,4 +240,25 @@ void main() {
       );
     },
   );
+
+  test('a self-applying tarball installs on tap and restarts once staged', () {
+    const tarball = ClientUpdate(
+      version: '0.99.0',
+      releaseUrl: 'https://example.invalid/release',
+      format: InstallFormat.tarball,
+    );
+    expect(
+      updateMenuAction(tarball, selfApplies: true),
+      UpdateMenuAction.installAndRestart,
+    );
+    expect(
+      updateMenuAction(tarball, selfApplies: true, staged: '0.99.0'),
+      UpdateMenuAction.restartToUpdate,
+    );
+    expect(
+      updateMenuAction(tarball, selfApplies: true, staged: '0.98.0'),
+      UpdateMenuAction.installAndRestart,
+    );
+    expect(updateMenuAction(tarball), UpdateMenuAction.openRelease);
+  });
 }

@@ -15,6 +15,8 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:slimm_api/api.dart' as api;
 import 'package:slimm_app/src/desktop/rpm_updater.dart';
+import 'package:slimm_app/src/desktop/self_update/self_update_controller.dart';
+import 'package:slimm_app/src/desktop/self_update/self_update_failure.dart';
 import 'package:slimm_app/src/desktop/startup_screen.dart';
 import 'package:slimm_app/src/desktop/startup_state.dart';
 import 'package:slimm_app/src/desktop/startup_updates.dart';
@@ -76,6 +78,32 @@ class _Dnf implements RpmUpdater {
 
   @override
   Future<String?> installedVersion() async => '1.0.0';
+}
+
+class _FakeSelfUpdate extends SelfUpdateController {
+  _FakeSelfUpdate(super.ref, {this.onInstall, this.fail = false});
+
+  final void Function(String currentVersion)? onInstall;
+  final bool fail;
+
+  @override
+  Future<String?> install({
+    required String currentVersion,
+    InstallFormat? format,
+    String? resolvedExecutable,
+  }) async {
+    onInstall?.call(currentVersion);
+    if (fail) {
+      ref
+          .read(selfUpdateFailureProvider.notifier)
+          .state = const SelfUpdateFailure(
+        SelfUpdateFailureKind.downloadFailed,
+        'could not download',
+      );
+      return null;
+    }
+    return '9.9.9';
+  }
 }
 
 void main() {
@@ -152,6 +180,64 @@ void main() {
         reason: 'the default is not an answer to save',
       );
     }
+  });
+
+  test(
+    'a per-user tarball installs itself and relaunches without asking',
+    () async {
+      final c = container();
+      var installedFor = '';
+      var relaunched = false;
+      final controllerOverride = selfUpdateProvider.overrideWith(
+        (ref) => _FakeSelfUpdate(ref, onInstall: (v) => installedFor = v),
+      );
+      final scoped = ProviderContainer(
+        parent: c,
+        overrides: [controllerOverride],
+      );
+      addTearDown(scoped.dispose);
+
+      await runStartupUpdates(
+        scoped,
+        check: _Check(_update(InstallFormat.tarball)).call,
+        relaunch: () async => relaunched = true,
+        format: InstallFormat.tarball,
+        currentVersion: '1.0.0',
+        selfApplies: true,
+      );
+
+      expect(installedFor, '1.0.0');
+      expect(relaunched, isTrue);
+      expect(scoped.read(startupStatusProvider), 'Restarting into 9.9.9');
+    },
+  );
+
+  test('a failed per-user install keeps the current build and the failure '
+      'in the persistent state', () async {
+    final c = container();
+    final scoped = ProviderContainer(
+      parent: c,
+      overrides: [
+        selfUpdateProvider.overrideWith(
+          (ref) => _FakeSelfUpdate(ref, fail: true),
+        ),
+      ],
+    );
+    addTearDown(scoped.dispose);
+
+    await runStartupUpdates(
+      scoped,
+      check: _Check(_update(InstallFormat.tarball)).call,
+      relaunch: () async => fail('nothing was installed to restart into'),
+      format: InstallFormat.tarball,
+      currentVersion: '1.0.0',
+      selfApplies: true,
+    );
+
+    expect(
+      scoped.read(selfUpdateFailureProvider)?.kind,
+      SelfUpdateFailureKind.downloadFailed,
+    );
   });
 
   test('a dnf install relaunches into the new build without asking', () async {

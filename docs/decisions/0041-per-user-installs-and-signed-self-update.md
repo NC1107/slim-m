@@ -1,7 +1,7 @@
 # 0041 - Per-user installs and signed self-update
 
 Date: 2026-09-28
-Status: proposed; the design and the CI signing are built, the client-side appliers are carded and not started
+Status: proposed; the design, the CI signing, the verified download and the Linux tarball applier are built, the Windows and macOS appliers are carded and not started
 
 ## Context
 
@@ -125,3 +125,11 @@ The workflow signs with `openssl pkeyutl` because python's standard library has 
 
 Backlog cards, one per OS because the swap mechanics differ materially: the Linux per-user tarball updater, the Windows launcher and updater, the macOS bundle swap.
 A shared card covers the pure-Dart verify-and-download core they all sit on, and the owner-run key generation is listed above rather than carded.
+
+## Linux applier as built
+
+The version directories sit beside `current` and `previous` symlinks in the layout root, and `install.sh` in the tarball lays that out.
+The launcher counts starts in `pending.tries` while a `pending` marker names its own version, and the third start moves `current` back to `previous` and leaves a `rolled-back` marker.
+The app clears `pending` and prunes everything but `current` and `previous` after it has stayed up for twenty seconds, and reports a `rolled-back` marker in the persistent error banner.
+A tarball that is not in this layout, or whose root is not writable, keeps the notifier behaviour.
+
