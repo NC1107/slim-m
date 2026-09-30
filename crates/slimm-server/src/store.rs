@@ -100,6 +100,8 @@ mod storage;
 mod thread_listing;
 mod threads;
 mod timeouts;
+mod totp;
+mod totp_verify;
 mod user_notes;
 mod users;
 mod webhooks;
@@ -188,6 +190,8 @@ pub use threads::{
     MAX_THREADS_PER_CHANNEL, OpenThreadError, OpenedThread, ThreadParent, ThreadSummary,
 };
 pub use timeouts::{MAX_TIMEOUT_MS, MemberTimeout};
+pub use totp::{RECOVERY_CODE_COUNT, TotpEnrolment, TotpError, TotpPolicy, TotpStatus};
+pub use totp_verify::{ChallengeError, TotpChallenge, TotpProof, TotpSignIn};
 pub use user_notes::UserNote;
 pub use users::ProfileUpdate;
 pub use webhooks::{NewWebhook, Webhook, WebhookContext};

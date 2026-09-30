@@ -240,9 +240,23 @@ paths:
           application/json:
             schema:
               $ref: "#/components/schemas/LoginRequest"
+      description: >
+        An account with two-factor authentication on answers 202 with a
+        challenge instead of 200 with a token pair: the password was accepted
+        and the sign-in is not finished. Complete it at /auth/totp/verify.
       responses:
         "200":
           $ref: "#/components/responses/Tokens"
+        "202":
+          description: >
+            The password was accepted and a second factor is still owed. The
+            challenge is single-use and short-lived, and it carries the device
+            fields from this request, so the follow-up call does not resend
+            them.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TotpChallenge"
         "400":
           $ref: "#/components/responses/BadRequest"
         "401":
@@ -351,6 +365,200 @@ paths:
           $ref: "#/components/responses/BadRequest"
         "503":
           $ref: "#/components/responses/Unavailable"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
+
+  /auth/totp:
+    get:
+      operationId: getTotpStatus
+      tags: [auth]
+      summary: Whether the caller has a second factor, and what this server asks for.
+      responses:
+        "200":
+          description: The caller's own factor state.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TotpStatus"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
+
+  /auth/totp/enrol:
+    post:
+      operationId: beginTotpEnrolment
+      tags: [auth]
+      summary: Start enrolling a TOTP second factor.
+      description: >
+        Returns a fresh secret once, as text for manual entry and as an
+        otpauth URI to render as a QR code. Nothing is enforced yet: the factor
+        goes live only once /auth/totp/confirm verifies a code from it, so a
+        mis-scanned code or an unsynchronised clock cannot lock anybody out.
+        Calling this again replaces an unconfirmed enrolment; an already-enabled
+        factor is a 409 and has to be disabled first.
+      responses:
+        "200":
+          description: The new secret and its provisioning URI.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TotpEnrolment"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
+
+  /auth/totp/confirm:
+    post:
+      operationId: confirmTotpEnrolment
+      tags: [auth]
+      summary: Switch the factor on with a code from the authenticator.
+      description: >
+        Returns the recovery codes for this factor, once. They are stored
+        hashed and are not retrievable later; each is usable once.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TotpCodeRequest"
+      responses:
+        "200":
+          description: The factor is on, and these are its recovery codes.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TotpRecoveryCodes"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
+
+  /auth/totp/recovery-codes:
+    post:
+      operationId: reissueTotpRecoveryCodes
+      tags: [auth]
+      summary: Replace the recovery codes, against a current code.
+      description: >
+        The previous set stops working. Accepts either an authenticator code or
+        one of the current recovery codes, and spends whichever was presented.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TotpCodeRequest"
+      responses:
+        "200":
+          description: The new recovery codes, shown once.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TotpRecoveryCodes"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
+
+  /auth/totp/disable:
+    post:
+      operationId: disableTotp
+      tags: [auth]
+      summary: Turn the factor off, against a current code or a recovery code.
+      description: >
+        Live sessions are deliberately left alone: the caller has just proved
+        both factors, so signing their other devices out would penalise
+        housekeeping. Clearing somebody else's factor (the administrator path)
+        does revoke, because it has no such proof.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TotpCodeRequest"
+      responses:
+        "204":
+          description: The factor and its recovery codes are gone.
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
+
+  /auth/totp/verify:
+    post:
+      operationId: verifyTotpChallenge
+      tags: [auth]
+      summary: Finish a sign-in that /auth/login answered with a challenge.
+      description: >
+        Unauthenticated, like /auth/reset: the caller has no session yet. The
+        code may be an authenticator code or one of the recovery codes; the
+        server tries both and spends a recovery code if that is what was
+        presented. A wrong code leaves the challenge live so it can be retyped,
+        while still counting against the account's failure budget. A code is
+        accepted within one 30-second step either side of now, and never twice.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TotpVerifyRequest"
+      responses:
+        "200":
+          $ref: "#/components/responses/Tokens"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
+        "503":
+          $ref: "#/components/responses/Unavailable"
+
+  /admin/users/{userId}/totp:
+    parameters:
+      - name: userId
+        in: path
+        required: true
+        description: The account whose second factor is to be cleared.
+        schema:
+          type: string
+          format: uuid
+    delete:
+      operationId: clearTotpFactor
+      tags: [admin]
+      summary: Clear a member's second factor. Requires ADMINISTRATOR.
+      description: >
+        For a member who has lost both their authenticator and their recovery
+        codes. Deliberately a separate act from issuing a password reset code,
+        which does not touch the factor: one answers "I forgot my password" and
+        this answers "I lost my authenticator". It revokes every live session on
+        the account and writes a totp_cleared entry to the moderation audit log,
+        so it cannot be done quietly.
+      responses:
+        "204":
+          description: The factor is cleared and the account's sessions are revoked.
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
         "429":
           $ref: "#/components/responses/TooManyRequests"
 
@@ -7925,10 +8133,101 @@ components:
             one, defaulting to a stable value derived from its id. An index
             outside the set is a 400.
 
+    TotpChallenge:
+      type: object
+      required: [totp_challenge, expires_at]
+      properties:
+        totp_challenge:
+          type: string
+          description: >
+            Single-use, and short-lived. Present it to /auth/totp/verify with a
+            code. It carries the device fields from the login request that
+            produced it, so those are not resent.
+        expires_at:
+          type: integer
+          format: int64
+          description: Unix milliseconds after which the challenge is refused.
+    TotpEnrolment:
+      type: object
+      required: [secret, provisioning_uri]
+      properties:
+        secret:
+          type: string
+          description: >
+            The base32 shared secret, for somebody typing it in by hand.
+            Returned once and never again.
+        provisioning_uri:
+          type: string
+          description: >
+            An otpauth URI to render as a QR code. It states no algorithm,
+            digit count or period, because those are the otpauth defaults this
+            server uses (HMAC-SHA1, 6 digits, 30 seconds) and several
+            authenticator apps mis-handle them when stated explicitly.
+    TotpCodeRequest:
+      type: object
+      required: [code]
+      properties:
+        code:
+          type: string
+          description: >
+            A six-digit authenticator code, or one of the recovery codes.
+            Surrounding whitespace is trimmed.
+    TotpVerifyRequest:
+      type: object
+      required: [challenge, code]
+      properties:
+        challenge:
+          type: string
+        code:
+          type: string
+    TotpRecoveryCodes:
+      type: object
+      required: [recovery_codes]
+      properties:
+        recovery_codes:
+          type: array
+          description: >
+            Shown exactly once. Stored only as hashes, so this list cannot be
+            re-read; each code works once.
+          items:
+            type: string
+    TotpStatus:
+      type: object
+      required: [enabled, pending, recovery_codes_remaining, policy]
+      properties:
+        enabled:
+          type: boolean
+          description: Confirmed, and therefore required at sign-in.
+        pending:
+          type: boolean
+          description: >
+            Enrolled but never confirmed, so not required at sign-in. A client
+            seeing this offers to finish setup rather than to start over.
+        confirmed_at:
+          type: [integer, "null"]
+          format: int64
+        recovery_codes_remaining:
+          type: integer
+          description: Unused recovery codes left.
+        policy:
+          type: string
+          enum: [off, optional, required_for_elevated]
+          description: >
+            What this deployment asks for. `off` refuses new enrolments and
+            deliberately keeps enforcing a factor somebody already enabled, so
+            the switch cannot silently weaken an account; the disable path stays
+            open either way.
     SpaceSettings:
       type: object
       required: [join_policy]
       properties:
+        totp_policy:
+          type: string
+          enum: [off, optional, required_for_elevated]
+          description: >
+            The deployment's second-factor policy. Optional in a PATCH body, so
+            a client that predates it can change the join policy without
+            silently resetting this. Always present in a response.
         join_policy:
           type: string
           enum: [invite, open]

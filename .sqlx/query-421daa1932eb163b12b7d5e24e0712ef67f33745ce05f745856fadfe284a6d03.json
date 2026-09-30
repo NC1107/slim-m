@@ -1,0 +1,20 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT confirmed_at FROM user_totp_factors WHERE user_id = ?",
+  "describe": {
+    "columns": [
+      {
+        "name": "confirmed_at",
+        "ordinal": 0,
+        "type_info": "Integer"
+      }
+    ],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": [
+      true
+    ]
+  },
+  "hash": "421daa1932eb163b12b7d5e24e0712ef67f33745ce05f745856fadfe284a6d03"
+}

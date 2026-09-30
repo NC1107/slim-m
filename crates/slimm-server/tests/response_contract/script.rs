@@ -12,7 +12,6 @@
 use base64::Engine as _;
 use base64::engine::general_purpose::STANDARD as BASE64;
 use serde_json::{Value, json};
-use uuid::Uuid;
 
 use super::world::{Contract, Payload};
 
@@ -25,6 +24,7 @@ mod content_media_slots;
 mod content_messages_window;
 mod content_roles;
 mod dock;
+mod farewell;
 mod gifs;
 mod link_preview;
 mod member_account;
@@ -34,10 +34,9 @@ mod people;
 mod read_state;
 mod refusals;
 mod threads;
+mod totp_calls;
 mod webhooks;
 
-use admin_recovery::recovery_calls;
-use bots::bot_calls;
 use content::{channel_calls, message_calls};
 use content_dm_calls::dm_call_ring_calls;
 use content_emoji::emoji_calls;
@@ -45,12 +44,11 @@ use content_media_slots::media_slot_calls;
 use content_messages_window::bulk_delete_by_author_call;
 use content_roles::{overwrite_calls, role_calls};
 use dock::dock_calls;
+use farewell::farewell_calls;
 use gifs::gif_calls;
 use link_preview::link_preview_calls;
-use members_bulk::bulk_member_calls;
 use people::{moderation_calls, profile_calls, safety_calls};
 use threads::thread_calls;
-use webhooks::webhook_calls;
 
 const PASSWORD: &str = "a-long-enough-password";
 /// A PNG header is all the server's content sniffing looks at.
@@ -101,7 +99,7 @@ pub async fn run(c: &mut Contract) {
             "POST",
             "/invites",
             root,
-            json!({ "max_uses": 5 }),
+            json!({ "max_uses": 6 }),
         )
         .await;
     let code = text(&invite, "code");
@@ -398,103 +396,4 @@ async fn invite_calls(c: &mut Contract, root: &str, bob_token: &str) {
     .await;
     c.bare("revokeInvite", "DELETE", &format!("/invites/{spare}"), root)
         .await;
-}
-
-/// The calls that end a session or an account, on throwaway accounts so
-/// nothing above depends on what they destroy. `resetPassword` is last of all
-/// because it revokes every session the account it recovers still holds.
-async fn farewell_calls(c: &mut Contract, root: &str, bob_id: &str, code: &str, channel: &str) {
-    let carol = c
-        .call(
-            "register",
-            "POST",
-            "/auth/register",
-            None,
-            Payload::Json(signup("carol", "desktop", Some(code))),
-        )
-        .await;
-    c.bare(
-        "logout",
-        "POST",
-        "/auth/logout",
-        &text(&carol, "access_token"),
-    )
-    .await;
-
-    // Dave writes before he leaves, so the later listing carries the anonymized
-    // author shape the schema documents and nothing else here would produce.
-    let dave = c
-        .call(
-            "register",
-            "POST",
-            "/auth/register",
-            None,
-            Payload::Json(signup("dave", "desktop", Some(code))),
-        )
-        .await;
-    let dave_token = text(&dave, "access_token");
-    let messages = format!("/channels/{channel}/messages");
-    c.json(
-        "sendMessage",
-        "POST",
-        &messages,
-        &dave_token,
-        json!({ "id": Uuid::now_v7().to_string(), "content": "written before leaving" }),
-    )
-    .await;
-    c.bare("deleteAccount", "DELETE", "/account", &dave_token)
-        .await;
-    c.get("listMessages", &format!("{messages}?limit=50"), root)
-        .await;
-
-    // Erin exists only to be moderated: a removal revokes the target's sessions.
-    let erin = c
-        .call(
-            "register",
-            "POST",
-            "/auth/register",
-            None,
-            Payload::Json(signup("erin", "desktop", Some(code))),
-        )
-        .await;
-    let erin_id = text(&erin, "user_id");
-    c.json(
-        "timeOutMember",
-        "PUT",
-        &format!("/members/{erin_id}/timeout"),
-        root,
-        json!({ "duration_seconds": 300, "reason": "contract" }),
-    )
-    .await;
-    c.bare(
-        "liftMemberTimeout",
-        "DELETE",
-        &format!("/members/{erin_id}/timeout"),
-        root,
-    )
-    .await;
-    c.json(
-        "removeMember",
-        "PUT",
-        &format!("/members/{erin_id}/removal"),
-        root,
-        json!({ "reason": "contract" }),
-    )
-    .await;
-    c.get("listRemovedMembers", "/members/removed", root).await;
-    c.bare(
-        "restoreMember",
-        "DELETE",
-        &format!("/members/{erin_id}/removal"),
-        root,
-    )
-    .await;
-
-    bulk_member_calls(c, root, &erin_id).await;
-
-    member_account::member_account_calls(c, root, code).await;
-
-    recovery_calls(c, root, bob_id).await;
-    bot_calls(c, root, channel).await;
-    webhook_calls(c, root, channel).await;
 }

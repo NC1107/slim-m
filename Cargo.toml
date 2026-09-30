@@ -38,6 +38,8 @@ base64 = "0.22"
 # `getrandom` turns on rand_core's OsRng, the entropy behind both the Argon2
 # salt and the opaque token secrets, unifying onto argon2's own rand_core.
 rand_core = { version = "0.6", features = ["getrandom"] }
+# RFC 6238 TOTP (decision 0047). The 5.x hold and the feature cuts are both load-bearing; see docs/dependencies.md.
+totp-rs = { version = "5.7", default-features = false, features = ["otpauth"] }
 # Anonymous sealed boxes for the content-free push envelope. Exact-pinned
 # because the `seal` API is still pre-release; see docs/dependencies.md.
 crypto_box = { version = "=0.10.0-pre.0", features = ["seal"] }

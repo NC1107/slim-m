@@ -69,6 +69,12 @@ pub(crate) fn spawn_token_sweep(store: store::Store) {
     spawn_sweep(TOKEN_SWEEP_INTERVAL, move || {
         let store = store.clone();
         async move {
+            // Same schedule and reasoning as the token sweep: a spent challenge grants nothing.
+            match store.sweep_expired_totp_challenges().await {
+                Ok(0) => {}
+                Ok(swept) => tracing::info!(swept, "swept expired TOTP challenge rows"),
+                Err(err) => tracing::warn!(error = %err, "TOTP challenge sweep failed"),
+            }
             match store.sweep_expired_tokens().await {
                 Ok(swept) => {
                     if swept.total() > 0 {

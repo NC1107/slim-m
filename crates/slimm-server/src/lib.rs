@@ -33,6 +33,7 @@ pub mod ratelimit;
 mod sidecar_url;
 pub mod store;
 mod sweeps;
+pub mod totp;
 pub mod typing;
 pub mod viewing;
 pub mod voice;

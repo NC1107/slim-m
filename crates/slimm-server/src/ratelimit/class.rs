@@ -288,6 +288,31 @@ pub enum Class {
     /// account's other devices into a notification firehose. Sign-ins past
     /// the budget still succeed; only the notice is dropped.
     SignInAlert,
+    /// Presenting a second factor: the sign-in challenge, and the enrolled
+    /// member's own confirm/disable/reissue calls.
+    ///
+    /// Tighter than [`Class::Password`], which is the point of having it at
+    /// all. A password has whatever entropy somebody chose; a TOTP code has
+    /// exactly a million values and a recovery code is one of ten live at a
+    /// time, so the rate a caller may present guesses at is a first-class
+    /// control rather than a cost bound. Sized for a person who mistypes six
+    /// digits a couple of times and then gets it right, not for a script.
+    ///
+    /// This is only the rate half. What bounds the *total* number of guesses
+    /// against one account is the persistent lockout counter on the factor
+    /// row (`store::totp_verify::record_failure`), which survives a restart
+    /// and does not care which address is asking; see decision 0048 for why
+    /// neither one alone is enough.
+    ///
+    /// The burst is deliberately *above* `totp::MAX_FAILURES`, and that
+    /// ordering is load-bearing rather than incidental. At or below it, this
+    /// bucket empties first and every refusal past that point is a 429 from
+    /// the address's rate budget, so the per-account lockout never gets to
+    /// fire and, worse, two people signing in from one office share one
+    /// account's worth of attempts. Found by a test that asserted the lockout
+    /// and was passing on the limiter's 429 instead; `all_tests` below now
+    /// pins the relationship.
+    Totp,
     /// A member's rich-presence activity (`PUT`/`DELETE /presence/activity`).
     ///
     /// A player reports a track change every few minutes at most, but a
@@ -338,6 +363,8 @@ impl Class {
             // See this variant's own doc comment for how these were sized.
             Class::SignInAlert => (3.0, 1.0 / 600.0),
             // See this variant's own doc comment for how these were sized.
+            Class::Totp => (8.0, 1.0 / 10.0),
+            // See this variant's own doc comment for how these were sized.
             Class::PresenceActivity => (6.0, 1.0 / 5.0),
         }
     }
@@ -347,7 +374,7 @@ impl Class {
     /// [`Self::label`]; a class added to the enum without extending this
     /// array compiles clean and is simply never counted, so add to all three
     /// together.
-    pub const ALL: [Class; 24] = [
+    pub const ALL: [Class; 25] = [
         Class::Password,
         Class::Refresh,
         Class::Ticket,
@@ -372,6 +399,7 @@ impl Class {
         Class::ModulePost,
         Class::SignInAlert,
         Class::PresenceActivity,
+        Class::Totp,
     ];
 
     /// The Prometheus label value for this class: lowercase, snake_case, and
@@ -402,99 +430,10 @@ impl Class {
             Class::ModulePost => "module_post",
             Class::SignInAlert => "sign_in_alert",
             Class::PresenceActivity => "presence_activity",
+            Class::Totp => "totp",
         }
     }
 }
 
 #[cfg(test)]
-mod all_tests {
-    use super::*;
-
-    /// `ALL` exists so `/metrics` never has to be told about a new class by
-    /// hand; if this ever drifts, a class silently stops being counted.
-    #[test]
-    fn all_lists_every_variant_exactly_once() {
-        let mut seen = std::collections::HashSet::new();
-        for class in Class::ALL {
-            assert!(
-                seen.insert(class),
-                "{class:?} appears more than once in ALL"
-            );
-        }
-        assert_eq!(seen.len(), Class::ALL.len());
-    }
-
-    /// The label is a Prometheus dimension, so two classes sharing one would
-    /// silently merge their counters. Each must also be the lowercase snake_case
-    /// the doc promises a dashboard can key on.
-    #[test]
-    fn every_label_is_unique_and_snake_case() {
-        let mut seen = std::collections::HashSet::new();
-        for class in Class::ALL {
-            let label = class.label();
-            assert!(!label.is_empty(), "{class:?} has an empty label");
-            assert!(
-                label
-                    .chars()
-                    .all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '_'),
-                "{class:?} label {label:?} is not lowercase snake_case"
-            );
-            assert!(seen.insert(label), "two classes share the label {label:?}");
-        }
-    }
-
-    /// A bucket with a non-positive burst can never admit a request, and a
-    /// non-positive refill never recovers one; either is a budget typo that
-    /// would wedge every caller of that class.
-    #[test]
-    fn every_budget_is_positive() {
-        for class in Class::ALL {
-            let (burst, refill) = class.budget();
-            assert!(burst > 0.0, "{class:?} has a non-positive burst {burst}");
-            assert!(refill > 0.0, "{class:?} has a non-positive refill {refill}");
-        }
-    }
-
-    /// The whole point of giving a ring its own class is that it is cheaper
-    /// to send than it is to receive: one request wakes a device, starts a
-    /// looping tone and raises a window. On `Write`'s budget a contact could
-    /// sustain five of those a second, and since a fresh ring replaces the
-    /// outstanding one that needs no cooperation from the callee. If this
-    /// ever loosens back to `Write`, the throttle has quietly gone.
-    #[test]
-    fn ringing_is_throttled_harder_than_an_ordinary_write() {
-        let (ring_burst, ring_refill) = Class::Ring.budget();
-        let (write_burst, write_refill) = Class::Write.budget();
-        assert!(
-            ring_refill < write_refill,
-            "ring refill {ring_refill} is not tighter than write's {write_refill}"
-        );
-        assert!(
-            ring_burst < write_burst,
-            "ring burst {ring_burst} is not tighter than write's {write_burst}"
-        );
-        assert!(
-            write_refill / ring_refill >= 10.0,
-            "ring is only {}x tighter than write; that is not a throttle",
-            write_refill / ring_refill
-        );
-    }
-
-    /// A webhook delivery wakes every phone in the community, not just one -
-    /// a bigger amplification than a ring's single device - so its sustained
-    /// rate must stay well under one per second, and its burst must still
-    /// absorb an honest alert-feed flurry (this variant's own doc names
-    /// thirty).
-    #[test]
-    fn webhook_delivery_is_throttled_well_under_once_a_second() {
-        let (burst, refill) = Class::Webhook.budget();
-        assert!(
-            refill < 1.0,
-            "webhook refill {refill} is not well under one per second"
-        );
-        assert!(
-            burst >= 30.0,
-            "webhook burst {burst} does not cover a thirty-item import"
-        );
-    }
-}
+mod tests;

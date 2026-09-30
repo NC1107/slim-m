@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "INSERT INTO totp_challenges\n                 (challenge_hash, user_id, device_name, client_kind, client_version,\n                  issued_at, expires_at)\n             VALUES (?, ?, ?, ?, ?, ?, ?)",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 7
+    },
+    "nullable": []
+  },
+  "hash": "a115e6893b527aaa5eea9052022c1f9c932ebee2f963aeb4f04becadf6a01e45"
+}

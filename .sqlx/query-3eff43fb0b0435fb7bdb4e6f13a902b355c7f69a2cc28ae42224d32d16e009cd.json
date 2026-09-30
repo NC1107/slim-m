@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "UPDATE user_totp_factors\n             SET last_step = ?, failed_attempts = 0, locked_until = NULL\n             WHERE user_id = ?",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 2
+    },
+    "nullable": []
+  },
+  "hash": "3eff43fb0b0435fb7bdb4e6f13a902b355c7f69a2cc28ae42224d32d16e009cd"
+}

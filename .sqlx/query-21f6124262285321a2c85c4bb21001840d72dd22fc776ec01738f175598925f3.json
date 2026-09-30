@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "DELETE FROM totp_challenges WHERE rowid IN\n             (SELECT rowid FROM totp_challenges WHERE expires_at < ? LIMIT 5000)",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": []
+  },
+  "hash": "21f6124262285321a2c85c4bb21001840d72dd22fc776ec01738f175598925f3"
+}

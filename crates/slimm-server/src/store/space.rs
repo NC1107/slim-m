@@ -9,6 +9,7 @@ use sqlx::SqliteExecutor;
 
 use super::Store;
 use super::now_ms;
+use super::totp::TotpPolicy;
 
 /// The highest resolution `ScreenShareQuality.crisp` already asks a desktop
 /// to publish (see `client/packages/rtc/lib/src/screen_share.dart`). The
@@ -159,6 +160,39 @@ impl Store {
         .execute(&self.pool)
         .await
         .context("set canvas object cap")?;
+        Ok(())
+    }
+
+    /// This deployment's second-factor policy. Read on every enrolment and
+    /// reported to the client so a screen can say what the operator chose.
+    ///
+    /// An unrecognised stored value falls back to `optional` rather than
+    /// failing the request: a policy nobody can parse must not be read as
+    /// "off", which would quietly stop new enrolments.
+    pub async fn totp_policy(&self) -> anyhow::Result<TotpPolicy> {
+        let value = sqlx::query_scalar!(
+            r#"SELECT totp_policy AS "p!: String" FROM space_settings WHERE id = 1"#
+        )
+        .fetch_optional(&self.pool)
+        .await
+        .context("read totp policy")?;
+        Ok(value
+            .as_deref()
+            .and_then(TotpPolicy::parse)
+            .unwrap_or(TotpPolicy::Optional))
+    }
+
+    pub async fn set_totp_policy(&self, policy: TotpPolicy) -> anyhow::Result<()> {
+        let now = now_ms();
+        let value = policy.as_str();
+        sqlx::query!(
+            "UPDATE space_settings SET totp_policy = ?, updated_at = ? WHERE id = 1",
+            value,
+            now
+        )
+        .execute(&self.pool)
+        .await
+        .context("set totp policy")?;
         Ok(())
     }
 

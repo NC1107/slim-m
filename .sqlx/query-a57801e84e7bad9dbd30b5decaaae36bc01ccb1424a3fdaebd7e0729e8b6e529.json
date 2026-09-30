@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "INSERT INTO user_totp_factors (user_id, secret, created_at)\n             SELECT ?, ?, ? WHERE EXISTS (SELECT 1 FROM users WHERE id = ? AND deleted_at IS NULL)\n             ON CONFLICT(user_id) DO UPDATE\n                SET secret = excluded.secret, created_at = excluded.created_at,\n                    confirmed_at = NULL, last_step = NULL,\n                    failed_attempts = 0, locked_until = NULL",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 4
+    },
+    "nullable": []
+  },
+  "hash": "a57801e84e7bad9dbd30b5decaaae36bc01ccb1424a3fdaebd7e0729e8b6e529"
+}
