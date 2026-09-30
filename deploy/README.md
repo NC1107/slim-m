@@ -136,6 +136,8 @@ docker compose ps                         # server and caddy healthy, plus livek
 ```
 
 `curl https://<SLIMM_API_DOMAIN>/version` reports what this deployment can do.
+It also carries a `build_id`, the short git SHA the image was built from, which tells two deploys of one version apart.
+A build made without one (a local `cargo run`, or `docker build` with no `SLIMM_BUILD_ID` build arg) leaves the field out.
 Without the voice overlay it simply has no SFU, which is the expected answer rather than a fault.
 
 ## Backups (optional)

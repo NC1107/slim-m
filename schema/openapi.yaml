@@ -7402,6 +7402,12 @@ components:
         version:
           type: string
           description: The server's release version.
+        build_id:
+          type: string
+          description: >
+            Short git commit SHA the server was built from, so two deploys of
+            one version can be told apart. Absent when the build was not given
+            one (a plain `cargo run`, or a server older than this field).
         protocol:
           type: integer
           format: int32

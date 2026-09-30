@@ -41,6 +41,7 @@ cp .env.example .env
 cargo run --bin slimm-server
 curl localhost:8080/healthz     # -> ok
 curl localhost:8080/version     # -> {"name":"slim-m",...}
+# optional: SLIMM_BUILD_ID=$(git rev-parse --short HEAD) cargo run adds a build_id to /version
 ```
 
 ## Documents

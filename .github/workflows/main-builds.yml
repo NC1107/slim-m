@@ -473,6 +473,7 @@ jobs:
           context: .
           file: docker/server.Dockerfile
           platforms: linux/amd64
+          build-args: SLIMM_BUILD_ID=${{ github.sha }}
           tags: |
             ${{ env.IMAGE }}:sha-${{ github.sha }}
             ${{ env.IMAGE }}:main
