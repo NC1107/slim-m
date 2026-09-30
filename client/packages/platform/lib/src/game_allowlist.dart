@@ -5,6 +5,10 @@
 /// a program that is not here is never reported, stored or logged. It ships
 /// with the client and Settings shows it in full. It is deliberately short:
 /// adding a game is a code change someone reviews, not a runtime setting.
+///
+/// Every `steamAppId` was checked against Steam's store `appdetails` on
+/// 2026-09-30. Process names are not verified against the games, so a wrong
+/// one detects nothing rather than naming the wrong title.
 library;
 
 /// One game, recognised by its process names and, for Steam titles, its app
