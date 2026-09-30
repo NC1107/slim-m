@@ -189,6 +189,8 @@ pub(super) enum ServerFrame {
     #[serde(rename = "watch.tick")]
     WatchTick {
         channel_id: String,
+        bot_user_id: String,
+        ended: bool,
         item_id: String,
         playing: bool,
         position_ms: i64,

@@ -622,6 +622,8 @@ pub(super) async fn authorize_unstamped(
         },
         Event::WatchTick {
             channel_id,
+            bot_user_id,
+            ended,
             item_id,
             playing,
             position_ms,
@@ -629,6 +631,8 @@ pub(super) async fn authorize_unstamped(
             epoch,
         } => ServerFrame::WatchTick {
             channel_id: channel_id.to_string(),
+            bot_user_id: bot_user_id.to_string(),
+            ended,
             item_id,
             playing,
             position_ms,

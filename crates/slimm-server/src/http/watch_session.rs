@@ -2,6 +2,14 @@
 //! A voice channel's shared watch position: a bot sets and re-samples it, a
 //! member reads it. See
 //! docs/decisions/0050-watch-party-sync-authority-and-direct-play.md.
+//!
+//! A session belongs to one bot and lives only while that bot is on the call:
+//! every write needs the bot's call heartbeat, a read hides a session whose
+//! bot has none, and the bot leaving cleanly ends it with an ended tick.
+//! A bot evicted for a stale heartbeat is not announced; readers see the
+//! session gone at once and viewers drop it when its ticks stop. Another bot
+//! may replace a session whose owner is off the call or past the lifetime
+//! below, and nobody else can end it.
 
 use axum::Router;
 use axum::extract::{DefaultBodyLimit, Path, State};
@@ -19,7 +27,9 @@ use crate::hub::Event;
 use crate::ids::{ChannelId, UserId};
 use crate::permissions::Permissions;
 use crate::ratelimit::Class;
-use crate::store::{WatchSample, WatchSession, WatchSessionWrite, WatchWriteOutcome, now_ms};
+use crate::store::{
+    WATCH_SESSION_TTL_MS, WatchSample, WatchSession, WatchSessionWrite, WatchWriteOutcome, now_ms,
+};
 
 const BODY_LIMIT: usize = 4 * 1024;
 const VOICE_CHANNEL_KIND: &str = "voice";
@@ -49,7 +59,11 @@ struct WatchSessionDto {
     position_ms: i64,
     sampled_at_ms: i64,
     epoch: i64,
+    /// Advisory: who the bot says is steering, for display only.
     controller_user_id: Option<String>,
+    /// How long after `sampled_at_ms` the session still counts as live, so a
+    /// viewer hides it on the server's own rule rather than a guess.
+    ttl_ms: i64,
     /// The server clock at this read, so a reader can correct for its own skew.
     server_time_ms: i64,
 }
@@ -67,13 +81,14 @@ impl WatchSessionDto {
             sampled_at_ms: s.sampled_at,
             epoch: s.epoch,
             controller_user_id: s.controller_user_id.map(|u| u.to_string()),
+            ttl_ms: WATCH_SESSION_TTL_MS,
             server_time_ms,
         }
     }
 }
 
 /// What the room is watching and where it is; 404 when nothing is playing,
-/// including a session whose bot stopped ticking.
+/// including a session whose bot stopped ticking or left the call.
 async fn get_session(
     AuthedLimited(ctx): AuthedLimited<AUTHED_READ>,
     State(state): State<AppState>,
@@ -93,6 +108,7 @@ async fn get_session(
         .store
         .watch_session(channel_id, now)
         .await?
+        .filter(|s| state.voice.has_heartbeat(s.bot_user_id, channel_id))
         .ok_or(NONE)?;
     Ok(Json(WatchSessionDto::new(session, now)))
 }
@@ -122,7 +138,8 @@ fn in_range(ms: i64) -> bool {
 }
 
 impl SetSessionRequest {
-    fn validate(self) -> Result<WatchSessionWrite, ApiError> {
+    /// `controller` is already parsed and checked against the channel.
+    fn validate(self, controller: Option<UserId>) -> Result<WatchSessionWrite, ApiError> {
         if !plain_text(&self.item_id, MAX_ITEM_ID_CHARS) {
             return Err(ApiError::BadRequest("item_id is empty, too long or hidden"));
         }
@@ -132,11 +149,6 @@ impl SetSessionRequest {
         if !in_range(self.position_ms) || !self.duration_ms.is_none_or(in_range) {
             return Err(ApiError::BadRequest("a time is out of range"));
         }
-        let controller_user_id = self
-            .controller_user_id
-            .as_deref()
-            .map(|raw| parse_uuid(raw).map(UserId))
-            .transpose()?;
         Ok(WatchSessionWrite {
             item_id: self.item_id,
             title: self.title,
@@ -144,13 +156,36 @@ impl SetSessionRequest {
             playing: self.playing,
             position_ms: self.position_ms,
             seeked: self.seeked,
-            controller_user_id,
+            controller_user_id: controller,
         })
     }
 }
 
-/// A bot whose own voice channel this is, or the refusal for everyone else.
-async fn require_bot_in_voice_channel(
+/// The controller hint, which must be somebody who can view the channel.
+async fn checked_controller(
+    state: &AppState,
+    channel_id: ChannelId,
+    raw: Option<&str>,
+) -> Result<Option<UserId>, ApiError> {
+    let Some(raw) = raw else { return Ok(None) };
+    const REFUSED: ApiError = ApiError::BadRequest("controller_user_id cannot view this channel");
+    let user = UserId(parse_uuid(raw)?);
+    if state.store.user_profile(user).await?.is_none() {
+        return Err(REFUSED);
+    }
+    let can_view = state
+        .store
+        .permissions_in_channel(user, channel_id)
+        .await?
+        .contains(Permissions::VIEW_CHANNEL);
+    if !can_view {
+        return Err(REFUSED);
+    }
+    Ok(Some(user))
+}
+
+/// A bot that is on the call of this voice channel, or the refusal for everyone else.
+async fn require_bot_in_call(
     state: &AppState,
     bot: UserId,
     channel_id: ChannelId,
@@ -171,12 +206,22 @@ async fn require_bot_in_voice_channel(
     {
         return Err(ApiError::NotFound("no such channel"));
     }
-    Ok(())
+    require_in_call(state, bot, channel_id)
 }
 
-fn publish_tick(state: &AppState, channel_id: ChannelId, sample: WatchSample) {
+fn require_in_call(state: &AppState, bot: UserId, channel_id: ChannelId) -> Result<(), ApiError> {
+    if state.voice.has_heartbeat(bot, channel_id) {
+        Ok(())
+    } else {
+        Err(ApiError::ForbiddenBecause("the bot is not on this call"))
+    }
+}
+
+fn publish_tick(state: &AppState, channel_id: ChannelId, sample: WatchSample, ended: bool) {
     state.hub.publish(Event::WatchTick {
         channel_id,
+        bot_user_id: sample.bot_user_id,
+        ended,
         item_id: sample.item_id,
         playing: sample.playing,
         position_ms: sample.position_ms,
@@ -194,16 +239,20 @@ async fn set_session(
     Path(channel_id): Path<String>,
     Json(req): Json<SetSessionRequest>,
 ) -> Result<StatusCode, ApiError> {
-    enforce(&state, &parts, Some(&ctx), Class::Write)?;
+    enforce(&state, &parts, Some(&ctx), Class::WatchTick)?;
     let channel_id = ChannelId(parse_uuid(&channel_id)?);
-    require_bot_in_voice_channel(&state, ctx.user_id, channel_id).await?;
-    let write = req.validate()?;
-    match state
+    require_bot_in_call(&state, ctx.user_id, channel_id).await?;
+    let controller =
+        checked_controller(&state, channel_id, req.controller_user_id.as_deref()).await?;
+    let write = req.validate(controller)?;
+    let outcome = state
         .store
-        .put_watch_session(channel_id, ctx.user_id, &write, now_ms())
-        .await?
-    {
-        WatchWriteOutcome::Written(sample) => publish_tick(&state, channel_id, sample),
+        .put_watch_session(channel_id, ctx.user_id, &write, now_ms(), |owner| {
+            state.voice.has_heartbeat(owner, channel_id)
+        })
+        .await?;
+    match outcome {
+        WatchWriteOutcome::Written(sample) => publish_tick(&state, channel_id, sample, false),
         WatchWriteOutcome::HeldByAnotherBot => {
             return Err(ApiError::Conflict(
                 "another bot is running a watch session here",
@@ -233,6 +282,7 @@ async fn tick(
     if !state.store.is_bot(ctx.user_id).await? {
         return Err(ApiError::Forbidden);
     }
+    require_in_call(&state, ctx.user_id, channel_id)?;
     if !in_range(req.position_ms) {
         return Err(ApiError::BadRequest("a time is out of range"));
     }
@@ -247,8 +297,20 @@ async fn tick(
         )
         .await?
         .ok_or(ApiError::NotFound("no watch session"))?;
-    publish_tick(&state, channel_id, sample);
+    publish_tick(&state, channel_id, sample, false);
     Ok(StatusCode::NO_CONTENT)
+}
+
+/// Ends a bot's session because it left the call, and tells the viewers.
+pub(super) async fn end_for_departed(
+    state: &AppState,
+    user_id: UserId,
+    channel_id: ChannelId,
+) -> Result<(), ApiError> {
+    if let Some(sample) = state.store.end_watch_session(channel_id, user_id).await? {
+        publish_tick(state, channel_id, sample, true);
+    }
+    Ok(())
 }
 
 /// A bot ends its own session.
@@ -263,12 +325,11 @@ async fn end_session(
     if !state.store.is_bot(ctx.user_id).await? {
         return Err(ApiError::Forbidden);
     }
-    if !state
+    let sample = state
         .store
         .end_watch_session(channel_id, ctx.user_id)
         .await?
-    {
-        return Err(ApiError::NotFound("no watch session"));
-    }
+        .ok_or(ApiError::NotFound("no watch session"))?;
+    publish_tick(&state, channel_id, sample, true);
     Ok(StatusCode::NO_CONTENT)
 }

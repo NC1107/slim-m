@@ -213,6 +213,8 @@ sealed class ServerEvent {
         ),
       'watch.tick'
           when decoded['channel_id'] is String &&
+              decoded['bot_user_id'] is String &&
+              decoded['ended'] is bool &&
               decoded['item_id'] is String &&
               decoded['playing'] is bool &&
               decoded['position_ms'] is int &&
@@ -220,6 +222,8 @@ sealed class ServerEvent {
               decoded['epoch'] is int =>
         WatchTick(
           channelId: decoded['channel_id'] as String,
+          botUserId: decoded['bot_user_id'] as String,
+          ended: decoded['ended'] as bool,
           itemId: decoded['item_id'] as String,
           playing: decoded['playing'] as bool,
           positionMs: decoded['position_ms'] as int,

@@ -386,10 +386,14 @@ pub enum Event {
     /// Ephemeral by the reasons [`Event::CanvasCursorMoved`] gives: no `seq`,
     /// never persisted, and a receiver that misses one is corrected by the
     /// next. The durable copy is `watch_sessions`, which a late joiner or a
-    /// reconnect reads over REST. There is no matching "stopped": the tick is
-    /// the session's heartbeat, so a receiver treats silence as the end.
+    /// reconnect reads over REST. `ended` marks the bot's own end of the
+    /// session; a bot that just stops ticking is over once the session's
+    /// lifetime passes, so a receiver still treats silence as the end.
+    /// `bot_user_id` and the epoch together name which session this belongs to.
     WatchTick {
         channel_id: ChannelId,
+        bot_user_id: UserId,
+        ended: bool,
         item_id: String,
         playing: bool,
         position_ms: i64,

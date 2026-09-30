@@ -22,6 +22,10 @@ pub mod module_world;
 /// Router and account helpers shared by the channel-overwrite test binaries.
 pub mod overwrite_harness;
 
+/// A voice channel with two bots on its call, for the watch session tests.
+#[allow(dead_code)]
+pub mod watch_world;
+
 /// Wasm fixtures for `crate::module_runtime`, shared by every test that
 /// installs a module and actually invokes it.
 #[allow(dead_code)]

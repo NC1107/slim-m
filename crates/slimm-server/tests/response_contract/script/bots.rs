@@ -163,7 +163,15 @@ async fn watch_session_calls(c: &mut Contract, root: &str, bot_token: &str) {
             json!({ "name": "watch-room", "kind": "voice" }),
         )
         .await;
-    let uri = format!("/channels/{}/watch-session", text(&room, "id"));
+    let room_id = text(&room, "id");
+    let uri = format!("/channels/{room_id}/watch-session");
+    c.bare(
+        "sendVoiceHeartbeat",
+        "POST",
+        &format!("/channels/{room_id}/voice/heartbeat"),
+        bot_token,
+    )
+    .await;
     c.json(
         "setWatchSession",
         "PUT",

@@ -48,6 +48,7 @@ pub enum WatchWriteOutcome {
 /// The part of a session a tick carries: where it is, sampled when.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct WatchSample {
+    pub bot_user_id: UserId,
     pub item_id: String,
     pub playing: bool,
     pub position_ms: i64,
@@ -88,13 +89,17 @@ impl Store {
 
     /// Sets the session, bumping the epoch on a new title or an explicit seek.
     ///
-    /// Another bot's live session is not replaced; an expired one is.
+    /// Another bot's session is replaced only once it has expired or its bot
+    /// is no longer on the call, as told by `owner_in_call`. An epoch is the
+    /// write's own millisecond timestamp or one past the last, so it never
+    /// repeats across an end and a fresh session.
     pub async fn put_watch_session(
         &self,
         channel: ChannelId,
         bot: UserId,
         write: &WatchSessionWrite,
         now: i64,
+        owner_in_call: impl Fn(UserId) -> bool,
     ) -> anyhow::Result<WatchWriteOutcome> {
         let mut tx = self.pool.begin().await?;
         let existing = sqlx::query("SELECT * FROM watch_sessions WHERE channel_id = ?")
@@ -103,14 +108,24 @@ impl Store {
             .await?
             .map(|r| from_row(&r));
         let epoch = match &existing {
-            Some(s) if s.bot_user_id != bot && now - s.sampled_at <= WATCH_SESSION_TTL_MS => {
+            Some(s)
+                if s.bot_user_id != bot
+                    && now - s.sampled_at <= WATCH_SESSION_TTL_MS
+                    && owner_in_call(s.bot_user_id) =>
+            {
                 return Ok(WatchWriteOutcome::HeldByAnotherBot);
             }
-            Some(s) if s.bot_user_id == bot && s.item_id == write.item_id && !write.seeked => {
+            // A bot back after the session lapsed may be anywhere, so viewers must resync.
+            Some(s)
+                if s.bot_user_id == bot
+                    && s.item_id == write.item_id
+                    && !write.seeked
+                    && now - s.sampled_at <= WATCH_SESSION_TTL_MS =>
+            {
                 s.epoch
             }
-            Some(s) => s.epoch + 1,
-            None => 1,
+            Some(s) => (s.epoch + 1).max(now),
+            None => now,
         };
         sqlx::query(
             "INSERT INTO watch_sessions
@@ -138,6 +153,7 @@ impl Store {
         .await?;
         tx.commit().await?;
         Ok(WatchWriteOutcome::Written(WatchSample {
+            bot_user_id: bot,
             item_id: write.item_id.clone(),
             playing: write.playing,
             position_ms: write.position_ms,
@@ -171,6 +187,7 @@ impl Store {
         .fetch_optional(&self.pool)
         .await?;
         Ok(row.map(|r| WatchSample {
+            bot_user_id: bot,
             item_id: r.get("item_id"),
             playing,
             position_ms,
@@ -179,14 +196,27 @@ impl Store {
         }))
     }
 
-    /// Ends the caller's own session; whether there was one.
-    pub async fn end_watch_session(&self, channel: ChannelId, bot: UserId) -> anyhow::Result<bool> {
-        let done =
-            sqlx::query("DELETE FROM watch_sessions WHERE channel_id = ? AND bot_user_id = ?")
-                .bind(channel)
-                .bind(bot)
-                .execute(&self.pool)
-                .await?;
-        Ok(done.rows_affected() > 0)
+    /// Ends the caller's own session, returning its last sample when there was one.
+    pub async fn end_watch_session(
+        &self,
+        channel: ChannelId,
+        bot: UserId,
+    ) -> anyhow::Result<Option<WatchSample>> {
+        let row = sqlx::query(
+            "DELETE FROM watch_sessions WHERE channel_id = ? AND bot_user_id = ?
+             RETURNING item_id, playing, position_ms, sampled_at, epoch",
+        )
+        .bind(channel)
+        .bind(bot)
+        .fetch_optional(&self.pool)
+        .await?;
+        Ok(row.map(|r| WatchSample {
+            bot_user_id: bot,
+            item_id: r.get("item_id"),
+            playing: r.get::<i64, _>("playing") != 0,
+            position_ms: r.get("position_ms"),
+            sampled_at: r.get("sampled_at"),
+            epoch: r.get("epoch"),
+        }))
     }
 }

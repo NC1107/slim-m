@@ -6186,7 +6186,8 @@ paths:
         reconnect reads here. A playing position is `position_ms` plus the time
         since `sampled_at_ms`, measured on the server clock given as
         `server_time_ms`. 404 when nothing is playing, for a caller who cannot
-        view the channel, and once the bot has gone 30 seconds without a tick.
+        view the channel, once the bot has gone `ttl_ms` without a tick, and
+        once the bot is no longer on the call.
       responses:
         "200":
           description: The session.
@@ -6206,11 +6207,15 @@ paths:
       summary: A bot states the room's watch session.
       description: >-
         Decision 0050-watch-party-sync-authority-and-direct-play. Refused for a
-        caller that is not a bot and for a channel that is not a voice channel
-        the bot can view. The epoch changes when `item_id` changes or
-        `seeked` is true. Fans out as a `watch.tick` so viewers hear of a
-        play, pause or seek now. A live session another bot holds is not
-        replaced.
+        caller that is not a bot, for a channel that is not a voice channel
+        the bot can view, and for a bot that is not on the call (403). The
+        epoch changes when `item_id` changes or `seeked` is true, and is a
+        millisecond timestamp so it never repeats across an end and a new
+        session. `controller_user_id` must be a user who can view the
+        channel, and is advisory. Fans out as a `watch.tick` so viewers hear
+        of a play, pause or seek now. A session whose bot is still on the call
+        and has ticked within `ttl_ms` is not replaced by another bot (409);
+        one whose bot has left is. Charged to the tick rate class.
       requestBody:
         required: true
         content:
@@ -6236,6 +6241,10 @@ paths:
       operationId: endWatchSession
       tags: [channels]
       summary: A bot ends its own watch session.
+      description: >-
+        Fans out a `watch.tick` with `ended` true. A bot that leaves the call
+        through `DELETE /channels/{channelId}/voice/heartbeat` ends its
+        session the same way.
       responses:
         "204":
           description: Ended.
@@ -6258,8 +6267,9 @@ paths:
       description: >-
         Decision 0050-watch-party-sync-authority-and-direct-play. Send one
         about every 5 seconds, paused or not: it is the session's heartbeat,
-        and a session 30 seconds without one reads as ended. Fans out as a
-        `watch.tick`. Charged to its own rate class, not the write class.
+        and a session `ttl_ms` without one reads as ended. Refused with 403
+        when the bot is not on the call. Fans out as a `watch.tick`. Charged
+        to its own rate class, not the write class.
       requestBody:
         required: true
         content:
@@ -13382,13 +13392,14 @@ components:
 
     WatchSession:
       type: object
-      required: [channel_id, bot_user_id, item_id, title, playing, position_ms, sampled_at_ms, epoch, server_time_ms]
+      required: [channel_id, bot_user_id, item_id, title, playing, position_ms, sampled_at_ms, epoch, ttl_ms, server_time_ms]
       properties:
         channel_id:
           type: string
           format: uuid
         bot_user_id:
           type: string
+          format: uuid
         item_id:
           type: string
         title:
@@ -13409,6 +13420,14 @@ components:
           format: int64
         controller_user_id:
           type: [string, "null"]
+          format: uuid
+          description: Advisory, for display; never an authority.
+        ttl_ms:
+          type: integer
+          format: int64
+          description: >
+            How long after `sampled_at_ms` the session still counts as live.
+            A viewer hides it on this rather than a number of its own.
         server_time_ms:
           type: integer
           format: int64
@@ -13433,6 +13452,7 @@ components:
           type: boolean
         controller_user_id:
           type: string
+          format: uuid
 
     WatchTickRequest:
       type: object
@@ -13446,12 +13466,15 @@ components:
 
     WatchTick:
       type: object
-      required: [type, channel_id, item_id, playing, position_ms, sampled_at_ms, epoch]
+      required: [type, channel_id, bot_user_id, ended, item_id, playing, position_ms, sampled_at_ms, epoch]
       description: >
         The room's watch position, about every 5 seconds and on every play,
         pause or seek. Ephemeral: no seq, never persisted, and a missed one is
-        corrected by the next. Silence for 15 seconds is the end of the
-        session. Decision 0050-watch-party-sync-authority-and-direct-play.
+        corrected by the next. `ended` is true when the bot ended the session
+        or left the call; a session whose ticks just stop is over once
+        `ttl_ms` from the REST read has passed. `bot_user_id` and `epoch`
+        name the session: a tick for a lower epoch is older and is dropped.
+        Decision 0050-watch-party-sync-authority-and-direct-play.
       properties:
         type:
           type: string
@@ -13459,6 +13482,11 @@ components:
         channel_id:
           type: string
           format: uuid
+        bot_user_id:
+          type: string
+          format: uuid
+        ended:
+          type: boolean
         item_id:
           type: string
         playing:

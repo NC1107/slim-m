@@ -13,6 +13,7 @@ class WatchSession {
     required this.positionMs,
     required this.sampledAtMs,
     required this.epoch,
+    required this.ttlMs,
     required this.serverTimeMs,
     this.durationMs,
     this.controllerUserId,
@@ -29,9 +30,15 @@ class WatchSession {
   final int positionMs;
   final int sampledAtMs;
 
-  /// Changes on every seek or title change.
+  /// Changes on every seek or title change and never repeats across an end
+  /// and a new session.
   final int epoch;
+
+  /// Advisory: who the bot says is steering, for display only.
   final String? controllerUserId;
+
+  /// How long after [sampledAtMs] the session still counts as live.
+  final int ttlMs;
 
   /// The server clock when this was read; [serverTimeMs] minus [sampledAtMs]
   /// is how stale the sample is, on one clock.
@@ -48,6 +55,7 @@ class WatchSession {
         sampledAtMs: json['sampled_at_ms'] as int,
         epoch: json['epoch'] as int,
         controllerUserId: json['controller_user_id'] as String?,
+        ttlMs: json['ttl_ms'] as int,
         serverTimeMs: json['server_time_ms'] as int,
       );
 }

@@ -7,8 +7,10 @@
 --
 -- `sampled_at` is the server wall clock the position was read at, in
 -- milliseconds, so a reader can advance a playing position by its own clock.
--- `epoch` changes on every seek or title change. A row the bot stopped
--- refreshing is treated as ended by the reader, not swept.
+-- `epoch` changes on every seek or title change, and is a millisecond
+-- timestamp so it stays monotone across an end and a fresh session. A row the
+-- bot stopped refreshing is treated as ended by the reader, not swept.
+-- `controller_user_id` is an advisory hint for display, never an authority.
 CREATE TABLE watch_sessions (
     channel_id BLOB PRIMARY KEY REFERENCES channels(id) ON DELETE CASCADE,
     bot_user_id BLOB NOT NULL REFERENCES users(id) ON DELETE CASCADE,
@@ -19,5 +21,5 @@ CREATE TABLE watch_sessions (
     position_ms INTEGER NOT NULL CHECK (position_ms >= 0),
     sampled_at INTEGER NOT NULL,
     epoch INTEGER NOT NULL,
-    controller_user_id BLOB
+    controller_user_id BLOB REFERENCES users(id)
 ) STRICT, WITHOUT ROWID;

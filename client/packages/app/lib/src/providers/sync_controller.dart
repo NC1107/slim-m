@@ -26,6 +26,7 @@ import 'providers.dart';
 import 'reconnect_backoff.dart';
 import 'typing_controller.dart';
 import 'user_profiles.dart';
+import 'watch_room.dart';
 
 part 'sync_controller_events.dart';
 
@@ -194,6 +195,8 @@ class SyncController extends StateNotifier<SyncStatus> {
     _ref.read(dmCallRingControllerProvider.notifier).clear();
     // Same: typing.stopped is ephemeral, so one missed frame sticks forever.
     _ref.invalidate(typingControllerProvider);
+    // A watch tick is ephemeral too: the session may have moved on or ended while offline.
+    _ref.invalidate(watchRoomProvider);
     // Listens for private answers from here on; created lazily it would miss the first one.
     _ref.read(ephemeralMessagesProvider);
     try {

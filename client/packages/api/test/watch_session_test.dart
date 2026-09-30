@@ -34,6 +34,7 @@ const _session = {
   'sampled_at_ms': 1000,
   'epoch': 2,
   'controller_user_id': null,
+  'ttl_ms': 30000,
   'server_time_ms': 3500,
 };
 
@@ -55,6 +56,7 @@ void main() {
     expect(session.positionMs, 5025000);
     expect(session.serverTimeMs - session.sampledAtMs, 2500);
     expect(session.controllerUserId, isNull);
+    expect(session.ttlMs, 30000);
   });
 
   test('a room with nothing playing is null, not an error', () async {
@@ -73,6 +75,8 @@ void main() {
       jsonEncode({
         'type': 'watch.tick',
         'channel_id': 'c1',
+        'bot_user_id': 'b1',
+        'ended': true,
         'item_id': 'item-1',
         'playing': false,
         'position_ms': 7000,
@@ -85,6 +89,8 @@ void main() {
     expect(tick.positionMs, 7000);
     expect(tick.playing, isFalse);
     expect(tick.epoch, 3);
+    expect(tick.botUserId, 'b1');
+    expect(tick.ended, isTrue);
 
     final bad = ServerEvent.parse(
       jsonEncode({'type': 'watch.tick', 'channel_id': 'c1'}),

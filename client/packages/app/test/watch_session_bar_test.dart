@@ -34,25 +34,52 @@ Map<String, Object?> _session({bool playing = true, int position = 5025000}) =>
       'sampled_at_ms': 10000,
       'epoch': 1,
       'controller_user_id': null,
+      'ttl_ms': 30000,
       'server_time_ms': 12000,
     };
 
 class _Rig {
-  _Rig(this.events);
+  _Rig(this.events, this.container);
 
   final StreamController<api.ServerEvent> events;
+  final ProviderContainer container;
   int reads = 0;
+}
+
+api.WatchTick _tick({
+  int epoch = 1,
+  int sampledAtMs = 12000,
+  int positionMs = 6000000,
+  bool playing = false,
+  bool ended = false,
+  String itemId = 'item-1',
+  String bot = 'jelly',
+}) => api.WatchTick(
+  channelId: 'call-1',
+  botUserId: bot,
+  ended: ended,
+  itemId: itemId,
+  playing: playing,
+  positionMs: positionMs,
+  sampledAtMs: sampledAtMs,
+  epoch: epoch,
+);
+
+Future<void> _settle(WidgetTester tester) async {
+  await tester.pump();
+  await tester.pump();
 }
 
 Future<_Rig> _pump(
   WidgetTester tester, {
   required Map<String, Object?>? session,
   double width = 360,
+  Future<http.Response> Function(int read)? respond,
 }) async {
   final events = StreamController<api.ServerEvent>.broadcast();
   addTearDown(events.close);
   var clock = _start;
-  final rig = _Rig(events);
+  late final _Rig rig;
   final container = ProviderContainer(
     overrides: [
       liveEventsProvider.overrideWithValue(events.stream),
@@ -70,6 +97,7 @@ Future<_Rig> _pump(
           ),
           httpClient: MockClient((http.Request request) async {
             rig.reads++;
+            if (respond != null) return respond(rig.reads);
             return http.Response(
               jsonEncode(session ?? {'error': 'no watch session'}),
               session == null ? 404 : 200,
@@ -82,6 +110,7 @@ Future<_Rig> _pump(
       }),
     ],
   );
+  rig = _Rig(events, container);
   addTearDown(container.dispose);
   await tester.pumpWidget(
     UncontrolledProviderScope(
@@ -145,18 +174,8 @@ void main() {
     tester,
   ) async {
     final rig = await _pump(tester, session: _session());
-    rig.events.add(
-      const api.WatchTick(
-        channelId: 'call-1',
-        itemId: 'item-1',
-        playing: false,
-        positionMs: 6000000,
-        sampledAtMs: 1,
-        epoch: 1,
-      ),
-    );
-    await tester.pump();
-    await tester.pump();
+    rig.events.add(_tick());
+    await _settle(tester);
     expect(find.text('1:40:00 / 2:00:00'), findsOneWidget);
     expect(find.byIcon(AppIcons.pause), findsOneWidget);
     expect(rig.reads, 1, reason: 'same epoch needs no re-read');
@@ -166,25 +185,95 @@ void main() {
     tester,
   ) async {
     final rig = await _pump(tester, session: _session());
-    rig.events.add(
-      const api.WatchTick(
-        channelId: 'call-1',
-        itemId: 'item-1',
-        playing: true,
-        positionMs: 1000,
-        sampledAtMs: 1,
-        epoch: 2,
-      ),
-    );
-    await tester.pump();
-    await tester.pump();
+    rig.events.add(_tick(epoch: 2, positionMs: 1000, playing: true));
+    await _settle(tester);
     expect(rig.reads, 2);
   });
 
-  testWidgets('a room that stopped ticking is treated as over', (tester) async {
+  testWidgets('a tick from another bot or item re-reads the session', (
+    tester,
+  ) async {
+    final rig = await _pump(tester, session: _session());
+    rig.events.add(_tick(bot: 'other'));
+    await _settle(tester);
+    expect(rig.reads, 2);
+    rig.events.add(_tick(itemId: 'item-2'));
+    await _settle(tester);
+    expect(rig.reads, 3);
+  });
+
+  testWidgets('a tick older than the sample, or of a lower epoch, is dropped', (
+    tester,
+  ) async {
+    final rig = await _pump(tester, session: _session(position: 5025000));
+    rig.events.add(_tick(sampledAtMs: 9000, positionMs: 6000000));
+    rig.events.add(_tick(epoch: 0, sampledAtMs: 13000, positionMs: 6000000));
+    await _settle(tester);
+    expect(find.text('1:23:47 / 2:00:00'), findsOneWidget);
+    expect(rig.reads, 1, reason: 'a lower epoch is not a cue to re-read');
+  });
+
+  testWidgets('a read that finishes after a newer tick does not undo it', (
+    tester,
+  ) async {
+    final late = Completer<http.Response>();
+    final rig = await _pump(
+      tester,
+      session: _session(),
+      respond: (read) => read == 1
+          ? Future.value(
+              http.Response(
+                jsonEncode(_session()),
+                200,
+                headers: {'content-type': 'application/json'},
+              ),
+            )
+          : late.future,
+    );
+    rig.events.add(_tick(bot: 'other'));
+    await _settle(tester);
+    rig.events.add(_tick(sampledAtMs: 13000, positionMs: 6100000));
+    await _settle(tester);
+    expect(find.text('1:41:40 / 2:00:00'), findsOneWidget);
+    late.complete(
+      http.Response(
+        jsonEncode(_session(position: 1000)),
+        200,
+        headers: {'content-type': 'application/json'},
+      ),
+    );
+    await _settle(tester);
+    expect(rig.reads, 2);
+    expect(find.text('1:41:40 / 2:00:00'), findsOneWidget);
+  });
+
+  testWidgets('an ended tick hides the bar at once', (tester) async {
+    final rig = await _pump(tester, session: _session());
+    rig.events.add(_tick(ended: true));
+    await _settle(tester);
+    expect(find.text('A Film'), findsNothing);
+    expect(rig.reads, 1);
+  });
+
+  testWidgets('a room past the server lifetime is treated as over', (
+    tester,
+  ) async {
     await _pump(tester, session: _session());
-    _advance(watchRoomStaleAfter + const Duration(seconds: 1));
+    // Sampled 2s before the read, with a 30s lifetime.
+    _advance(const Duration(seconds: 27));
     await tester.pump(const Duration(seconds: 1));
+    expect(find.text('A Film'), findsOneWidget);
+    _advance(const Duration(seconds: 2));
+    await tester.pump(const Duration(seconds: 1));
+    expect(find.text('A Film'), findsNothing);
+  });
+
+  testWidgets('a session the client cannot parse is an error, not silence', (
+    tester,
+  ) async {
+    final rig = await _pump(tester, session: _session()..remove('title'));
+    final state = rig.container.read(watchRoomProvider('call-1'));
+    expect(state.hasError, isTrue);
     expect(find.text('A Film'), findsNothing);
   });
 

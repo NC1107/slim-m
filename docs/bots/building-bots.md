@@ -250,14 +250,22 @@ It does not move anyone's video; the shared screen share is unchanged.
 Send it on a new title, a play, a pause or a seek, and set `seeked: true` for a seek so viewers resync rather than drift-correct.
 The epoch changes on a new `item_id` or `seeked`.
 
+A session belongs to a bot that is on the call.
+Every write is refused with 403 unless you have a current call heartbeat in that channel, the same signal a call control uses.
+`controller_user_id` must be a user who can view the channel, and it is a display hint only: it grants nothing.
+
 `POST /channels/{channelId}/watch-session/tick` with `playing` and `position_ms` re-samples it.
 Send one about every 5 seconds, paused or not.
-It is the session's heartbeat: a session 30 seconds without a write reads as ended, and members see nothing once 15 seconds pass without a `watch.tick`.
-`DELETE` ends it.
+It is the session's heartbeat: a session `ttl_ms` (30 seconds) without a write reads as ended, and so does one whose bot has left the call.
+`DELETE` ends it, and so does leaving the call with `DELETE /channels/{channelId}/voice/heartbeat`.
+Another bot may take a channel whose session is past that lifetime or whose owner is off the call; nobody else can end it.
 
-Both writes fan out as a `watch.tick` frame on the ephemeral channel, with no `seq`.
-A late joiner reads `GET /channels/{channelId}/watch-session` instead, which also returns `server_time_ms` to work out how old the sample is.
-The routes are for bots only, and a live session another bot holds is not replaced.
+Writes fan out as a `watch.tick` frame on the ephemeral channel, with no `seq`.
+The frame names the session with `bot_user_id` and `epoch`, and carries `ended: true` when the session was ended.
+The epoch is a millisecond timestamp: it changes on a new `item_id` or `seeked`, and never repeats across an end and a new session, so a viewer drops any tick for a lower epoch.
+A late joiner or a reconnecting client reads `GET /channels/{channelId}/watch-session` instead, which also returns `server_time_ms` to work out how old the sample is and `ttl_ms` for how long it stays live.
+PUT and tick share one rate class, so do not re-send the session faster than a tick.
+The routes are for bots only.
 
 See `docs/decisions/0050-watch-party-sync-authority-and-direct-play.md`.
 

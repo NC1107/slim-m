@@ -5,151 +5,19 @@
 
 use std::time::Duration;
 
-use axum::body::Body;
-use axum::http::{Request, StatusCode};
+use axum::http::StatusCode;
 use futures_util::{SinkExt, StreamExt};
 use serde_json::{Value, json};
-use slimm_server::auth::Auth;
-use slimm_server::config::Config;
-use slimm_server::db;
-use slimm_server::http::{self, AppState};
-use slimm_server::hub::{Event, Hub};
+use slimm_server::http;
+use slimm_server::hub::Event;
 use slimm_server::ids::ChannelId;
-use slimm_server::permissions::Permissions;
-use slimm_server::push::PushSender;
-use slimm_server::ratelimit::RateLimiter;
-use slimm_server::store::Store;
 use tokio::net::TcpListener;
 use tokio_tungstenite::connect_async;
 use tokio_tungstenite::tungstenite::Message as WsMessage;
-use tower::ServiceExt;
 
 mod support;
 
-struct World {
-    state: AppState,
-    pool: sqlx::SqlitePool,
-    voice: ChannelId,
-    text: ChannelId,
-    bot: String,
-    other_bot: String,
-    member: String,
-    alice: slimm_server::ids::UserId,
-    bob: String,
-    _guard: support::TestDbGuard,
-}
-
-async fn world() -> World {
-    let (path, guard) = support::TestDbGuard::new("slimm-watch-session");
-    let config = Config {
-        port: 0,
-        database_path: path,
-        hash_concurrency: 2,
-        ..Config::default()
-    };
-    let pool = db::connect(&config).await.expect("connect + migrate");
-    let store = Store::new(pool.clone());
-    let root = store
-        .create_account("root", "root", "not-a-real-hash")
-        .await
-        .unwrap();
-    store.bootstrap_deployment(root.id).await.unwrap();
-    let voice = store.create_channel("lounge", "voice").await.unwrap().id;
-    let text = store.create_channel("general", "text").await.unwrap().id;
-    let user = store.create_user("alice", "alice").await.unwrap();
-    let member = store
-        .open_session(user.id, "cli")
-        .await
-        .unwrap()
-        .access_token;
-    let bob_user = store.create_user("bob", "bob").await.unwrap();
-    let bob = store
-        .open_session(bob_user.id, "cli")
-        .await
-        .unwrap()
-        .access_token;
-    let bot = store
-        .create_bot("jelly", "Jelly", Permissions::NONE, root.id)
-        .await
-        .unwrap()
-        .token;
-    let other_bot = store
-        .create_bot("other", "Other", Permissions::NONE, root.id)
-        .await
-        .unwrap()
-        .token;
-    let state = AppState {
-        store,
-        auth: Auth::new(2).unwrap(),
-        hub: Hub::new(),
-        limiter: RateLimiter::new(),
-        push: PushSender::disabled(),
-        voice: slimm_server::voice::VoiceService::disabled(),
-        media: slimm_server::media::Media::for_tests(),
-        gifs: slimm_server::http::gifs::GifSearch::disabled(),
-        link_previews: slimm_server::http::link_preview::LinkPreviews::disabled(),
-        dock: slimm_server::http::dock::Dock::disabled(),
-        code_runner: slimm_server::code_runner::CodeRunner::disabled(),
-    };
-    World {
-        state,
-        pool,
-        voice,
-        text,
-        bot,
-        other_bot,
-        member,
-        alice: user.id,
-        bob,
-        _guard: guard,
-    }
-}
-
-async fn call(
-    w: &World,
-    method: &str,
-    uri: &str,
-    token: &str,
-    body: Option<Value>,
-) -> (StatusCode, Value) {
-    let builder = Request::builder()
-        .method(method)
-        .uri(uri)
-        .header("authorization", format!("Bearer {token}"));
-    let request = match body {
-        Some(value) => builder
-            .header("content-type", "application/json")
-            .body(Body::from(value.to_string()))
-            .unwrap(),
-        None => builder.body(Body::empty()).unwrap(),
-    };
-    let response = http::router(w.state.clone())
-        .oneshot(request)
-        .await
-        .unwrap();
-    let status = response.status();
-    let bytes = axum::body::to_bytes(response.into_body(), usize::MAX)
-        .await
-        .unwrap();
-    (
-        status,
-        serde_json::from_slice(&bytes).unwrap_or(Value::Null),
-    )
-}
-
-fn film(position_ms: i64, playing: bool) -> Value {
-    json!({
-        "item_id": "item-1",
-        "title": "A Film",
-        "duration_ms": 5_400_000,
-        "playing": playing,
-        "position_ms": position_ms,
-    })
-}
-
-fn session_uri(channel: ChannelId) -> String {
-    format!("/channels/{channel}/watch-session")
-}
+use support::watch_world::{World, call, film, session_uri, world};
 
 #[tokio::test]
 async fn a_member_reads_the_position_the_bot_set_from_rest_alone() {
@@ -166,7 +34,8 @@ async fn a_member_reads_the_position_the_bot_set_from_rest_alone() {
     assert_eq!(body["title"], "A Film");
     assert_eq!(body["position_ms"], 5_025_000);
     assert_eq!(body["playing"], true);
-    assert_eq!(body["epoch"], 1);
+    assert!(body["epoch"].as_i64().unwrap() > 0);
+    assert_eq!(body["ttl_ms"], slimm_server::store::WATCH_SESSION_TTL_MS);
     assert_eq!(body["duration_ms"], 5_400_000);
     assert!(body["server_time_ms"].as_i64().unwrap() >= body["sampled_at_ms"].as_i64().unwrap());
 }
@@ -179,19 +48,19 @@ async fn the_epoch_changes_on_a_seek_or_a_new_title_and_not_on_a_plain_pause() {
     call(&w, "PUT", &uri, &w.bot, Some(film(1_000, true))).await;
     call(&w, "PUT", &uri, &w.bot, Some(film(2_000, false))).await;
     let (_, paused) = call(&w, "GET", &uri, &w.member, None).await;
-    assert_eq!(epoch(&paused), 1);
+    let first = epoch(&paused);
 
     let mut seek = film(60_000, false);
     seek["seeked"] = json!(true);
     call(&w, "PUT", &uri, &w.bot, Some(seek)).await;
     let (_, seeked) = call(&w, "GET", &uri, &w.member, None).await;
-    assert_eq!(epoch(&seeked), 2);
+    assert!(epoch(&seeked) > first);
 
     let mut next = film(0, true);
     next["item_id"] = json!("item-2");
     call(&w, "PUT", &uri, &w.bot, Some(next)).await;
     let (_, retitled) = call(&w, "GET", &uri, &w.member, None).await;
-    assert_eq!(epoch(&retitled), 3);
+    assert!(epoch(&retitled) > epoch(&seeked));
 }
 
 #[tokio::test]
@@ -218,12 +87,14 @@ async fn a_tick_rides_the_ephemeral_channel_only_and_moves_the_durable_position(
             position_ms,
             playing,
             epoch,
+            ended,
             ..
         } => {
             assert_eq!(channel_id, w.voice);
             assert_eq!(position_ms, 6_000);
             assert!(playing);
-            assert_eq!(epoch, 1);
+            assert!(epoch > 0);
+            assert!(!ended);
         }
         other => panic!("expected a watch tick, got {other:?}"),
     }
@@ -337,6 +208,8 @@ async fn next_frame(ws: &mut Client) -> Value {
 fn tick_for(channel_id: ChannelId) -> Event {
     Event::WatchTick {
         channel_id,
+        bot_user_id: slimm_server::ids::UserId::generate(),
+        ended: false,
         item_id: "item-1".to_owned(),
         playing: true,
         position_ms: 7_000,
