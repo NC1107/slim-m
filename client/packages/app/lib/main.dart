@@ -51,6 +51,7 @@ import 'src/widgets/client_too_old_gate.dart';
 import 'src/widgets/server_identity_change_gate.dart';
 import 'src/widgets/incoming_call_overlay.dart';
 import 'src/widgets/picture_in_picture_gate.dart';
+import 'src/widgets/popout_host.dart';
 import 'src/widgets/toast_overlay.dart';
 
 /// Entry point.
@@ -319,24 +320,26 @@ Widget appChromeBuilder(BuildContext context, Widget? child) => Consumer(
       child: child ?? const SizedBox.shrink(),
     );
     final motionChoice = ref.watch(motionPreferenceControllerProvider);
-    return DesktopChrome(
-      child: MediaQuery(
-        data: overrideMotion(MediaQuery.of(context), motionChoice),
-        // Above the routed tree and its dialogs and sheets, under the motion override; the call overlay paints last, above the toasts too.
-        child: Stack(
-          children: [
-            // Outside everything routed: a client the server refuses has nothing useful behind this. Fail-open.
-            ClientTooOldGate(
-              child: ServerIdentityChangeGate(
-                child: PictureInPictureGate(child: densityWrapped),
+    return PopOutHost(
+      child: DesktopChrome(
+        child: MediaQuery(
+          data: overrideMotion(MediaQuery.of(context), motionChoice),
+          // Above the routed tree and its dialogs and sheets, under the motion override; the call overlay paints last, above the toasts too.
+          child: Stack(
+            children: [
+              // Outside everything routed: a client the server refuses has nothing useful behind this. Fail-open.
+              ClientTooOldGate(
+                child: ServerIdentityChangeGate(
+                  child: PictureInPictureGate(child: densityWrapped),
+                ),
               ),
-            ),
-            const Positioned.fill(child: ToastOverlay()),
-            const Positioned.fill(child: WebUpdatePill()),
-            const Positioned.fill(child: IncomingCallOverlay()),
-            // Last, so a locked screen covers a toast or a ring too, not just the routed app underneath.
-            const Positioned.fill(child: AppLockGate()),
-          ],
+              const Positioned.fill(child: ToastOverlay()),
+              const Positioned.fill(child: WebUpdatePill()),
+              const Positioned.fill(child: IncomingCallOverlay()),
+              // Last, so a locked screen covers a toast or a ring too, not just the routed app underneath.
+              const Positioned.fill(child: AppLockGate()),
+            ],
+          ),
         ),
       ),
     );

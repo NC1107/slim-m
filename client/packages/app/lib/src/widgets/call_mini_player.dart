@@ -18,6 +18,7 @@ import 'package:slimm_design_system/design_system.dart';
 import 'package:slimm_rtc/rtc.dart';
 
 import '../providers/call_mini_player.dart';
+import '../providers/popout_window.dart';
 import '../providers/voice_controller.dart';
 import '../providers/voice_flags.dart';
 import '../routing/breakpoints.dart';
@@ -265,6 +266,14 @@ class _MiniPlayerCard extends ConsumerWidget {
                   variant: AppIconButtonVariant.danger,
                   onPressed: controller.leave,
                 ),
+                if (ref.watch(popOutSupportedProvider))
+                  AppIconButton(
+                    icon: AppIcons.popOut,
+                    semanticLabel: 'Pop out',
+                    tooltip: 'Pop out',
+                    onPressed: () =>
+                        ref.read(popOutFeedProvider.notifier).state = feed,
+                  ),
                 AppIconButton(
                   icon: AppIcons.dismiss,
                   semanticLabel: 'Hide the mini-player',

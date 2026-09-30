@@ -203,6 +203,7 @@ class _StageWithFilmstrip extends StatelessWidget {
         child: ScreenShareStage(
           sharerName: sharer.name,
           isLocal: sharer.isLocal,
+          popOutIdentity: sharer.identity,
           onExpand: () => showFullscreenVideo(
             context,
             identity: sharer.identity,
