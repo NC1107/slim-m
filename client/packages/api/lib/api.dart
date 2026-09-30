@@ -63,6 +63,7 @@ export 'src/client.dart'
         SlimmApiInteractions,
         SlimmApiUsers,
         SlimmApiVoice,
+        SlimmApiWatchSession,
         SlimmApiWebhooks,
         JoinPolicy;
 export 'src/events.dart'
@@ -122,6 +123,7 @@ export 'src/events.dart'
         VoiceParticipantJoined,
         VoiceParticipantLeft,
         VoiceScreenShareChanged,
+        WatchTick,
         protocolVersion;
 export 'src/exceptions.dart';
 export 'src/limits.dart'

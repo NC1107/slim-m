@@ -86,6 +86,7 @@ fn extra_bit(event: &Event) -> Option<Permissions> {
         | Event::VoiceParticipantJoined { .. }
         | Event::VoiceParticipantLeft { .. }
         | Event::VoiceScreenShareChanged { .. }
+        | Event::WatchTick { .. }
         // Same again: a DM's own VIEW_CHANNEL already limits this to the pair.
         | Event::CallRinging { .. }
         | Event::CallRingEnded { .. }
@@ -308,6 +309,7 @@ pub(super) async fn authorize_unstamped(
             Event::VoiceParticipantJoined { channel_id, .. } => *channel_id,
             Event::VoiceParticipantLeft { channel_id, .. } => *channel_id,
             Event::VoiceScreenShareChanged { channel_id, .. } => *channel_id,
+            Event::WatchTick { channel_id, .. } => *channel_id,
             Event::CallRinging { channel_id, .. } => *channel_id,
             Event::CallRingEnded { channel_id, .. } => *channel_id,
             // canvas_frames::channel_id already answered Some for any of these.
@@ -617,6 +619,21 @@ pub(super) async fn authorize_unstamped(
             channel_id: channel_id.to_string(),
             user_id: user_id.to_string(),
             is_sharing_screen,
+        },
+        Event::WatchTick {
+            channel_id,
+            item_id,
+            playing,
+            position_ms,
+            sampled_at_ms,
+            epoch,
+        } => ServerFrame::WatchTick {
+            channel_id: channel_id.to_string(),
+            item_id,
+            playing,
+            position_ms,
+            sampled_at_ms,
+            epoch,
         },
         Event::CallRinging {
             channel_id,

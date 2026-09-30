@@ -104,6 +104,7 @@ mod totp;
 mod totp_verify;
 mod user_notes;
 mod users;
+mod watch_sessions;
 mod webhooks;
 
 pub use account_deletion::DeleteAccountError;
@@ -194,6 +195,9 @@ pub use totp::{RECOVERY_CODE_COUNT, TotpEnrolment, TotpError, TotpPolicy, TotpSt
 pub use totp_verify::{ChallengeError, TotpChallenge, TotpProof, TotpSignIn};
 pub use user_notes::UserNote;
 pub use users::ProfileUpdate;
+pub use watch_sessions::{
+    WATCH_SESSION_TTL_MS, WatchSample, WatchSession, WatchSessionWrite, WatchWriteOutcome,
+};
 pub use webhooks::{NewWebhook, Webhook, WebhookContext};
 
 /// Largest number of ids to bind into one `IN (...)` list, for the batched

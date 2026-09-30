@@ -15,6 +15,7 @@ part 'events_connection.dart';
 part 'events_frames.dart';
 part 'events_frames_bots.dart';
 part 'events_frames_canvas.dart';
+part 'events_frames_watch.dart';
 
 /// The envelope version this client speaks. The server refuses a mismatch, so a
 /// client that is too old fails at connect rather than misreading frames.
@@ -209,6 +210,21 @@ sealed class ServerEvent {
           channelId: decoded['channel_id'] as String,
           userId: decoded['user_id'] as String,
           isSharingScreen: decoded['is_sharing_screen'] as bool,
+        ),
+      'watch.tick'
+          when decoded['channel_id'] is String &&
+              decoded['item_id'] is String &&
+              decoded['playing'] is bool &&
+              decoded['position_ms'] is int &&
+              decoded['sampled_at_ms'] is int &&
+              decoded['epoch'] is int =>
+        WatchTick(
+          channelId: decoded['channel_id'] as String,
+          itemId: decoded['item_id'] as String,
+          playing: decoded['playing'] as bool,
+          positionMs: decoded['position_ms'] as int,
+          sampledAtMs: decoded['sampled_at_ms'] as int,
+          epoch: decoded['epoch'] as int,
         ),
       'call.ringing'
           when decoded['channel_id'] is String &&

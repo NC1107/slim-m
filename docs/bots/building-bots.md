@@ -241,6 +241,26 @@ A call control is refused unless you are on that call, judged by your call heart
 
 See `docs/decisions/0045-bot-contributed-ui.md`.
 
+## Sharing a watch position
+
+A bot running a watch party in a voice channel can tell the call where it is, so members see a title, a progress bar and the playing state.
+It does not move anyone's video; the shared screen share is unchanged.
+
+`PUT /channels/{channelId}/watch-session` states the session: `item_id`, `title`, `playing`, `position_ms`, and optionally `duration_ms` and `controller_user_id`.
+Send it on a new title, a play, a pause or a seek, and set `seeked: true` for a seek so viewers resync rather than drift-correct.
+The epoch changes on a new `item_id` or `seeked`.
+
+`POST /channels/{channelId}/watch-session/tick` with `playing` and `position_ms` re-samples it.
+Send one about every 5 seconds, paused or not.
+It is the session's heartbeat: a session 30 seconds without a write reads as ended, and members see nothing once 15 seconds pass without a `watch.tick`.
+`DELETE` ends it.
+
+Both writes fan out as a `watch.tick` frame on the ephemeral channel, with no `seq`.
+A late joiner reads `GET /channels/{channelId}/watch-session` instead, which also returns `server_time_ms` to work out how old the sample is.
+The routes are for bots only, and a live session another bot holds is not replaced.
+
+See `docs/decisions/0050-watch-party-sync-authority-and-direct-play.md`.
+
 ## Registering your commands
 
 Call this once you are connected, and again every time you reconnect:

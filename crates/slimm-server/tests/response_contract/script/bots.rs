@@ -138,6 +138,8 @@ pub(crate) async fn bot_calls(c: &mut Contract, root: &str, channel: &str) {
     )
     .await;
 
+    watch_session_calls(c, root, &bot_token).await;
+
     c.json(
         "setBotPermissions",
         "PATCH",
@@ -148,4 +150,42 @@ pub(crate) async fn bot_calls(c: &mut Contract, root: &str, channel: &str) {
     .await;
     c.bare("revokeBot", "POST", &format!("/bots/{bot_id}/revoke"), root)
         .await;
+}
+
+/// A bot runs a watch session in a voice channel of its own and a member reads it.
+async fn watch_session_calls(c: &mut Contract, root: &str, bot_token: &str) {
+    let room = c
+        .json(
+            "createChannel",
+            "POST",
+            "/channels",
+            root,
+            json!({ "name": "watch-room", "kind": "voice" }),
+        )
+        .await;
+    let uri = format!("/channels/{}/watch-session", text(&room, "id"));
+    c.json(
+        "setWatchSession",
+        "PUT",
+        &uri,
+        bot_token,
+        json!({
+            "item_id": "item-1",
+            "title": "A Film",
+            "duration_ms": 5_400_000,
+            "playing": true,
+            "position_ms": 60_000,
+        }),
+    )
+    .await;
+    c.json(
+        "tickWatchSession",
+        "POST",
+        &format!("{uri}/tick"),
+        bot_token,
+        json!({ "playing": true, "position_ms": 65_000 }),
+    )
+    .await;
+    c.get("getWatchSession", &uri, root).await;
+    c.bare("endWatchSession", "DELETE", &uri, bot_token).await;
 }
