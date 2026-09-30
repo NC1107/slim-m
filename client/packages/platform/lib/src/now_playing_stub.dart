@@ -4,4 +4,4 @@ library;
 
 import 'now_playing.dart';
 
-NowPlayingSource? createNowPlayingSource() => null;
+NowPlayingSource? createNowPlayingSource({bool? linux, bool? windows}) => null;

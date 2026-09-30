@@ -1,16 +1,18 @@
 // SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
-/// The switch for showing what you are listening to (decision 0044).
+/// Every rich-presence switch, and what is being shared right now, in one
+/// place (decision 0044).
 ///
-/// Off by default, and absent on a platform with no source rather than shown
-/// dead. It sits in the Profile pane because it decides what your profile
-/// card and member row say about you.
+/// Each source is off by default and absent on a platform that has none
+/// rather than shown dead. It sits in the Profile pane because it decides
+/// what your profile card and member row say about you.
 library;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:slimm_design_system/design_system.dart';
 
-import '../providers/activity_publisher.dart';
-import '../providers/activity_sharing_settings.dart';
+import '../providers/activity_feeds.dart';
+import '../providers/presence_activity.dart';
 import 'settings_section_header.dart';
 import 'settings_toggle_row.dart';
 
@@ -19,9 +21,8 @@ class ActivitySharingSection extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    if (ref.watch(nowPlayingSourceProvider) == null) {
-      return const SizedBox.shrink();
-    }
+    final feeds = ref.watch(availableActivityFeedsProvider);
+    if (feeds.isEmpty) return const SizedBox.shrink();
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -33,20 +34,41 @@ class ActivitySharingSection extends ConsumerWidget {
         ),
         SettingsSectionCard(
           children: [
-            SettingsToggleRow(
-              label: 'Show what I am listening to',
-              description:
-                  'Reads the track from any player on this computer and '
-                  'shows it on your profile card and member row. It clears '
-                  'when you pause, stop or quit.',
-              value: ref.watch(shareListeningProvider),
-              onChanged: (value) =>
-                  ref.read(shareListeningProvider.notifier).setEnabled(value),
-              semanticLabel: 'Show what I am listening to',
-            ),
+            for (final feed in feeds)
+              SettingsToggleRow(
+                label: feed.label,
+                description: feed.description,
+                value: ref.watch(feed.enabled),
+                onChanged: (value) =>
+                    ref.read(feed.enabled.notifier).setEnabled(value),
+                semanticLabel: feed.label,
+              ),
+            const _SharingNow(),
           ],
         ),
       ],
+    );
+  }
+}
+
+class _SharingNow extends ConsumerWidget {
+  const _SharingNow();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final shared = ref.watch(sharedActivityProvider);
+    final tokens = Theme.of(context).extension<AppTokens>()!;
+    return Padding(
+      padding: const EdgeInsets.symmetric(
+        horizontal: AppSpacing.s8,
+        vertical: AppSpacing.s8,
+      ),
+      child: Text(
+        shared == null
+            ? 'Sharing right now: nothing'
+            : 'Sharing right now: ${describeActivity(shared)}',
+        style: AppText.caption.copyWith(color: tokens.textSecondary),
+      ),
     );
   }
 }

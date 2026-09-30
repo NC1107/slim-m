@@ -13,6 +13,7 @@ import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:slimm_api/api.dart' as api;
+import 'package:slimm_app/src/providers/activity_feeds.dart';
 import 'package:slimm_app/src/providers/activity_publisher.dart';
 import 'package:slimm_app/src/providers/activity_sharing_settings.dart';
 import 'package:slimm_app/src/providers/live_events.dart';
@@ -28,19 +29,20 @@ const _tokens = api.TokenPair(
 );
 
 class _FakeSource implements NowPlayingSource {
-  final _controller = StreamController<NowPlaying?>(onListen: null, sync: true);
+  StreamController<NowPlaying?>? _controller;
   int listens = 0;
-  bool cancelled = false;
 
   @override
   Stream<NowPlaying?> watch() {
     listens++;
-    return _controller.stream.transform(
-      StreamTransformer.fromHandlers(handleDone: (sink) => sink.close()),
-    );
+    final controller = StreamController<NowPlaying?>(sync: true);
+    _controller = controller;
+    return controller.stream;
   }
 
-  void play(NowPlaying? track) => _controller.add(track);
+  bool get open => _controller?.hasListener ?? false;
+
+  void play(NowPlaying? track) => _controller?.add(track);
 }
 
 class _Harness {
@@ -147,6 +149,7 @@ void main() {
     await h.container.read(shareListeningProvider.notifier).setEnabled(false);
     await h.settle();
     expect(h.calls.last, 'DELETE /presence/activity');
+    expect(source.open, isFalse);
     source.play(const NowPlaying(title: 'Ignored'));
     await h.settle();
     expect(h.calls, hasLength(2));
@@ -160,9 +163,11 @@ void main() {
     h.container.read(presenceVisibilityDisplayProvider.notifier).state =
         api.PresenceVisibility.hidden;
 
+    await h.settle();
     source.play(const NowPlaying(title: 'Secret'));
     await h.settle();
     expect(h.calls, isEmpty);
+    expect(source.open, isFalse);
   });
 
   test('hiding after sharing clears it, and unhiding shares again', () async {
@@ -180,7 +185,11 @@ void main() {
     await h.settle();
     expect(h.calls.last, 'DELETE /presence/activity');
 
+    expect(source.open, isFalse);
+
     visibility.state = api.PresenceVisibility.online;
+    await h.settle();
+    source.play(const NowPlaying(title: 'Song'));
     await h.settle();
     expect(h.calls.last, startsWith('PUT /presence/activity'));
   });

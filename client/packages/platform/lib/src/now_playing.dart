@@ -1,12 +1,12 @@
 // SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// What this device is playing right now, for rich presence (decision 0044).
 ///
-/// Only Linux has a source today (MPRIS over D-Bus). Everywhere else
-/// [createNowPlayingSource] is null: web has no such API and the other
-/// desktops each need their own binding, filed as separate cards.
+/// Linux reads MPRIS over D-Bus and Windows reads the system media transport
+/// controls through a method channel. Everywhere else [createNowPlayingSource]
+/// is null: web has no such API and macOS has no supported one (decision 0044).
 library;
 
-import 'now_playing_stub.dart' if (dart.library.io) 'now_playing_mpris.dart'
+import 'now_playing_stub.dart' if (dart.library.io) 'now_playing_io.dart'
     as impl;
 
 /// One track a local player reports as playing.
