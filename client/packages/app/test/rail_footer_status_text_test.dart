@@ -1,9 +1,12 @@
 // SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// The rail footer's second line used to always be the generic presence
-/// word (`connected`, `away`, ...); `Me.statusText`, set from the same
-/// status menu right above this row, was never surfaced anywhere here. It
-/// now joins the presence word ("online · swagging"), the same pair the
-/// member pane shows for everyone else (design review note 7).
+/// word; `Me.statusText`, set from the same status menu right above this row,
+/// was never surfaced anywhere here. It now joins the presence word
+/// ("online · swagging"), the same pair the member pane shows for everyone
+/// else (design review note 7).
+///
+/// The generic word is `status unknown` rather than the `connected` it was:
+/// see `presenceDisplayOf`. Nothing on this line reports the socket.
 library;
 
 import 'dart:convert';
@@ -17,6 +20,7 @@ import 'package:slimm_api/api.dart' as api;
 import 'package:slimm_app/src/providers/providers.dart';
 import 'package:slimm_app/src/providers/sync_controller.dart';
 import 'package:slimm_app/src/widgets/channel_rail_frame.dart';
+import 'package:slimm_app/src/widgets/presence_menu.dart';
 import 'package:slimm_design_system/design_system.dart';
 import 'package:slimm_platform/platform.dart';
 
@@ -99,7 +103,7 @@ void main() {
     await _pumpFooter(tester, container);
 
     expect(
-      find.text('connected · heads down, back in an hour'),
+      find.text('$unknownPresenceLabel · heads down, back in an hour'),
       findsOneWidget,
     );
   });
@@ -111,7 +115,7 @@ void main() {
     addTearDown(container.dispose);
     await _pumpFooter(tester, container);
 
-    expect(find.text('connected'), findsOneWidget);
+    expect(find.text(unknownPresenceLabel), findsOneWidget);
   });
 
   testWidgets('a status cleared back to empty falls back to the generic word', (
@@ -121,6 +125,6 @@ void main() {
     addTearDown(container.dispose);
     await _pumpFooter(tester, container);
 
-    expect(find.text('connected'), findsOneWidget);
+    expect(find.text(unknownPresenceLabel), findsOneWidget);
   });
 }

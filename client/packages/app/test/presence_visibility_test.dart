@@ -176,8 +176,8 @@ void main() {
     );
   });
 
-  testWidgets('the footer reports the connection rather than claiming online '
-      'before any choice is made', (tester) async {
+  testWidgets('the footer says the status is unknown rather than claiming '
+      'online before any choice is made', (tester) async {
     final container = _container();
     addTearDown(container.dispose);
     await _pumpFooter(tester, container);
@@ -189,7 +189,14 @@ void main() {
           'a user who chose appear-offline last week is still hidden '
           'server-side; telling them they are online is the privacy lie',
     );
-    expect(find.text('connected'), findsOneWidget);
+    expect(
+      find.text('connected'),
+      findsNothing,
+      reason:
+          'connected is the connection vocabulary the header dot owns; it is '
+          'what made the owner read this row as a connection indicator',
+    );
+    expect(find.text(unknownPresenceLabel), findsOneWidget);
   });
 
   testWidgets('the status menu marks nothing current until a choice is made', (

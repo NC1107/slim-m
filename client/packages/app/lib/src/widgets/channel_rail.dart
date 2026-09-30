@@ -16,7 +16,10 @@ import '../permissions.dart';
 import '../providers/channel_order_controller.dart';
 import '../providers/dms.dart';
 import '../providers/providers.dart';
+import '../providers/sync_controller.dart';
+import '../providers/sync_failure.dart';
 import '../routing/routes.dart';
+import 'channel_rail_failure.dart';
 import 'channel_rail_frame.dart';
 import 'channel_rail_selection_marker.dart';
 import 'channel_rail_sections.dart';
@@ -214,14 +217,9 @@ class _ChannelRailState extends ConsumerState<ChannelRail> {
   }) {
     return storeAsync.when(
       loading: () => const Center(child: CircularProgressIndicator()),
-      error: (e, _) => Center(
-        child: Padding(
-          padding: const EdgeInsets.all(AppSpacing.s16),
-          child: AppErrorState(
-            message: 'Could not load channels.',
-            onRetry: () => ref.invalidate(storeProvider),
-          ),
-        ),
+      error: (e, _) => RailFailureNotice(
+        failure: localStoreRailFailure(e),
+        onRetry: () => ref.invalidate(storeProvider),
       ),
       data: (store) => StreamBuilder<List<Channel>>(
         // Deduped to what the rail draws; see MessageStore.watchRailChannels.
@@ -239,6 +237,20 @@ class _ChannelRailState extends ConsumerState<ChannelRail> {
               final nonDm = channels
                   .where((c) => c.kind != dmChannelKind)
                   .toList(growable: false);
+              // Only once the store has actually answered with nothing; a stream that has not delivered yet is still loading.
+              if (channelSnapshot.hasData && channels.isEmpty) {
+                final failure = emptyRailFailure(
+                  ref.watch(syncFailureProvider),
+                );
+                if (failure != null) {
+                  return RailFailureNotice(
+                    failure: failure,
+                    onRetry: () => unawaited(
+                      ref.read(syncControllerProvider.notifier).start(),
+                    ),
+                  );
+                }
+              }
               // A scroll view over one column, not a ListView: the selection marker layer has to span both sections to slide between them.
               final list = SingleChildScrollView(
                 controller: widget.scrollController,

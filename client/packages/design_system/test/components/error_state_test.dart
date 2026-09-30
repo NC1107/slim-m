@@ -7,6 +7,11 @@
 /// 2026-09-03 so such an error clears itself instead of sticking forever -
 /// without becoming a SnackBar, which the error grammar and check-error-surface
 /// both forbid.
+///
+/// Also its height: every caller hands this loose vertical constraints, and the
+/// Column's default MainAxisSize.max stretched one line of text into a border
+/// the full height of the pane. The channel rail shipped roughly 1,200 physical
+/// pixels of empty bordered sidebar that way.
 library;
 
 import 'package:flutter/material.dart';
@@ -63,5 +68,52 @@ void main() {
     );
     await tester.pump(const Duration(seconds: 2));
     expect(find.text('orphan'), findsOneWidget);
+  });
+
+  testWidgets(
+      'it is as tall as its own content, not as tall as the space '
+      'it is offered', (tester) async {
+    const offered = 560.0;
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: buildTheme(Brightness.light, AppTokens.light),
+        home: const Scaffold(
+          body: SizedBox(
+            width: 248,
+            height: offered,
+            child: Stack(
+              children: [
+                Positioned.fill(
+                  child: Center(
+                    child: AppErrorState(message: 'Could not load channels.'),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    final box = tester.getRect(find.byType(AppErrorState));
+    final text = tester.getRect(find.text('Could not load channels.'));
+    expect(
+      box.height,
+      lessThan(offered / 2),
+      reason:
+          'a one-line failure must not enclose the pane it sits in; this is '
+          'the 1,200px bordered sidebar the rail shipped',
+    );
+    expect(
+      box.height,
+      lessThanOrEqualTo(text.height + AppSpacing.s12 * 2 + 2),
+      reason: 'the border hugs the line plus its own padding, nothing more',
+    );
+    expect(
+      box.width,
+      248,
+      reason: 'width still fills, so the box lines up with the rows above it',
+    );
   });
 }
