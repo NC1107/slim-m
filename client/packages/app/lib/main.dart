@@ -47,6 +47,7 @@ import 'src/routing/router.dart';
 import 'src/web_update/web_update_pill.dart';
 import 'src/widgets/app_lock_gate.dart';
 import 'src/widgets/client_too_old_gate.dart';
+import 'src/widgets/server_identity_change_gate.dart';
 import 'src/widgets/incoming_call_overlay.dart';
 import 'src/widgets/toast_overlay.dart';
 
@@ -322,7 +323,9 @@ Widget appChromeBuilder(BuildContext context, Widget? child) => Consumer(
         child: Stack(
           children: [
             // Outside everything routed: a client the server refuses has nothing useful behind this. Fail-open.
-            ClientTooOldGate(child: densityWrapped),
+            ClientTooOldGate(
+              child: ServerIdentityChangeGate(child: densityWrapped),
+            ),
             const Positioned.fill(child: ToastOverlay()),
             const Positioned.fill(child: WebUpdatePill()),
             const Positioned.fill(child: IncomingCallOverlay()),

@@ -10,12 +10,14 @@
 /// branch, which `flutter test` on Linux would otherwise never reach.
 library;
 
+import 'dart:io';
 import 'dart:ui' show Rect;
 
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:gal/gal.dart';
+import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
 
 /// What the viewer's action bar offers, and what each action does.
@@ -44,7 +46,11 @@ class PhotoLibraryDenied implements Exception {
 }
 
 class PlatformImageExporter implements ImageExporter {
-  const PlatformImageExporter();
+  /// [tempRoot] and [shareFiles] are seams so a test can watch the temp file.
+  const PlatformImageExporter({this.tempRoot, this.shareFiles});
+
+  final Future<Directory> Function()? tempRoot;
+  final Future<void> Function(ShareParams params)? shareFiles;
 
   static bool get _mobile =>
       !kIsWeb &&
@@ -64,13 +70,41 @@ class PlatformImageExporter implements ImageExporter {
     required String contentType,
     Rect? origin,
   }) async {
-    await SharePlus.instance.share(
-      ShareParams(
-        files: [XFile.fromData(bytes, name: filename, mimeType: contentType)],
-        fileNameOverrides: [filename],
+    final root = await (tempRoot ?? getTemporaryDirectory)();
+    // share_plus never deletes the copy it makes of XFile.fromData.
+    await _sweep(root);
+    final folder = await root.createTemp(_folderPrefix);
+    try {
+      final file = File(
+        '${folder.path}/${filename.split(RegExp(r'[\\/]')).last}',
+      );
+      await file.writeAsBytes(bytes);
+      final params = ShareParams(
+        files: [XFile(file.path, mimeType: contentType)],
         sharePositionOrigin: origin,
-      ),
-    );
+      );
+      await (shareFiles ?? SharePlus.instance.share)(params);
+    } finally {
+      // Android's chooser reports back before the target app has read the file.
+      if (!_deferDelete) await folder.delete(recursive: true);
+    }
+  }
+
+  static const _folderPrefix = 'share_';
+
+  static bool get _deferDelete =>
+      !kIsWeb && defaultTargetPlatform == TargetPlatform.android;
+
+  /// Clears what an earlier share left behind, which is all of it on Android.
+  static Future<void> _sweep(Directory root) async {
+    await for (final entry in root.list()) {
+      if (entry is Directory &&
+          entry.uri.pathSegments
+              .lastWhere((s) => s.isNotEmpty)
+              .startsWith(_folderPrefix)) {
+        await entry.delete(recursive: true).catchError((_) => entry);
+      }
+    }
   }
 
   @override
