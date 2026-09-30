@@ -24,6 +24,7 @@ import 'op_adjacency.dart';
 import 'message_extras.dart';
 import 'providers.dart';
 import 'reconnect_backoff.dart';
+import 'sync_failure.dart';
 import 'typing_controller.dart';
 import 'user_profiles.dart';
 
@@ -216,6 +217,7 @@ class SyncController extends StateNotifier<SyncStatus> {
       _backoff.reset();
       state = SyncStatus.live;
       _ref.read(hasFailedSinceLiveProvider.notifier).state = false;
+      _ref.read(syncFailureProvider.notifier).state = null;
       // A DB read failure here must not read as this connect itself having failed; retryMessage's own catch already covers a failed resend.
       unawaited(
         retryFailedSends(
@@ -224,11 +226,12 @@ class SyncController extends StateNotifier<SyncStatus> {
           isCurrent: () => generation == _generation,
         ).catchError((_) {}),
       );
-    } catch (_) {
+    } catch (error) {
       if (generation != _generation) return;
-      // A connectivity or auth problem here: both mean show offline and retry with backoff.
+      // Both show offline and retry with backoff, but the reader is told which: see syncFailureProvider.
       state = SyncStatus.offline;
       _ref.read(hasFailedSinceLiveProvider.notifier).state = true;
+      _ref.read(syncFailureProvider.notifier).state = syncFailureFor(error);
       _scheduleRetry();
     }
   }
@@ -458,6 +461,7 @@ class SyncController extends StateNotifier<SyncStatus> {
     _ref.invalidate(meProvider);
     _ref.invalidate(initialSyncCompleteProvider);
     _ref.invalidate(hasFailedSinceLiveProvider);
+    _ref.invalidate(syncFailureProvider);
     _ref.invalidate(ephemeralMessagesProvider);
     _ref.read(messageExtrasProvider.notifier).clear();
     _ref.read(dmCallRingControllerProvider.notifier).clear();

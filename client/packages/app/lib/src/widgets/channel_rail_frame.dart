@@ -14,6 +14,7 @@ import '../desktop/update_watch.dart';
 import '../providers/presence_controller.dart';
 import '../providers/providers.dart';
 import '../providers/sync_controller.dart';
+import '../providers/sync_failure.dart';
 import '../providers/voice_controller.dart';
 import '../providers/voice_flags.dart';
 import '../routing/breakpoints.dart';
@@ -87,7 +88,10 @@ class RailHeader extends ConsumerWidget {
                 Expanded(
                   child: Row(
                     children: [
-                      SpaceConnectionDot(status: syncStatus),
+                      SpaceConnectionDot(
+                        status: syncStatus,
+                        failure: ref.watch(syncFailureProvider),
+                      ),
                       const SizedBox(width: 6),
                       Flexible(
                         child: Text(
@@ -127,20 +131,18 @@ class RailHeader extends ConsumerWidget {
 /// is the one state that has actually stopped, so it alone carries the warn
 /// tone, while connecting is transient and stays neutral.
 class SpaceConnectionDot extends StatelessWidget {
-  const SpaceConnectionDot({super.key, required this.status});
+  const SpaceConnectionDot({super.key, required this.status, this.failure});
 
   final SyncStatus status;
+
+  /// Why sync is down, when something knows: a refused session and an
+  /// unreachable server look identical here and recover differently.
+  final SyncFailure? failure;
 
   static const Map<SyncStatus, AppStatusShape> _shapeOf = {
     SyncStatus.live: AppStatusShape.filledDisc,
     SyncStatus.connecting: AppStatusShape.triangle,
     SyncStatus.offline: AppStatusShape.hollowRing,
-  };
-
-  static const Map<SyncStatus, String> _labelOf = {
-    SyncStatus.live: 'Connected to the server',
-    SyncStatus.connecting: 'Connecting to the server',
-    SyncStatus.offline: 'Offline, retrying',
   };
 
   static const double _size = 8;
@@ -153,7 +155,7 @@ class SpaceConnectionDot extends StatelessWidget {
       SyncStatus.connecting => tokens.textSecondary,
       SyncStatus.offline => tokens.warnText,
     };
-    final label = _labelOf[status]!;
+    final label = connectionLabel(status, failure);
     return Tooltip(
       message: label,
       child: Semantics(
@@ -200,7 +202,8 @@ class RailConnectionBar extends ConsumerWidget {
         tokens.textSecondary,
       ),
       SyncStatus.offline => (
-        'Offline, retrying',
+        // Drops "retrying" for a refusal: it does keep trying, and saying so would invite a wait for something that cannot arrive.
+        connectionLabel(status, ref.watch(syncFailureProvider)),
         AppIcons.retry,
         tokens.warnText,
       ),

@@ -35,20 +35,33 @@ const presenceOptions = <(api.PresenceVisibility, String, AppPresence)>[
 ];
 
 /// The rail footer's status line and dot for a chosen [visibility]: the same
-/// label the menu offers, lowercased to match the footer's register.
+/// label the menu offers, lowercased to match the footer's register and the
+/// member pane's own word for everyone else.
 ///
-/// A null [visibility] is "no choice known this session", so the line reports
-/// this device's connection, the way the connecting and offline cases already
-/// do, instead of claiming a visibility it cannot read back. Saying "online"
-/// there would tell someone who chose appear-offline last week that they are
-/// visible; see [presenceVisibilityDisplayProvider].
+/// A null [visibility] is "no choice known this session", which is every launch
+/// until someone picks one, because there is no read-back endpoint (see
+/// [presenceVisibilityDisplayProvider]). It says so. It used to return
+/// `connected` and a green online dot for that case, and both were unearned:
+/// the word is the connection vocabulary `SpaceConnectionDot` owns, which is
+/// how the owner came to read the footer as a connection indicator and doubt
+/// it, and the green dot asserted a visibility to someone who may have chosen
+/// appear-offline on another device. Nothing on this line reports the socket
+/// now, so it cannot disagree with the header's dot.
 (String, AppPresence) presenceDisplayOf(api.PresenceVisibility? visibility) {
-  if (visibility == null) return ('connected', AppPresence.online);
+  if (visibility == null) return (unknownPresenceLabel, AppPresence.offline);
   final option = presenceOptions.firstWhere(
     (option) => option.$1 == visibility,
   );
   return (option.$2.toLowerCase(), option.$3);
 }
+
+/// The footer's word for a visibility this client cannot read back.
+///
+/// Deliberately not a presence word and not a connection word: it is a
+/// statement about what this device knows, which is the only honest one here.
+/// One word because the footer's name column ellipsizes past about nine
+/// characters, and "status unkn..." says less than nothing.
+const unknownPresenceLabel = 'unknown';
 
 /// Sets the caller's own visibility, and puts the echo back if the server
 /// refuses it.

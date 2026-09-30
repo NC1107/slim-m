@@ -120,6 +120,8 @@ class _AppErrorStateState extends State<AppErrorState> {
           borderRadius: BorderRadius.circular(AppRadii.control),
         ),
         child: Column(
+          // Content height, never the space offered: callers hand this loose vertical constraints (a Center, an Align, a Positioned.fill), and the max default stretched one line of text into a border the full height of the pane.
+          mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Row(

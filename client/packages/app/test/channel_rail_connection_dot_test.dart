@@ -13,6 +13,7 @@ import 'package:http/testing.dart';
 import 'package:slimm_api/api.dart' as api;
 import 'package:slimm_app/src/providers/providers.dart';
 import 'package:slimm_app/src/providers/sync_controller.dart';
+import 'package:slimm_app/src/providers/sync_failure.dart';
 import 'package:slimm_app/src/widgets/channel_rail_frame.dart';
 import 'package:slimm_design_system/design_system.dart';
 import 'package:slimm_platform/platform.dart';
@@ -38,8 +39,10 @@ class _StubSyncController extends SyncController {
 ProviderContainer _setup(
   SyncStatus status, {
   bool hasFailedSinceLive = false,
+  SyncFailure? failure,
 }) => ProviderContainer(
   overrides: [
+    syncFailureProvider.overrideWith((ref) => failure),
     keyStoreProvider.overrideWithValue(InMemoryKeyStore()),
     sessionProvider.overrideWithValue(api.SessionStore(tokens: _tokens)),
     syncControllerProvider.overrideWith(
@@ -165,4 +168,17 @@ void main() {
       expect(find.byTooltip('Connecting to the server'), findsNothing);
     },
   );
+
+  testWidgets('a refused session does not read as an unreachable one', (
+    tester,
+  ) async {
+    // Both were 'Offline, retrying', and only one of the two is worth waiting out.
+    final setup = _setup(SyncStatus.offline, failure: SyncFailure.refused);
+    addTearDown(setup.dispose);
+    await _pumpHeader(tester, setup);
+    await tester.pumpAndSettle();
+
+    expect(find.byTooltip('The server refused this session'), findsOneWidget);
+    expect(find.byTooltip('Offline, retrying'), findsNothing);
+  });
 }
