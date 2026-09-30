@@ -23,7 +23,7 @@ void main() {
 
     await pumpAtWidth(tester, s.container, 1400, location: '/channels/c1');
 
-    expect(find.text('Canvas · general'), findsOneWidget);
+    expect(find.text('general, Canvas'), findsOneWidget);
     expect(find.text('Canvas'), findsNothing);
 
     await teardown(tester, s.container, s.db);
@@ -44,7 +44,7 @@ void main() {
 
     await pumpAtWidth(tester, s.container, 1400, location: '/channels/c1');
 
-    expect(find.text('Canvas · Alice'), findsOneWidget);
+    expect(find.text('Alice, Canvas'), findsOneWidget);
 
     await teardown(tester, s.container, s.db);
   });

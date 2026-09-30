@@ -27,21 +27,17 @@ import 'user_avatar.dart';
 
 /// The tile's size floor: the original fixed width, still right once a call
 /// is full enough that more room per tile would not help.
-const double kCallTileMinWidth = 112;
+const double kCallTileMinWidth = 144;
 
 /// The tile's size ceiling: past this, more room reads as air around a face
 /// rather than a bigger one.
-const double kCallTileMaxWidth = 200;
+const double kCallTileMaxWidth = 320;
 
-/// The video box's height as a fraction of tile width, matching the
-/// original fixed 112x84 box.
-const double _kCallTileVideoAspect = 0.75;
+/// The tile's height as a fraction of its width: 320x200 at the ceiling.
+const double _kCallTileAspect = 0.625;
 
-/// The name label's own height, plus the gap above it - additive rather
-/// than a fraction of width, since neither the label's type nor its gap
-/// scale with the tile (`design_system`'s density doc: type does not
-/// scale).
-const double _kCallTileLabelExtra = 28;
+/// Room the name label and its padding take at the tile's bottom edge.
+const double _kCallTileLabelBand = 36;
 
 /// How wide one grid tile should render for [count] participants inside
 /// [constraints] - the fixed 112px tile made a two-person call look like
@@ -71,8 +67,7 @@ double callGridTileWidth(
     var candidate = (maxWidth - (columns - 1) * spacing) / columns;
     if (maxHeight.isFinite) {
       final rowHeight = (maxHeight - (rows - 1) * spacing) / rows;
-      final fromHeight =
-          (rowHeight - _kCallTileLabelExtra) / _kCallTileVideoAspect;
+      final fromHeight = rowHeight / _kCallTileAspect;
       if (fromHeight < candidate) candidate = fromHeight;
     }
     if (candidate > best) best = candidate;
@@ -149,11 +144,22 @@ class CallParticipantTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final tokens = Theme.of(context).extension<AppTokens>()!;
-    final videoHeight = width * _kCallTileVideoAspect;
-    // 64 on the original 112px tile - grows with it, never past what a tile this wide has room for.
-    final avatarSize = width * 64 / kCallTileMinWidth;
+    final height = width * _kCallTileAspect;
+    final avatarSize = (height - _kCallTileLabelBand - AppSpacing.s8).clamp(
+      32.0,
+      96.0,
+    );
     // This build's own context, so a popover anchors to this tile - see [onTap]'s doc.
     final onTapHere = onTap == null ? null : () => onTap!(context);
+    final label = Text(
+      participant.isLocal ? '${participant.name} (you)' : participant.name,
+      maxLines: 1,
+      overflow: TextOverflow.ellipsis,
+      textAlign: TextAlign.center,
+      style: AppText.ui.copyWith(
+        color: _showsCamera ? const Color(0xFFFFFFFF) : tokens.textPrimary,
+      ),
+    );
     Widget tile = Stack(
       clipBehavior: Clip.none,
       children: [
@@ -169,74 +175,52 @@ class CallParticipantTile extends StatelessWidget {
                 duration: AppMotion.reduced(context, AppMotion.base),
                 curve: AppMotion.entrance,
                 alignment: Alignment.topCenter,
-                child: SizedBox(
-                  width: width,
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Stack(
-                        clipBehavior: Clip.none,
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(AppRadii.card),
+                  child: DecoratedBox(
+                    decoration: BoxDecoration(
+                      color: _showsCamera
+                          ? const Color(0xFF000000)
+                          : tokens.surfaceRaised,
+                      border: Border.all(color: tokens.borderSubtle),
+                      borderRadius: BorderRadius.circular(AppRadii.card),
+                    ),
+                    child: SizedBox(
+                      width: width,
+                      height: height,
+                      child: Stack(
                         children: [
-                          _showsCamera
-                              ? ClipRRect(
-                                  borderRadius: BorderRadius.circular(
-                                    AppRadii.card,
-                                  ),
-                                  child: SizedBox(
-                                    width: width,
-                                    height: videoHeight,
-                                    child: DecoratedBox(
-                                      decoration: const BoxDecoration(
-                                        color: Color(0xFF000000),
-                                      ),
-                                      child: cameraView,
-                                    ),
-                                  ),
-                                )
-                              : AuthorAvatar(
+                          if (_showsCamera)
+                            Positioned.fill(child: cameraView!)
+                          else
+                            Positioned(
+                              left: 0,
+                              right: 0,
+                              top: 0,
+                              bottom: _kCallTileLabelBand,
+                              child: Center(
+                                child: AuthorAvatar(
                                   name: participant.name,
                                   userId: participant.identity,
                                   size: avatarSize,
                                   speaking: participant.isSpeaking,
                                 ),
-                          Positioned(
-                            right: -2,
-                            bottom: -2,
-                            child: Container(
-                              width: 22,
-                              height: 22,
-                              alignment: Alignment.center,
-                              decoration: BoxDecoration(
-                                color: tokens.surfaceRaised,
-                                shape: BoxShape.circle,
-                                border: Border.all(color: tokens.borderSubtle),
-                              ),
-                              child: Icon(
-                                participant.isScreenSharing
-                                    ? AppIcons.screenShare
-                                    : participant.isMuted
-                                    ? AppIcons.micOff
-                                    : AppIcons.mic,
-                                size: 12,
-                                color: participant.isMuted
-                                    ? tokens.textSecondary
-                                    : tokens.accent,
                               ),
                             ),
+                          Positioned(
+                            left: AppSpacing.s12 + 22 + AppSpacing.s8,
+                            right: AppSpacing.s12 + 22 + AppSpacing.s8,
+                            bottom: AppSpacing.s12,
+                            child: label,
+                          ),
+                          Positioned(
+                            right: AppSpacing.s8,
+                            bottom: AppSpacing.s8,
+                            child: _StateBadge(participant: participant),
                           ),
                         ],
                       ),
-                      const SizedBox(height: AppSpacing.s8),
-                      Text(
-                        participant.isLocal
-                            ? '${participant.name} (you)'
-                            : participant.name,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        textAlign: TextAlign.center,
-                        style: AppText.ui.copyWith(color: tokens.textPrimary),
-                      ),
-                    ],
+                    ),
                   ),
                 ),
               ),
@@ -261,14 +245,47 @@ class CallParticipantTile extends StatelessWidget {
   }
 }
 
+class _StateBadge extends StatelessWidget {
+  const _StateBadge({required this.participant});
+
+  final VoiceParticipant participant;
+
+  @override
+  Widget build(BuildContext context) {
+    final tokens = Theme.of(context).extension<AppTokens>()!;
+    return Container(
+      width: 22,
+      height: 22,
+      alignment: Alignment.center,
+      decoration: BoxDecoration(
+        color: tokens.surfaceRaised,
+        shape: BoxShape.circle,
+        border: Border.all(color: tokens.borderSubtle),
+      ),
+      child: Icon(
+        participant.isScreenSharing
+            ? AppIcons.screenShare
+            : participant.isMuted
+            ? AppIcons.micOff
+            : AppIcons.mic,
+        size: 12,
+        color: participant.isMuted ? tokens.textSecondary : tokens.accent,
+      ),
+    );
+  }
+}
+
 /// `12:34`-style elapsed time since [since], ticking once a second.
 ///
 /// A text update, not motion, so it does not route through reduce-motion;
 /// the timer only exists while the readout is mounted.
 class CallDuration extends StatefulWidget {
-  const CallDuration({super.key, required this.since});
+  const CallDuration({super.key, required this.since, this.style});
 
   final DateTime since;
+
+  /// Overrides the default caption style, for a header that sets its own.
+  final TextStyle? style;
 
   @override
   State<CallDuration> createState() => _CallDurationState();
@@ -304,10 +321,12 @@ class _CallDurationState extends State<CallDuration> {
     final elapsed = DateTime.now().difference(widget.since);
     return Text(
       _format(elapsed.isNegative ? Duration.zero : elapsed),
-      style: AppText.caption.copyWith(
-        color: tokens.textSecondary,
-        fontFeatures: const [FontFeature.tabularFigures()],
-      ),
+      style:
+          widget.style ??
+          AppText.caption.copyWith(
+            color: tokens.textSecondary,
+            fontFeatures: const [FontFeature.tabularFigures()],
+          ),
     );
   }
 }

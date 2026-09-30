@@ -22,48 +22,33 @@
 library;
 
 import 'package:flutter/material.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:slimm_design_system/design_system.dart';
 
-import '../../providers/channel_by_id_provider.dart';
+import '../../widgets/call_header_facts.dart';
 
-class CanvasBar extends ConsumerWidget {
+class CanvasBar extends StatelessWidget {
   const CanvasBar({super.key, required this.channelId});
 
   final String channelId;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  Widget build(BuildContext context) {
     final tokens = Theme.of(context).extension<AppTokens>()!;
-    final name = ref.watch(channelByIdProvider(channelId)).valueOrNull?.name;
-    final label = name == null || name.isEmpty ? 'Canvas' : 'Canvas · $name';
     return Container(
       height: 36,
       padding: const EdgeInsets.symmetric(horizontal: AppSizes.paneGutter),
       alignment: Alignment.centerLeft,
-      child: Row(
-        children: [
-          Icon(
+      child: CallHeaderLine(
+        channelId: channelId,
+        mode: 'Canvas',
+        leading: Padding(
+          padding: const EdgeInsets.only(right: AppSpacing.s8),
+          child: Icon(
             AppIcons.canvas,
             size: AppSizes.icon16,
             color: tokens.textSecondary,
           ),
-          const SizedBox(width: AppSpacing.s8),
-          Flexible(
-            child: Semantics(
-              container: true,
-              header: true,
-              child: Text(
-                label,
-                overflow: TextOverflow.ellipsis,
-                style: AppText.body.copyWith(
-                  color: tokens.textPrimary,
-                  fontWeight: AppWeights.medium,
-                ),
-              ),
-            ),
-          ),
-        ],
+        ),
       ),
     );
   }
