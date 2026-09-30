@@ -1,5 +1,52 @@
 # Changelog
 
+## [0.89.0](https://github.com/Slim-m-org/slim-m/compare/client-v0.88.0...client-v0.89.0) (2026-09-30)
+
+
+### Features
+
+* **client:** add AppControlWithOptions and give the share button an options caret ([#1509](https://github.com/Slim-m-org/slim-m/issues/1509)) ([5c3c95b](https://github.com/Slim-m-org/slim-m/commit/5c3c95bc901a5cfb948c2deb343c97aa405a45dd))
+* **client:** Android picture-in-picture keeps a call's video floating when the app is backgrounded ([#1503](https://github.com/Slim-m-org/slim-m/issues/1503)) ([6af1f72](https://github.com/Slim-m-org/slim-m/commit/6af1f725e19c7bd0aeee2e1f0d9dc41bd214cd39))
+* **client:** call dock hugs its content, leave is last after a divider, canvas button toggles ([#1517](https://github.com/Slim-m-org/slim-m/issues/1517)) ([be3de8a](https://github.com/Slim-m-org/slim-m/commit/be3de8a213fa1b0098487bc4ba3f579bc0357ede))
+* **client:** call header shows channel, mode, count and timer; alone state is a normal tile ([#1510](https://github.com/Slim-m-org/slim-m/issues/1510)) ([0662545](https://github.com/Slim-m-org/slim-m/commit/0662545a86858197730cd99dac9703bc2dd0dfe9))
+* **client:** canvas pen and shape options through the controls-with-options pattern ([#1516](https://github.com/Slim-m-org/slim-m/issues/1516)) ([43865da](https://github.com/Slim-m-org/slim-m/commit/43865da84baefd7df87cfb20a501e4979efc695b))
+* **client:** desktop pop-out window for a remote share or camera on Linux ([#1528](https://github.com/Slim-m-org/slim-m/issues/1528)) ([ebddebe](https://github.com/Slim-m-org/slim-m/commit/ebddebea991f38be53301b98c44b527e593026db))
+* **client:** link a Spotify account with PKCE so phones can share what they play ([#1507](https://github.com/Slim-m-org/slim-m/issues/1507)) ([b846114](https://github.com/Slim-m-org/slim-m/commit/b846114b245ceb1a77b82d84c8e173e900d5ad25))
+* **client:** message row hover toolbar ([#1520](https://github.com/Slim-m-org/slim-m/issues/1520)) ([a404df4](https://github.com/Slim-m-org/slim-m/commit/a404df47baf003667e680e523e891074bc57dddb))
+* **client:** one seam for rich-presence sources, and a Windows now-playing source ([#1502](https://github.com/Slim-m-org/slim-m/issues/1502)) ([f8c800e](https://github.com/Slim-m-org/slim-m/commit/f8c800e57afe13d500393646525d6d9838f01d34))
+* **client:** opt-in game detection from an allowlist and Steam's running app id ([#1505](https://github.com/Slim-m-org/slim-m/issues/1505)) ([85aca0e](https://github.com/Slim-m-org/slim-m/commit/85aca0e634f500b935921dab24799cd2b2d47142))
+* **client:** pan is a hand glyph, first in the canvas tool order, with H P N S E keys ([#1511](https://github.com/Slim-m-org/slim-m/issues/1511)) ([26d9b28](https://github.com/Slim-m-org/slim-m/commit/26d9b28da8ceb8a5af7faeda5193231d50daa5d4))
+* **client:** route /channels/&lt;channel&gt;/m/&lt;message&gt; to a message ([#1484](https://github.com/Slim-m-org/slim-m/issues/1484)) ([c1d95d3](https://github.com/Slim-m-org/slim-m/commit/c1d95d3772ebba59d8409de2e3469897468c13ed))
+* **client:** self-update the per-user linux tarball install ([#1489](https://github.com/Slim-m-org/slim-m/issues/1489)) ([e81121d](https://github.com/Slim-m-org/slim-m/commit/e81121df55eca3b64e52719fc794eda62e6519d8))
+* **client:** self-update the per-user macos app bundle ([#1499](https://github.com/Slim-m-org/slim-m/issues/1499)) ([3dc0afe](https://github.com/Slim-m-org/slim-m/commit/3dc0afe9d97224e4dbad11d594c5359cce0df10b))
+* **client:** self-update the per-user windows install ([#1497](https://github.com/Slim-m-org/slim-m/issues/1497)) ([a34c8db](https://github.com/Slim-m-org/slim-m/commit/a34c8db60c4d58e4e0d1aee20f854893a41c4834))
+* **client:** verify and download a signed desktop update ([#1467](https://github.com/Slim-m-org/slim-m/issues/1467)) ([2ebe193](https://github.com/Slim-m-org/slim-m/commit/2ebe1933f458ba16aaeb35515a66fd3b07735e84))
+* durable watch session and watch.tick for a real position readout ([#1527](https://github.com/Slim-m-org/slim-m/issues/1527)) ([7039fc6](https://github.com/Slim-m-org/slim-m/commit/7039fc6526ee7ff081913a1b2516da9fa86eede1))
+* files and embeds on a private bot message, and reporting one ([#1494](https://github.com/Slim-m-org/slim-m/issues/1494)) ([29d53ce](https://github.com/Slim-m-org/slim-m/commit/29d53ce959813f5478e3eab5926ac3480484f1b8))
+* optional TOTP two-factor authentication ([#1512](https://github.com/Slim-m-org/slim-m/issues/1512)) ([ff1c2c4](https://github.com/Slim-m-org/slim-m/commit/ff1c2c494e1d1763a144c444c5bc4b1f14999389))
+* role hoist flag and top hoisted role on member rows ([#1492](https://github.com/Slim-m-org/slim-m/issues/1492)) ([2c1893a](https://github.com/Slim-m-org/slim-m/commit/2c1893ac02e398b1bd9a15b73fa78e9b0c28590f))
+* **server:** report a build id on /version ([#1498](https://github.com/Slim-m-org/slim-m/issues/1498)) ([b27c649](https://github.com/Slim-m-org/slim-m/commit/b27c649bb9e9dd75f8c4c6bb85b47a643e27b1c0))
+
+
+### Bug Fixes
+
+* a channel's notification override decides its badge, not only its push ([#1515](https://github.com/Slim-m-org/slim-m/issues/1515)) ([3b2fa1e](https://github.com/Slim-m-org/slim-m/commit/3b2fa1ecee38ed5a78e20f6f6175e3501aee6718))
+* **client:** canvas tools get their own row on narrow panes so the eraser is on screen ([#1526](https://github.com/Slim-m-org/slim-m/issues/1526)) ([72eeb9a](https://github.com/Slim-m-org/slim-m/commit/72eeb9a34360ba966a56e31ea986fbcbe4c06182))
+* **client:** check Slim-m-org for updates and point links at the org ([#1476](https://github.com/Slim-m-org/slim-m/issues/1476)) ([7be8517](https://github.com/Slim-m-org/slim-m/commit/7be8517197dab3930451afe395f1e2063aa880a0))
+* **client:** draw a standard :shortcode: reaction as its emoji and tighten the mention pill ([#1466](https://github.com/Slim-m-org/slim-m/issues/1466)) ([8821352](https://github.com/Slim-m-org/slim-m/commit/8821352db50ff788851c958a9378be91564faaef))
+* **client:** drop an event socket that goes silent and reconnect ([#1470](https://github.com/Slim-m-org/slim-m/issues/1470)) ([9c90818](https://github.com/Slim-m-org/slim-m/commit/9c90818cc25876e98795fee3468697e950819213))
+* **client:** fold a rail category by pressing its header ([#1468](https://github.com/Slim-m-org/slim-m/issues/1468)) ([4f77b19](https://github.com/Slim-m-org/slim-m/commit/4f77b190b2a37556617edd7b83906400e583e3d8))
+* **client:** follow another admin's overwrite changes in an open permissions grid and stop truncating header names ([#1485](https://github.com/Slim-m-org/slim-m/issues/1485)) ([149d6d4](https://github.com/Slim-m-org/slim-m/commit/149d6d4f05fc4c3bb5b7a728162e4e74343b61a2))
+* **client:** re-probe the server identity on relaunch, clean up shared image temp files, add channel settings and fullscreen viewer snapshots ([#1488](https://github.com/Slim-m-org/slim-m/issues/1488)) ([fd66367](https://github.com/Slim-m-org/slim-m/commit/fd663675cef6f3f120e7ab2f6e8d789040d9a25f))
+* **client:** rejoin a dropped call as soon as the websocket reconnects ([#1483](https://github.com/Slim-m-org/slim-m/issues/1483)) ([c8559f1](https://github.com/Slim-m-org/slim-m/commit/c8559f1795d12a83c42ba1d0aeb6ab225c7a5818))
+* **client:** sign in without creation rules, and one way to change Space ([#1522](https://github.com/Slim-m-org/slim-m/issues/1522)) ([f585dcd](https://github.com/Slim-m-org/slim-m/commit/f585dcd2aec4401563867ff6ec3b0c08cf24c6fb))
+* **client:** size the rail's failure to its content and say what actually failed ([#1523](https://github.com/Slim-m-org/slim-m/issues/1523)) ([5ac6b51](https://github.com/Slim-m-org/slim-m/commit/5ac6b51d70125ae605f2eab69f4be6242f335f30))
+* **client:** stop message jumps joining voice calls, and handle call_end and security pushes ([#1480](https://github.com/Slim-m-org/slim-m/issues/1480)) ([cd925b6](https://github.com/Slim-m-org/slim-m/commit/cd925b63776dfeb1fd68ac99d68f70c2a6cc9f7a))
+* **client:** stop the rail footer's avatar tap area filling a bounded parent ([#1500](https://github.com/Slim-m-org/slim-m/issues/1500)) ([aaaceb8](https://github.com/Slim-m-org/slim-m/commit/aaaceb82b586140baf5f1b1a778c5d1de1999ab3))
+* **server:** derive the ws viewing report and the push lifecycle report from one foreground rule ([#1496](https://github.com/Slim-m-org/slim-m/issues/1496)) ([1669839](https://github.com/Slim-m-org/slim-m/commit/166983983af0e46333b46f432518b0aa7e1229c6))
+* **server:** refuse to enable a module whose slash keyword another enabled module owns ([#1493](https://github.com/Slim-m-org/slim-m/issues/1493)) ([fadf826](https://github.com/Slim-m-org/slim-m/commit/fadf8265eed00c53adf61f1561e5a557189c2356))
+* write join_muted in the channel create and mark join_muted channels in the rail and rejoin screen ([#1486](https://github.com/Slim-m-org/slim-m/issues/1486)) ([263117e](https://github.com/Slim-m-org/slim-m/commit/263117e08cd4ab8592371296decb9ea6486cec71))
+
 ## [0.88.0](https://github.com/NC1107/slim-m/compare/client-v0.87.0...client-v0.88.0) (2026-09-29)
 
 
