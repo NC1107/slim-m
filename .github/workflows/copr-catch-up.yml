@@ -55,6 +55,7 @@ jobs:
         uses: ./.github/actions/linux-tarball
         with:
           version: ${{ needs.check.outputs.version }}
+          spotify_client_id: ${{ vars.SLIMM_SPOTIFY_CLIENT_ID }}
 
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
