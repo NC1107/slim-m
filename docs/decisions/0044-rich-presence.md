@@ -37,7 +37,7 @@ This record fixes the privacy model, where activity comes from, the wire shape a
 | Source | Credentials | Works on | Verdict |
 | --- | --- | --- | --- |
 | Linux MPRIS over D-Bus | none | Linux desktop, any player that exposes `org.mpris.MediaPlayer2.*` (Spotify, browsers, mpv, VLC) | First slice. Local, private, no third party. |
-| Windows SMTC (`GlobalSystemMediaTransportControls`) | none | Windows 10+ desktop, any app that registers a media session | Next. Needs a Windows binding; a separate card. |
+| Windows SMTC (`GlobalSystemMediaTransportControls`) | none | Windows 10+ desktop, any app that registers a media session | Built, see the amendment below. A runner method channel, no account. |
 | macOS Now Playing | none | macOS | Restricted. The MediaRemote framework is private and Apple has been closing it. Revisit only with a supported API. |
 | Spotify Web API | an OAuth app registered by the owner | any platform incl. phones | Later. Only the Spotify account, needs a token store and a refresh path. |
 | Game detection | none | desktop | Later, opt-in, allowlist only. |
@@ -108,3 +108,21 @@ When it is, the owner needs to:
 ## Follow-up cards
 
 Windows SMTC, macOS Now Playing, Spotify linking and game detection are separate Backlog cards linked to this record.
+
+## Amendment 2026-09-30: one seam for every source
+
+A source is an `ActivityFeed` in `activity_feeds.dart`: a Settings switch (off by default, one per source), a platform-availability check, and a stream of what the source sees.
+`ActivityPublisher` owns the privacy rules for all of them, so a new source declares itself in `activityFeedsProvider` and cannot skip them:
+
+- a feed is opened only while its switch is on, the caller is not hidden and the platform has the source;
+- hiding closes every feed, so nothing is read locally either, not only nothing sent;
+- when two feeds both report something, the first in the list is what others see;
+- Settings shows the activity the server last accepted, so the person can read exactly what is shared.
+
+### Windows SMTC
+
+`GlobalSystemMediaTransportControlsSessionManager` is read by the runner (`now_playing_smtc.cpp`) and answered over the `slimm/now_playing` method channel.
+It sees the title, artist and playback status of sessions that registered with Windows (browsers, Spotify, media players).
+It does not see cover art, other apps' windows, or anything while the switch is off.
+The worker thread starts on the first `current` call and stops by itself fifteen seconds after the Dart side stops asking, so turning the switch off ends all reads.
+The WinRT code is its own CMake library because the runner builds with exceptions off and warnings as errors.

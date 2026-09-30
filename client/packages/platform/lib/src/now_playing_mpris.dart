@@ -7,19 +7,14 @@
 /// coming and going. Every failure reads as "nothing playing".
 library;
 
-import 'dart:async';
-import 'dart:io' show Platform;
-
 import 'package:dbus/dbus.dart';
 
 import 'now_playing.dart';
+import 'polled_stream.dart';
 
 const _mprisPrefix = 'org.mpris.MediaPlayer2.';
 const _playerInterface = 'org.mpris.MediaPlayer2.Player';
 const _defaultPollInterval = Duration(seconds: 5);
-
-NowPlayingSource? createNowPlayingSource() =>
-    Platform.isLinux ? MprisNowPlayingSource() : null;
 
 /// A player's own report, before deciding which one is "the" track.
 class MprisPlayerState {
@@ -54,37 +49,15 @@ class MprisNowPlayingSource implements NowPlayingSource {
   @override
   Stream<NowPlaying?> watch() {
     DBusClient? bus;
-    Timer? timer;
-    NowPlaying? last;
-    var first = true;
-    late final StreamController<NowPlaying?> controller;
-
-    Future<void> poll() async {
-      NowPlaying? current;
-      try {
-        current =
-            pickNowPlaying(await _readPlayers(bus ??= DBusClient.session()));
-      } on Object {
-        current = null;
-      }
-      if (controller.isClosed || (!first && current == last)) return;
-      first = false;
-      last = current;
-      controller.add(current);
-    }
-
-    controller = StreamController<NowPlaying?>(
-      onListen: () {
-        unawaited(poll());
-        timer = Timer.periodic(_pollInterval, (_) => unawaited(poll()));
-      },
+    return polledStream<NowPlaying>(
+      interval: _pollInterval,
+      read: () async =>
+          pickNowPlaying(await _readPlayers(bus ??= DBusClient.session())),
       onCancel: () async {
-        timer?.cancel();
         await bus?.close();
         bus = null;
       },
     );
-    return controller.stream;
   }
 
   Future<List<MprisPlayerState>> _readPlayers(DBusClient bus) async {
