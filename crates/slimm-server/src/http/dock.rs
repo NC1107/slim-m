@@ -329,7 +329,12 @@ async fn install(
         Some(requested) => approvable_host_capabilities(&manifest, requested)?,
         None => carried_host_capabilities(&state, &manifest).await?,
     };
-    if state.store.installed_module(&id).await?.is_some_and(|m| m.enabled) {
+    if state
+        .store
+        .installed_module(&id)
+        .await?
+        .is_some_and(|m| m.enabled)
+    {
         let keywords = manifest
             .extension_points
             .iter()

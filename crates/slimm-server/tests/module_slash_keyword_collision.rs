@@ -90,7 +90,10 @@ async fn post(router: &Router, token: &str, uri: &str) -> (StatusCode, Value) {
     let bytes = axum::body::to_bytes(response.into_body(), usize::MAX)
         .await
         .unwrap();
-    (status, serde_json::from_slice(&bytes).unwrap_or(Value::Null))
+    (
+        status,
+        serde_json::from_slice(&bytes).unwrap_or(Value::Null),
+    )
 }
 
 #[tokio::test]
@@ -119,7 +122,10 @@ async fn enabling_a_module_whose_keyword_is_taken_is_refused_until_the_owner_is_
     let (status, body) = post(&router, token, "/space/dock/modules/other-dice/enable").await;
     assert_eq!(status, StatusCode::CONFLICT);
     let message = body["error"].as_str().unwrap();
-    assert!(message.contains("/roll") && message.contains("dice"), "{message}");
+    assert!(
+        message.contains("/roll") && message.contains("dice"),
+        "{message}"
+    );
 
     let (status, _) = post(&router, token, "/space/dock/modules/dice/disable").await;
     assert_eq!(status, StatusCode::OK);
