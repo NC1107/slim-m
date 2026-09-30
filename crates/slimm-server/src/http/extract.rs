@@ -157,6 +157,9 @@ pub(crate) const LINK_PREVIEW: u8 = 10;
 /// Running a module command, direct or shared; see [`Class::Module`].
 pub(crate) const MODULE: u8 = 11;
 
+/// Presenting a second factor; see [`Class::Totp`].
+pub(crate) const TOTP: u8 = 12;
+
 /// Panics on an unknown code rather than falling back.
 ///
 /// It used to end `_ => Class::Refresh`, which meant a new code compiled clean
@@ -167,6 +170,7 @@ pub(crate) const MODULE: u8 = 11;
 fn class_of(code: u8) -> Class {
     match code {
         MODULE => Class::Module,
+        TOTP => Class::Totp,
         PASSWORD => Class::Password,
         REFRESH => Class::Refresh,
         INVITE_CHECK => Class::InviteCheck,

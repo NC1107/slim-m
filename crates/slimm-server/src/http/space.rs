@@ -19,7 +19,7 @@ use super::error::ApiError;
 use super::extract::require_manage_server;
 use super::extract::{Authed, Json, enforce};
 use crate::ratelimit::Class;
-use crate::store::JoinPolicy;
+use crate::store::{JoinPolicy, TotpPolicy};
 
 const BODY_LIMIT: usize = 1024;
 
@@ -33,6 +33,12 @@ pub fn routes() -> Router<AppState> {
 #[derive(Serialize, Deserialize)]
 struct SpaceSettingsDto {
     join_policy: String,
+    /// `off`, `optional` or `required_for_elevated`; see
+    /// [`crate::store::TotpPolicy`]. Optional on the way in so a client that
+    /// predates it can still change the join policy without silently resetting
+    /// this one.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    totp_policy: Option<String>,
 }
 
 async fn read(
@@ -45,6 +51,7 @@ async fn read(
     require_manage_server(&state, ctx.user_id).await?;
     Ok(Json(SpaceSettingsDto {
         join_policy: state.store.join_policy().await?.as_str().to_owned(),
+        totp_policy: Some(state.store.totp_policy().await?.as_str().to_owned()),
     }))
 }
 
@@ -64,8 +71,19 @@ async fn update(
         "open" => JoinPolicy::Open,
         _ => return Err(ApiError::BadRequest("join_policy must be invite or open")),
     };
+    // Parsed before either write, so a bad value cannot leave the join policy changed and the request refused.
+    let totp = match body.totp_policy.as_deref() {
+        Some(value) => Some(TotpPolicy::parse(value).ok_or(ApiError::BadRequest(
+            "totp_policy must be off, optional or required_for_elevated",
+        ))?),
+        None => None,
+    };
     state.store.set_join_policy(policy).await?;
+    if let Some(totp) = totp {
+        state.store.set_totp_policy(totp).await?;
+    }
     Ok(Json(SpaceSettingsDto {
         join_policy: policy.as_str().to_owned(),
+        totp_policy: Some(state.store.totp_policy().await?.as_str().to_owned()),
     }))
 }

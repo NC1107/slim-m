@@ -79,12 +79,35 @@ struct RefreshRequest {
     refresh_token: String,
 }
 
+/// Shared with [`super::totp`], which mints the same pair once a sign-in has
+/// met its second factor.
 #[derive(Serialize)]
-struct TokenResponse {
+pub(super) struct TokenResponse {
     user_id: String,
     access_token: String,
     refresh_token: String,
     access_expires_at: i64,
+}
+
+/// What `login` answers with, since an account with a second factor gets a
+/// challenge instead of a session.
+///
+/// Two response codes rather than one shape with optional token fields: a
+/// reader that has always been able to count on `access_token` being there
+/// should keep being able to, and `202 Accepted` says exactly what happened -
+/// the password was accepted and the sign-in is not finished.
+enum LoginOutcome {
+    Tokens(TokenResponse),
+    Challenge(super::totp::ChallengeResponse),
+}
+
+impl axum::response::IntoResponse for LoginOutcome {
+    fn into_response(self) -> axum::response::Response {
+        match self {
+            LoginOutcome::Tokens(tokens) => Json(tokens).into_response(),
+            LoginOutcome::Challenge(challenge) => challenge.into_response(),
+        }
+    }
 }
 
 #[derive(Serialize)]
@@ -111,7 +134,7 @@ fn parse_client_info(
     ))
 }
 
-fn token_response(tokens: &IssuedTokens) -> TokenResponse {
+pub(super) fn token_response(tokens: &IssuedTokens) -> TokenResponse {
     TokenResponse {
         user_id: tokens.user_id.to_string(),
         access_token: tokens.access_token.clone(),
@@ -198,11 +221,18 @@ async fn register(
     Ok(Json(token_response(&tokens)))
 }
 
+/// Verifies a password, and then either opens a session or asks for the second
+/// factor.
+///
+/// The password check is unchanged and still runs first, including its decoy
+/// hash for an unknown account: whether a second factor exists must not be
+/// learnable without the password, or the challenge itself becomes a way to
+/// enumerate which accounts have one.
 async fn login(
     _limited: RateLimited<PASSWORD>,
     State(state): State<AppState>,
     Json(req): Json<LoginRequest>,
-) -> Result<Json<TokenResponse>, ApiError> {
+) -> Result<LoginOutcome, ApiError> {
     validate_username(&req.username)?;
     validate_password(&req.password)?;
     validate_label(&req.device_name, "device_name must be 1 to 64 characters")?;
@@ -232,6 +262,23 @@ async fn login(
         return Err(ApiError::Unauthorized);
     }
 
+    if state.store.totp_required_at_sign_in(user_id).await? {
+        let challenge = state
+            .store
+            .begin_totp_challenge(
+                user_id,
+                &req.device_name,
+                client_kind.as_deref(),
+                client_version.as_deref(),
+            )
+            .await?;
+        // No alert yet: `/auth/totp/verify` announces once the factor is met, so a stolen password alone cannot spam the account.
+        return Ok(LoginOutcome::Challenge(super::totp::ChallengeResponse {
+            totp_challenge: challenge.challenge,
+            expires_at: challenge.expires_at,
+        }));
+    }
+
     let tokens = state
         .store
         .open_session_as(
@@ -242,7 +289,7 @@ async fn login(
         )
         .await?;
     super::sign_in_alert::announce(&state, &tokens, &req.device_name, client_kind.as_deref()).await;
-    Ok(Json(token_response(&tokens)))
+    Ok(LoginOutcome::Tokens(token_response(&tokens)))
 }
 
 async fn refresh(

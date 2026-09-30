@@ -22,6 +22,19 @@ HMAC-SHA256 for the LiveKit access tokens, which are HS256 JWTs.
 They are only ever signed here, never verified, so none of the JWT verification pitfalls (`alg=none`, algorithm confusion) are in play, and a full JWT library would be carrying parsing code this never runs.
 It is the same RustCrypto family as `sha2`, and was already in the tree transitively.
 
+## totp-rs
+
+The RFC 6238 arithmetic for the optional second factor (decision 0048), rather than hand-rolling HOTP truncation over `hmac`.
+
+Default features are empty and only `otpauth` is turned on, for the `otpauth://` provisioning URI an authenticator app scans.
+`gen_secret` is deliberately left off: it would pull a second `rand` into the tree, and the secret is minted from the `rand_core` `OsRng` that already backs every other secret here.
+
+It is held at the 5.x line, and that hold is load-bearing rather than staleness.
+6.0 moved onto `hmac` 0.13 and `crypto-common` 0.2.x, which cannot co-exist with the `crypto-common` 0.2.0-rc.4 that `crypto_box`'s exact pin requires, for the same pre-release reason recorded under `ed25519-dalek` below: a pre-release satisfies nothing outside its own pre-release line.
+Cargo cannot resolve the two at all, so this is a hard conflict rather than a preference.
+5.x rides the `hmac`, `sha1` and `sha2` versions already in the tree and adds only `base32` and `constant_time_eq`.
+Revisit when `crypto_box` reaches a stable 0.10.
+
 ## crypto_box
 
 Anonymous sealed boxes (libsodium `crypto_box_seal`, X25519 plus XSalsa20Poly1305) for the content-free push envelope.

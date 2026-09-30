@@ -1,0 +1,20 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT 1 AS \"one!: i64\" FROM user_totp_factors\n               WHERE user_id = ? AND confirmed_at IS NOT NULL",
+  "describe": {
+    "columns": [
+      {
+        "name": "one!: i64",
+        "ordinal": 0,
+        "type_info": "Null"
+      }
+    ],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": [
+      null
+    ]
+  },
+  "hash": "8ff2a08b2f65f8b526cf2d65af6be52f6cc5c5f1d7fe59e6c50e310df0f8c89b"
+}

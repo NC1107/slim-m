@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "DELETE FROM user_totp_factors WHERE user_id = ?",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": []
+  },
+  "hash": "7ce3d3cb70daea31fbfcccdaef037cddf9a873a2a8e4c74db5fc0b95547cb8e9"
+}

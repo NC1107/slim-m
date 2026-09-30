@@ -110,6 +110,7 @@ mod storage;
 mod sync;
 mod sync_ops;
 mod threads;
+mod totp;
 mod user_avatars;
 mod user_notes;
 mod user_status;
@@ -226,6 +227,7 @@ pub fn router(state: AppState) -> Router {
         .merge(dms::routes())
         .merge(search::routes())
         .merge(space::routes())
+        .merge(totp::routes())
         .merge(storage::routes())
         .merge(sync::routes())
         .merge(threads::routes())
