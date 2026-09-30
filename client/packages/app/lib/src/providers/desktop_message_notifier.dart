@@ -11,8 +11,15 @@
 ///
 /// Only when the window is not focused. A focused desktop app shows its own
 /// unread state in the rail, and a second OS banner on top of the channel you
-/// are already reading is noise, not news. Own messages and muted channels are
-/// skipped for the reasons their names give.
+/// are already reading is noise, not news. Own messages are skipped for the
+/// reason their name gives.
+///
+/// The channel's own override runs through [channelEarnsASound], the gate the
+/// chime already uses and the rule the server's
+/// `narrow_for_notification_preference` enforces for push. This path used to
+/// read only the mute half of it, so a channel narrowed to mentions kept
+/// raising a banner for every ordinary message while the chime beside it
+/// stayed silent.
 ///
 /// Also gated by the notification schedule (`notification_schedule_rules.dart`),
 /// the same policy `notification_sound_controller.dart` already applies to
@@ -35,6 +42,7 @@ import 'channel_notification_overrides_controller.dart';
 import 'live_events.dart';
 import 'notification_schedule_controller.dart';
 import 'notification_schedule_rules.dart';
+import 'notification_sound_rules.dart';
 import 'providers.dart';
 import 'push_controller.dart';
 
@@ -74,13 +82,6 @@ class _DesktopMessageNotifier {
         WidgetsBinding.instance.lifecycleState == AppLifecycleState.resumed;
     if (foreground) return;
 
-    // A muted channel asked for silence.
-    if (_ref
-        .read(channelNotificationOverridesProvider)
-        .isMuted(message.channelId)) {
-      return;
-    }
-
     final store = await _ref.read(storeProvider.future);
     final channel = await store.watchChannelRow(message.channelId).first;
     final isDm = channel?.kind == 'dm';
@@ -91,6 +92,16 @@ class _DesktopMessageNotifier {
       if (username != null) {
         mentionsSelf = messageMentionsUsername(message.content, username);
       }
+    }
+
+    if (!channelEarnsASound(
+      channelOverride: _ref
+          .read(channelNotificationOverridesProvider)
+          .overrideFor(message.channelId),
+      isDm: isDm,
+      mentionsSelf: mentionsSelf,
+    )) {
+      return;
     }
 
     final schedule = _ref.read(notificationScheduleProvider).valueOrNull;
@@ -111,8 +122,12 @@ class _DesktopMessageNotifier {
         ? 'New message'
         : 'New message from $author';
     final notifications = _ref.read(localNotificationsProvider);
+    // The per-kind OS control only reaches a banner filed under the kind it is; see LocalAlertChannel.
+    final alertChannel = mentionsSelf
+        ? LocalAlertChannel.mentions
+        : LocalAlertChannel.messages;
     // Fire-and-forget: a failed notification must never break event handling.
-    unawaited(notifications.show(text, channel: LocalAlertChannel.messages));
+    unawaited(notifications.show(text, channel: alertChannel));
   }
 
   /// Best-effort, matching `NotificationSoundController`'s own: a lookup

@@ -2,8 +2,11 @@
 /// The desktop live-message notifier turns an incoming socket message into an
 /// OS notification, but only for someone else's message that arrives while the
 /// window is not in the foreground. Own messages, a focused window, and a
-/// muted channel are each silent; the mute half leans on [isMuted]'s own
-/// coverage and is exercised here through the real overrides controller.
+/// channel the override quietens are each silent. The override half runs
+/// through the real controller, and covers mentions-only as well as mute:
+/// this path used to read only the mute, so a channel narrowed to mentions
+/// still raised a banner for every ordinary message while the chime beside
+/// it correctly stayed silent.
 library;
 
 import 'dart:async';
@@ -27,10 +30,13 @@ import 'package:slimm_platform/platform.dart';
 
 class _FakeNotifications implements LocalNotifications {
   final shown = <String>[];
+  final channels = <LocalAlertChannel>[];
 
   @override
-  Future<void> show(String text, {required LocalAlertChannel channel}) async =>
-      shown.add(text);
+  Future<void> show(String text, {required LocalAlertChannel channel}) async {
+    shown.add(text);
+    channels.add(channel);
+  }
 
   @override
   dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
@@ -48,13 +54,14 @@ api.Message _message({
   required String authorId,
   String? authorDisplayName,
   required String channelId,
+  String content = 'hi',
 }) => api.Message(
   id: id,
   channelId: channelId,
   authorId: authorId,
   authorDisplayName: authorDisplayName ?? authorId,
   seq: 1,
-  content: 'hi',
+  content: content,
   createdAt: 0,
   editedAt: null,
 );
@@ -118,6 +125,15 @@ Future<_Setup> _wire() async {
                 'preference': body['preference'],
               });
             }
+            if (request.url.path.endsWith('/me')) {
+              return _json({
+                'id': 'me',
+                'username': 'nick',
+                'display_name': 'Nick',
+                'created_at': 0,
+                'permissions': 0,
+              });
+            }
             return _json(const <Object>[]);
           }),
         );
@@ -132,13 +148,20 @@ Future<_Setup> _wire() async {
   return _Setup(container, events, notifications, db);
 }
 
-Future<void> _settle(_Setup setup) async {
+/// Pushes a message by "me" (never notified) behind whatever the test just
+/// sent, then yields until [until] holds - a bounded wait on a condition, not
+/// a fixed number of turns: the mention path adds an `await` for the caller's
+/// own username that the ordinary path does not have.
+Future<void> _settle(_Setup setup, {bool Function()? until}) async {
   setup.events.add(
     api.MessageCreated(
       _message(id: 'flush', authorId: 'me', channelId: 'group-1'),
     ),
   );
-  await Future<void>.delayed(Duration.zero);
+  for (var turn = 0; turn < 50; turn++) {
+    await Future<void>.delayed(Duration.zero);
+    if (until != null && until()) return;
+  }
 }
 
 void main() {
@@ -257,6 +280,65 @@ void main() {
     await _settle(setup);
 
     expect(setup.notifications.shown, isEmpty);
+    await setup.dispose();
+  });
+
+  test(
+    'a mentions-only channel stays silent for an ordinary message',
+    () async {
+      if (!isDesktopHost) return;
+      binding.handleAppLifecycleStateChanged(AppLifecycleState.inactive);
+      final setup = await _wire();
+      await setup.container
+          .read(channelNotificationOverridesProvider.notifier)
+          .mentionsOnly('group-1');
+
+      setup.events.add(
+        api.MessageCreated(
+          _message(id: 'm1', authorId: 'alice', channelId: 'group-1'),
+        ),
+      );
+      await _settle(setup);
+
+      expect(
+        setup.notifications.shown,
+        isEmpty,
+        reason: 'the chime already refused this message; the banner did not',
+      );
+      await setup.dispose();
+    },
+  );
+
+  test('a real mention in a mentions-only channel still notifies, as a '
+      'mention', () async {
+    if (!isDesktopHost) return;
+    binding.handleAppLifecycleStateChanged(AppLifecycleState.inactive);
+    final setup = await _wire();
+    await setup.container
+        .read(channelNotificationOverridesProvider.notifier)
+        .mentionsOnly('group-1');
+
+    setup.events.add(
+      api.MessageCreated(
+        _message(
+          id: 'm1',
+          authorId: 'alice',
+          authorDisplayName: 'Alice',
+          channelId: 'group-1',
+          content: 'hey @nick look',
+        ),
+      ),
+    );
+    await _settle(setup, until: () => setup.notifications.shown.isNotEmpty);
+
+    expect(setup.notifications.shown, ['New message from Alice']);
+    expect(
+      setup.notifications.channels,
+      [LocalAlertChannel.mentions],
+      reason:
+          'every banner used to be filed under messages, so the OS\'s '
+          'own per-kind control for mentions never applied',
+    );
     await setup.dispose();
   });
 }

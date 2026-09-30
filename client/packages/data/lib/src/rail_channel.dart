@@ -11,10 +11,15 @@ import 'database.dart';
 /// compare structurally, so two keys are `==` exactly when the rail would
 /// render them identically.
 ///
-/// `unread` and `mentioned` are the derived booleans the rail shows, not the
-/// raw `cursor`/`mentionedSeq`/`lastReadSeq` behind them: a channel already
+/// `unread` and `mentioned` are derived rather than the raw
+/// `cursor`/`mentionedSeq`/`lastReadSeq` behind them: a channel already
 /// unread (or already mentioned) stays that way through every further
 /// message, so only the flip in or out of either state belongs in the key.
+///
+/// Deliberately broader than what a row paints, which a notification override
+/// can quieten (`providers/unread_indicator_rules.dart`): this key only
+/// decides whether the rail stream re-emits, and an emission that turns out
+/// to draw nothing new is free where a missed one leaves a stale rail.
 typedef RailChannelKey = ({
   String id,
   String name,

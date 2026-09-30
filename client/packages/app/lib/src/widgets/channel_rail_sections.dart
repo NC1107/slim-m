@@ -9,13 +9,15 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:slimm_api/api.dart' show ChannelOrderGroup;
+import 'package:slimm_api/api.dart'
+    show ChannelOrderGroup, NotificationPreference;
 import 'package:slimm_data/data.dart';
 import 'package:slimm_design_system/design_system.dart';
 
 import '../providers/channel_notification_overrides_controller.dart';
 import '../providers/collapsed_categories_preference.dart';
 import '../providers/member_presence.dart' show presenceSeedProvider;
+import '../providers/unread_indicator_rules.dart';
 import '../routing/routes.dart';
 import 'category_header_menu.dart';
 import 'channel_grouping.dart';
@@ -178,10 +180,19 @@ class _ChannelCategorySectionsState
     // the server to clear its membership the next time any other channel
     // moves. Zero size keeps every channel's identity and position in the
     // list - just invisible and unreachable by a drag - while collapsed.
+    final overrides = ref.watch(channelNotificationOverridesProvider);
+
+    // Breaking out of a collapsed category is an unread indicator like any other, so it reads the same rule the rows do.
     Widget row(Channel channel, bool longPressDrags, int? dragHandleIndex) {
       final pinnedOpen =
           channel.id == selectedId ||
-          channel.mentionedSeq > channel.lastReadSeq;
+          unreadIndicatorFor(
+            channelOverride: overrides.overrideFor(channel.id),
+            isDm: false,
+            unread: false,
+            mentioned: channel.mentionedSeq > channel.lastReadSeq,
+            manuallyUnread: false,
+          ).mentioned;
       if (channel.categoryId != null &&
           collapsed.contains(channel.categoryId) &&
           !pinnedOpen) {
@@ -273,15 +284,25 @@ class _TextChannelRow extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final tokens = Theme.of(context).extension<AppTokens>()!;
-    // Read state (`unread` below) is untouched by this; only the glyph replaces the dot.
-    final muted = ref.watch(
-      channelNotificationOverridesProvider.select((s) => s.isMuted(channel.id)),
+    // Read state is untouched by this; only what the row draws about it changes.
+    final override = ref.watch(
+      channelNotificationOverridesProvider.select(
+        (s) => s.overrideFor(channel.id),
+      ),
+    );
+    final muted = override == NotificationPreference.nothing;
+    final indicator = unreadIndicatorFor(
+      channelOverride: override,
+      isDm: false,
+      unread: channel.cursor > channel.lastReadSeq,
+      mentioned: channel.mentionedSeq > channel.lastReadSeq,
+      manuallyUnread: channel.manuallyUnread ?? false,
     );
     return AppListRow(
       label: channel.name,
       selected: selected,
-      unread: channel.cursor > channel.lastReadSeq,
-      mentioned: channel.mentionedSeq > channel.lastReadSeq,
+      unread: indicator.unread,
+      mentioned: indicator.mentioned,
       muted: muted,
       leading: ChannelKindIcon(
         isVoice: false,

@@ -110,12 +110,19 @@ impl Store {
     }
 
     /// The effective preference for each of `user_ids` in `channel_id`: that
-    /// user's own override for this channel if they have set one, else their
-    /// account default - one query rather than [`Store::notification_preferences`]
-    /// plus a second lookup, the batched shape [`Store::roles_for_users`]
-    /// already uses. An id absent from the map (deleted mid-fan-out) is read
-    /// as the default at the call site, the same contract every sibling
-    /// batched lookup in this crate follows.
+    /// user's own override for this channel if they have set one, else the one
+    /// they set on `parent_channel_id`, else their account default - one query
+    /// rather than [`Store::notification_preferences`] plus a second lookup,
+    /// the batched shape [`Store::roles_for_users`] already uses. An id absent
+    /// from the map (deleted mid-fan-out) is read as the default at the call
+    /// site, the same contract every sibling batched lookup in this crate
+    /// follows.
+    ///
+    /// `parent_channel_id` is a thread's parent channel, and `None` for every
+    /// other channel. A thread is its own channel row, so without that second
+    /// step muting a channel would only mute the part of the conversation that
+    /// nobody replied to in a thread; the thread's own override still wins
+    /// when one exists, since it is the more specific answer.
     ///
     /// This is the one place [`crate::push::recipients::narrow_for_notification_preference`]
     /// reads a preference from, replacing the account-only lookup it used
@@ -123,6 +130,7 @@ impl Store {
     pub async fn channel_notification_preferences(
         &self,
         channel_id: ChannelId,
+        parent_channel_id: Option<ChannelId>,
         user_ids: &[UserId],
     ) -> anyhow::Result<HashMap<UserId, NotificationPreference>> {
         if user_ids.is_empty() {
@@ -131,11 +139,16 @@ impl Store {
 
         // Built, not a fixed `query!`: the id list is variable length; see `user_profiles`.
         let mut builder = QueryBuilder::new(
-            "SELECT u.id AS id, COALESCE(c.preference, u.notification_preference) AS preference \
+            "SELECT u.id AS id, \
+             COALESCE(c.preference, p.preference, u.notification_preference) AS preference \
              FROM users u LEFT JOIN channel_notification_prefs c \
              ON c.user_id = u.id AND c.channel_id = ",
         );
         builder.push_bind(channel_id);
+        builder.push(
+            " LEFT JOIN channel_notification_prefs p ON p.user_id = u.id AND p.channel_id = ",
+        );
+        builder.push_bind(parent_channel_id);
         builder.push(" WHERE u.deleted_at IS NULL AND u.id IN (");
         let mut separated = builder.separated(", ");
         for id in user_ids {

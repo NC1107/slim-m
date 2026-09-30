@@ -11,9 +11,11 @@ import 'package:go_router/go_router.dart';
 import 'package:slimm_data/data.dart';
 import 'package:slimm_design_system/design_system.dart';
 
+import '../providers/channel_notification_overrides_controller.dart';
 import '../providers/dms.dart';
 import '../providers/personal_space_visibility.dart';
 import '../providers/providers.dart';
+import '../providers/unread_indicator_rules.dart';
 import '../routing/routes.dart';
 import 'personal_space_menu.dart';
 import 'run_guarded.dart';
@@ -84,6 +86,22 @@ class _PersonalSpaceRowState extends ConsumerState<PersonalSpaceRow>
         existing != null && ref.watch(personalSpaceVisibilityProvider);
     if (hidden) return const SizedBox.shrink();
 
+    // A DM with yourself, so mentions-only leaves it loud; only an outright mute quietens it.
+    final indicator = unreadIndicatorFor(
+      channelOverride: existing == null
+          ? null
+          : ref.watch(
+              channelNotificationOverridesProvider.select(
+                (s) => s.overrideFor(existing.id),
+              ),
+            ),
+      isDm: true,
+      unread: existing != null && existing.cursor > existing.lastReadSeq,
+      mentioned:
+          existing != null && existing.mentionedSeq > existing.lastReadSeq,
+      manuallyUnread: existing?.manuallyUnread ?? false,
+    );
+
     final touch = AppTouchTargets.of(context);
     final kebabShown = touch || _hovered || _kebabFocused;
     final kebab = existing == null
@@ -102,10 +120,8 @@ class _PersonalSpaceRowState extends ConsumerState<PersonalSpaceRow>
           AppListRow(
             label: personalSpaceName,
             selected: widget.selected,
-            unread: existing != null && existing.cursor > existing.lastReadSeq,
-            mentioned:
-                existing != null &&
-                existing.mentionedSeq > existing.lastReadSeq,
+            unread: indicator.unread,
+            mentioned: indicator.mentioned,
             // Matches AppAvatar(size: 20)'s 20x20 footprint; a bare 16px icon left the label 4dp misaligned.
             leading: SizedBox(
               width: 20,

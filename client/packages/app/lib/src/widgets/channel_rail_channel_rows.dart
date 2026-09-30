@@ -16,6 +16,8 @@ import 'package:slimm_data/data.dart';
 import 'package:slimm_design_system/design_system.dart';
 import 'package:slimm_rtc/rtc.dart';
 
+import '../providers/channel_notification_overrides_controller.dart';
+import '../providers/unread_indicator_rules.dart';
 import '../providers/voice_controller.dart';
 import '../providers/voice_flags.dart';
 import '../providers/voice_roster.dart';
@@ -160,14 +162,18 @@ class _ManagedChannelRowState extends State<ManagedChannelRow> {
   }
 }
 
-/// `unread` and `mentioned` read the same `cursor`/`mentionedSeq`-vs-
-/// `lastReadSeq` tests [_TextChannelRow] does: a voice channel has its own
-/// transcript and composer now (`screens/voice_text_pane.dart`), so unread
-/// text (and a mention in it) means the same thing here it does anywhere
-/// else. `unread` used to read `inCall` instead, which left the dot
+/// `unread` and `mentioned` run the same [unreadIndicatorFor] the rail's text
+/// rows do: a voice channel has its own transcript and composer now
+/// (`screens/voice_text_pane.dart`), so unread text - and a mention in it, and
+/// a notification override over both - means the same thing here it does
+/// anywhere else. `unread` used to read `inCall` instead, which left the dot
 /// permanently lit for whoever was in the call and blind to actual unread
 /// text; being in the call already has its own cue, the accented mic icon
 /// below, so it does not need to borrow this one too.
+///
+/// The mute glyph the text row draws has no slot to take here - the
+/// participant count already holds it - so a muted voice channel reads as
+/// muted from [AppListRow.muted]'s own dimming alone.
 class VoiceChannelRow extends ConsumerWidget {
   const VoiceChannelRow({
     super.key,
@@ -197,6 +203,18 @@ class VoiceChannelRow extends ConsumerWidget {
     final iconColor = inCall
         ? tokens.accent
         : tokens.textSecondary.withValues(alpha: 0.7);
+    final override = ref.watch(
+      channelNotificationOverridesProvider.select(
+        (s) => s.overrideFor(channel.id),
+      ),
+    );
+    final indicator = unreadIndicatorFor(
+      channelOverride: override,
+      isDm: false,
+      unread: channel.cursor > channel.lastReadSeq,
+      mentioned: channel.mentionedSeq > channel.lastReadSeq,
+      manuallyUnread: channel.manuallyUnread ?? false,
+    );
 
     // A joined call already has this live; an unjoined one polls for it below.
     final participants = inCall
@@ -214,8 +232,9 @@ class VoiceChannelRow extends ConsumerWidget {
         AppListRow(
           label: channel.name,
           selected: selected,
-          unread: channel.cursor > channel.lastReadSeq,
-          mentioned: channel.mentionedSeq > channel.lastReadSeq,
+          unread: indicator.unread,
+          mentioned: indicator.mentioned,
+          muted: override == api.NotificationPreference.nothing,
           leading: ChannelKindIcon(
             isVoice: true,
             restricted: channel.restricted ?? false,
