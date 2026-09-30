@@ -52,6 +52,7 @@ import '../voice_call_controls.dart';
 import '../../providers/voice_controller.dart';
 import '../../providers/voice_flags.dart';
 import '../../widgets/floating_dock_card.dart';
+import 'canvas_pen_style.dart';
 import 'canvas_tools_row.dart';
 
 /// The call half of the dock: exactly what `CallControls` already needs.
@@ -85,6 +86,8 @@ class CanvasDockData {
     required this.onToggleActivityLog,
     required this.shapeKind,
     required this.onShapeKindChanged,
+    required this.pen,
+    required this.onPenChanged,
     required this.onClose,
     required this.hasSelfBubble,
     required this.selfBubbleHidden,
@@ -118,6 +121,8 @@ class CanvasDockData {
   final VoidCallback onToggleActivityLog;
   final CanvasShapeKind shapeKind;
   final ValueChanged<CanvasShapeKind> onShapeKindChanged;
+  final CanvasPenStyle pen;
+  final ValueChanged<CanvasPenStyle> onPenChanged;
   final VoidCallback onClose;
 
   /// Whether the caller is on this channel's call at all, and the overflow
@@ -249,6 +254,8 @@ class _ToolsRow extends StatelessWidget {
           onToggleActivityLog: canvas.onToggleActivityLog,
           shapeKind: canvas.shapeKind,
           onShapeKindChanged: canvas.onShapeKindChanged,
+          pen: canvas.pen,
+          onPenChanged: canvas.onPenChanged,
           onClose: canvas.onClose,
           hasSelfBubble: canvas.hasSelfBubble,
           selfBubbleHidden: canvas.selfBubbleHidden,

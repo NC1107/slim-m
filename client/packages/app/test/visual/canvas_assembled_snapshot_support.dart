@@ -35,6 +35,7 @@ import 'package:slimm_app/src/providers/voice_flags.dart';
 import 'package:slimm_app/src/screens/canvas/canvas_activity_log.dart';
 import 'package:slimm_app/src/screens/canvas/canvas_call_dock.dart';
 import 'package:slimm_app/src/screens/canvas/canvas_pane_body.dart';
+import 'package:slimm_app/src/screens/canvas/canvas_pen_style.dart';
 import 'package:slimm_design_system/design_system.dart';
 import 'package:slimm_platform/platform.dart';
 import 'package:slimm_rtc/rtc.dart';
@@ -180,6 +181,8 @@ Future<void> renderCanvasAssembledPane(
               onShapePlace: (_, __) {},
               shapeKind: CanvasShapeKind.rectangle,
               onShapeKindChanged: (_) {},
+              pen: const CanvasPenStyle(),
+              onPenChanged: (_) {},
               onBringToFront: (_) {},
               onSendToBack: (_) {},
               onDeleteSelected: (_) {},

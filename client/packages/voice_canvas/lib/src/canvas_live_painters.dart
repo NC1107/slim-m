@@ -105,7 +105,8 @@ class DraftPainter extends CustomPainter {
   }
 
   @override
-  bool shouldRepaint(DraftPainter oldDelegate) => false;
+  bool shouldRepaint(DraftPainter oldDelegate) =>
+      oldDelegate.ink != ink || oldDelegate.width != width;
 }
 
 /// The box a shape tool is currently sizing by dragging, in screen

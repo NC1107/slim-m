@@ -442,6 +442,9 @@ abstract final class AppCanvasColors {
   static const Color annotation = Color(0xFFE86A5C);
   static const Color note = Color(0xFFE8B04B);
   static const Color shape = Color(0xFF5B8FD6);
+  static const Color penGreen = Color(0xFF6FBF73);
+  static const Color penPurple = Color(0xFF8C6FE0);
+  static const Color penPink = Color(0xFFE0699A);
 
   static const List<Color> cursors = [
     Color(0xFFE0699A),

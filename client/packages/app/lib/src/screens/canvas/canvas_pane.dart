@@ -53,6 +53,7 @@ import 'canvas_media_slot_sync.dart';
 import 'canvas_note_sheet.dart';
 import 'canvas_ops_controller.dart';
 import 'canvas_pane_body.dart';
+import 'canvas_pen_style.dart';
 import 'canvas_quick_placement.dart';
 import 'canvas_stroke_preview_relay.dart';
 import 'canvas_tool_model.dart';
@@ -90,6 +91,7 @@ class _CanvasPaneState extends ConsumerState<CanvasPane> {
   /// [CanvasTool.pan] the mode itself forced.
   CanvasTool? _toolBeforeFullscreen;
   CanvasShapeKind _shapeKind = CanvasShapeKind.rectangle;
+  CanvasPenStyle _pen = const CanvasPenStyle();
   CanvasImagePaste? _imagePasteHelper;
   CanvasQuickPlacement? _quickPlacementHelper;
 
@@ -231,6 +233,8 @@ class _CanvasPaneState extends ConsumerState<CanvasPane> {
           onShapePlace: (world, size) => unawaited(_onShapePlace(world, size)),
           shapeKind: _shapeKind,
           onShapeKindChanged: (kind) => setState(() => _shapeKind = kind),
+          pen: _pen,
+          onPenChanged: (pen) => setState(() => _pen = pen),
           onBringToFront: (id) => unawaited(_onBringToFront(id)),
           onSendToBack: (id) => unawaited(_onSendToBack(id)),
           onDeleteSelected: (id) => unawaited(_onDeleteSelected(id)),

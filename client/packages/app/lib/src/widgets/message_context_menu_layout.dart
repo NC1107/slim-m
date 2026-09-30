@@ -20,9 +20,16 @@ const double menuScreenMargin = 8;
 /// than letting it run off an edge: a long-press on a message low on a phone
 /// screen otherwise puts Delete past the bottom of the display.
 class MessageMenuLayout extends SingleChildLayoutDelegate {
-  const MessageMenuLayout({required this.anchor, required this.padding});
+  const MessageMenuLayout({
+    required this.anchor,
+    required this.padding,
+    this.above = false,
+  });
 
   final Offset anchor;
+
+  /// Treats [anchor] as the menu's bottom-left, for a trigger near the bottom edge.
+  final bool above;
   final EdgeInsets padding;
 
   @override
@@ -35,11 +42,16 @@ class MessageMenuLayout extends SingleChildLayoutDelegate {
     final maxY = size.height - padding.bottom - childSize.height;
     return Offset(
       anchor.dx.clamp(padding.left, math.max(padding.left, maxX)),
-      anchor.dy.clamp(padding.top, math.max(padding.top, maxY)),
+      (above ? anchor.dy - childSize.height : anchor.dy).clamp(
+        padding.top,
+        math.max(padding.top, maxY),
+      ),
     );
   }
 
   @override
   bool shouldRelayout(MessageMenuLayout oldDelegate) =>
-      anchor != oldDelegate.anchor || padding != oldDelegate.padding;
+      anchor != oldDelegate.anchor ||
+      padding != oldDelegate.padding ||
+      above != oldDelegate.above;
 }

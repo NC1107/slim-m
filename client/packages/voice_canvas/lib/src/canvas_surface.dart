@@ -90,6 +90,8 @@ class CanvasSurface extends StatefulWidget {
     this.shapeKind = CanvasShapeKind.rectangle,
     this.tool = CanvasTool.pen,
     this.strokeWidth = 3,
+    this.penInk,
+    this.inkColors = const {},
     this.enabled = true,
     this.cursors,
     this.cursorColors = const [],
@@ -112,6 +114,11 @@ class CanvasSurface extends StatefulWidget {
 
   final CanvasDocument document;
   final Color ink;
+
+  /// What the pen draws its live preview in; null uses [ink]. Committed ink
+  /// is painted from each stroke's own key through [inkColors].
+  final Color? penInk;
+  final Map<String, Color> inkColors;
 
   /// A note's own fill/border colour, and a shape's own outline colour.
   /// Null falls all the way back to [ink] - see [StrokePainter]'s own doc.
@@ -294,6 +301,7 @@ class _CanvasSurfaceState extends State<CanvasSurface>
   late final StrokePainter _strokes = StrokePainter(
     document: widget.document,
     ink: widget.ink,
+    inkColors: widget.inkColors,
     noteColor: widget.noteColor,
     shapeColor: widget.shapeColor,
     textInk: widget.noteTextInk,
@@ -302,12 +310,24 @@ class _CanvasSurfaceState extends State<CanvasSurface>
     placeholderIcon: widget.placeholderIcon,
     elevationShadow: widget.elevationShadow,
   );
-  late final DraftPainter _draftPainter = DraftPainter(
-    draft: _draft,
-    document: widget.document,
-    ink: widget.ink,
-    width: widget.strokeWidth,
-  );
+  late DraftPainter _draftPainter = _buildDraftPainter();
+
+  DraftPainter _buildDraftPainter() => DraftPainter(
+        draft: _draft,
+        document: widget.document,
+        ink: widget.penInk ?? widget.ink,
+        width: widget.strokeWidth,
+      );
+
+  @override
+  void didUpdateWidget(CanvasSurface oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.penInk != widget.penInk ||
+        oldWidget.strokeWidth != widget.strokeWidth) {
+      _draftPainter = _buildDraftPainter();
+    }
+  }
+
   final DraftShape _shapeDraft = DraftShape();
   late final DraftShapePainter _shapeDraftPainter = DraftShapePainter(
     draft: _shapeDraft,

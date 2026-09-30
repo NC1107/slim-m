@@ -8,20 +8,25 @@ import 'package:flutter/material.dart';
 import 'package:slimm_design_system/design_system.dart';
 
 import 'context_menu_region.dart';
+import 'control_swatch_row.dart';
 
 /// One row of a control's options menu.
-class ControlOption {
+class ControlOption extends ControlOptionEntry {
   const ControlOption({
     required this.label,
-    required this.icon,
+    this.icon,
     required this.onSelected,
     this.tone = AppMenuItemTone.normal,
+    this.selected = false,
   });
 
   final String label;
-  final IconData icon;
+  final IconData? icon;
   final VoidCallback onSelected;
   final AppMenuItemTone tone;
+
+  /// Marks the current value of a pick-one group, by a check as well as tint.
+  final bool selected;
 }
 
 /// [child] with a caret and long-press that open [options].
@@ -35,12 +40,20 @@ class ControlOptionsMenu extends StatefulWidget {
     required this.options,
     required this.optionsLabel,
     this.active = false,
+    this.caretHeight = AppSizes.controlMd,
+    this.opensAbove = false,
   });
 
   final Widget child;
-  final List<ControlOption> options;
+  final List<ControlOptionEntry> options;
   final String optionsLabel;
   final bool active;
+
+  /// The caret's drawn height, matching a primary shorter than a full chip.
+  final double caretHeight;
+
+  /// Opens the menu above the control, for one docked at the bottom edge.
+  final bool opensAbove;
 
   @override
   State<ControlOptionsMenu> createState() => _ControlOptionsMenuState();
@@ -62,24 +75,58 @@ class _ControlOptionsMenuState extends State<ControlOptionsMenu> {
       // The wrapped control is already a tab stop, and owns the long-press.
       ownsFocusNode: false,
       enableLongPress: false,
+      opensAbove: widget.opensAbove,
       itemsBuilder: (context, close) => [
-        for (final option in widget.options)
-          AppMenuItem(
-            label: option.label,
-            leading: option.icon,
-            tone: option.tone,
-            onTap: () {
-              close();
-              option.onSelected();
-            },
-          ),
+        for (final entry in widget.options) ..._rows(context, entry, close),
       ],
       child: AppControlWithOptions(
         active: widget.active,
+        visualHeight: widget.caretHeight,
         optionsLabel: widget.optionsLabel,
         onOpenOptions: () => _region.currentState?.open(),
         child: child,
       ),
+    );
+  }
+
+  List<Widget> _rows(
+    BuildContext context,
+    ControlOptionEntry entry,
+    VoidCallback close,
+  ) {
+    if (entry is ControlSwatchGroup) {
+      return [
+        AppMenuLabel(entry.heading),
+        ControlSwatchRow(swatches: entry.swatches, close: close),
+      ];
+    }
+    return _itemRows(context, entry as ControlOption, close);
+  }
+
+  List<Widget> _itemRows(
+    BuildContext context,
+    ControlOption option,
+    VoidCallback close,
+  ) => [
+    AppMenuItem(
+      label: option.label,
+      leading: option.icon,
+      tone: option.tone,
+      selected: option.selected,
+      trailing: _trailing(context, option),
+      onTap: () {
+        close();
+        option.onSelected();
+      },
+    ),
+  ];
+
+  Widget? _trailing(BuildContext context, ControlOption option) {
+    if (!option.selected) return null;
+    return Icon(
+      AppIcons.check,
+      size: AppSizes.icon16,
+      color: Theme.of(context).extension<AppTokens>()!.accent,
     );
   }
 }

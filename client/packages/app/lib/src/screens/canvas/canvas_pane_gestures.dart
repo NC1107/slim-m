@@ -193,8 +193,8 @@ extension _CanvasPaneGestures on _CanvasPaneState {
           w: segment.w,
           h: segment.h,
           points: segment.points,
-          width: 3,
-          colorKey: 'annotation',
+          width: _pen.width,
+          colorKey: _pen.colorKey,
           authorId: selfId,
         ),
       );
@@ -207,8 +207,8 @@ extension _CanvasPaneGestures on _CanvasPaneState {
           h: segment.h,
           props: {
             'points': segment.points,
-            'width': 3.0,
-            'color': 'annotation',
+            'width': _pen.width,
+            'color': _pen.colorKey,
           },
         ),
       );
