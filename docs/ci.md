@@ -100,7 +100,11 @@ Before this, nothing cached it, so an upstream hiccup failed an unrelated PR wit
 `native-hooks-diagnose` runs as an `if: failure()` step after the build.
 Flutter does not keep a failed hook's stderr (`stderr.txt` is empty), so the action finds every hook directory with an `input.json` and no `output.json` and re-runs the command recorded in its `stdout.txt`, printing the real cause.
 
-Not covered: `media_kit_libs_linux` downloads mimalloc from CMake during `flutter build linux`, into `build/linux/x64/release/`, which this does not cache.
+`media_kit_libs_linux` has the same shape: its CMake downloads mimalloc at configure time, before any hook, into `build/linux/x64/release/mimalloc-*.tar.gz`.
+`native-hooks-cache` caches that archive on Linux, keyed on the lockfile (which pins the plugin and so the mimalloc release).
+CMake skips the download when the file exists and only MD5-checks what it just downloaded, so a stale entry is not a risk as long as only a successful build saves the cache, which `actions/cache` guarantees.
+A failed download leaves an empty archive and the log says only `Integrity check failed`, so `native-hooks-diagnose` reports a missing or empty archive as a failed download.
+With both caches restored and no network, a full `flutter build linux --release` succeeds.
 
 ### Goldens are not a separate job
 

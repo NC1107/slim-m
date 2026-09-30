@@ -10,6 +10,12 @@
 # sibling per-hook directories embed absolute pub-cache paths and are cheap
 # to regenerate.
 #
+# media_kit_libs_linux's CMake downloads mimalloc the same way, at configure
+# time and before any hook, into build/linux/x64/release. CMake skips the
+# download when the archive exists, and the plugin MD5-checks it only after
+# downloading, so what is cached is a file that already passed that check.
+# The lockfile pins the plugin version and with it the mimalloc release.
+#
 # The lockfile pins the sqlite3 version, which fixes the sqlite3mc release and
 # its asset hash; pubspec.yaml carries the `source: sqlite3mc` user define.
 
@@ -23,3 +29,8 @@ runs:
       with:
         path: client/.dart_tool/hooks_runner/shared
         key: native-hooks-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('client/pubspec.lock', 'client/pubspec.yaml') }}
+    - if: runner.os == 'Linux'
+      uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+      with:
+        path: client/packages/app/build/linux/x64/release/mimalloc-*.tar.gz
+        key: mimalloc-${{ runner.arch }}-${{ hashFiles('client/pubspec.lock') }}
