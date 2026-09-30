@@ -16,11 +16,7 @@ name: main-builds
 # `crates/**` reaches the running production instance on its own, and that
 # is a deliberate trade being made here, not a gap nobody noticed.
 #
-# One workflow with one `on.push.paths` trigger wide enough for both halves,
-# narrowed per job by a `dorny/paths-filter` job. Two workflows with their
-# own top-level `paths` was the other shape the brief allowed; one file keeps
-# the shared concurrency group and this header in one place instead of
-# duplicated across two.
+# One workflow, one `on.push.paths` trigger wide enough for both halves, narrowed per job by a `dorny/paths-filter` job.
 #
 # Every job below reads secrets directly rather than declaring
 # `environment: release` or `environment: testflight`. Both exist with no
@@ -248,6 +244,7 @@ jobs:
           channel: stable
           flutter-version: 3.47.0
 
+      - uses: ./.github/actions/native-hooks-cache
       # Build number from the run number, build name from pubspec's tracked version; never from local pubspec defaults.
       - name: build android release
         if: steps.gate.outputs.ready == 'true'
@@ -304,6 +301,7 @@ jobs:
             client/packages/app/build/app/outputs/flutter-apk/app-release.apk
             client/packages/app/build/app/outputs/bundle/release/app-release.aab
           if-no-files-found: error
+      - {if: failure(), uses: ./.github/actions/native-hooks-diagnose}
 
   # Signed ipa straight to TestFlight; inert without its six secrets, the same gate release.yml uses.
   # CONTINUOUS_TESTFLIGHT=false leaves iOS to release.yml alone; a hand-run dispatch still builds.
@@ -411,6 +409,7 @@ jobs:
           channel: stable
           flutter-version: 3.47.0
 
+      - uses: ./.github/actions/native-hooks-cache
       # Build number from the run number, build name from pubspec's tracked version; both stores reject a reuse.
       - name: build ipa
         if: steps.gate.outputs.ready == 'true'
@@ -430,6 +429,7 @@ jobs:
             --file "${ipa[0]}" \
             --apiKey "$APP_STORE_CONNECT_KEY_ID" \
             --apiIssuer "$APP_STORE_CONNECT_ISSUER_ID"
+      - {if: failure(), uses: ./.github/actions/native-hooks-diagnose}
 
   # Pulled into its own file, copr-publish.yml, once this workflow reached
   # the 500-line hard ceiling - a reusable workflow rather than a composite

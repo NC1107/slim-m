@@ -1,0 +1,25 @@
+# SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
+#
+# Caches what the native build hooks download, so a client build does not
+# depend on the network for it.
+#
+# sqlite3's hook fetches the sqlite3mc binary into
+# client/.dart_tool/hooks_runner/shared/sqlite3/build/download-<hash>. Nothing
+# cached that, so one upstream hiccup failed an unrelated build with only
+# "Building assets for package:sqlite3 failed". Only `shared` is kept: the
+# sibling per-hook directories embed absolute pub-cache paths and are cheap
+# to regenerate.
+#
+# The lockfile pins the sqlite3 version, which fixes the sqlite3mc release and
+# its asset hash; pubspec.yaml carries the `source: sqlite3mc` user define.
+
+name: native hooks cache
+description: Restore and save the native build hooks' shared download directory.
+
+runs:
+  using: composite
+  steps:
+    - uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+      with:
+        path: client/.dart_tool/hooks_runner/shared
+        key: native-hooks-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('client/pubspec.lock', 'client/pubspec.yaml') }}

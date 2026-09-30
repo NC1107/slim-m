@@ -148,6 +148,8 @@ jobs:
       - name: libmpv (media_kit's native video backend on Linux)
         run: sudo apt-get update && sudo apt-get install -y --no-install-recommends libmpv-dev
 
+      - uses: ./.github/actions/native-hooks-cache
+
       # --enforce-lockfile, for the same reason the Rust side builds --locked:
       # without it the committed lockfile is advisory and CI can silently
       # resolve versions nobody committed.
@@ -192,6 +194,8 @@ jobs:
           done
           exit "$status"
 
+      - {if: failure(), uses: ./.github/actions/native-hooks-diagnose}
+
   # Keeps the check-run name release.yml's verify-client-ci waits on. It gates
   # on every shard above, so a red shard leaves this skipped rather than
   # successful and the release gate still refuses the commit.
@@ -210,6 +214,8 @@ jobs:
           flutter-version: 3.47.0
           cache: true
 
+      - uses: ./.github/actions/native-hooks-cache
+
       - name: resolve workspace dependencies
         working-directory: client
         run: flutter pub get --enforce-lockfile
@@ -222,6 +228,8 @@ jobs:
       - name: web compiles
         working-directory: client/packages/app
         run: flutter build web --release
+
+      - {if: failure(), uses: ./.github/actions/native-hooks-diagnose}
 
   # A native desktop plugin's own CMake is invisible to analyze, test and the
   # web build alike: adding audioplayers put a gstreamer-1.0 pkg-config
@@ -246,6 +254,8 @@ jobs:
           flutter-version: 3.47.0
           cache: true
 
+      - uses: ./.github/actions/native-hooks-cache
+
       - name: resolve workspace dependencies
         working-directory: client
         run: flutter pub get --enforce-lockfile
@@ -259,6 +269,8 @@ jobs:
           name: linux-desktop-shell-smoke-bundle
           path: client/packages/app/build/linux/x64/release/bundle
           if-no-files-found: error
+
+      - {if: failure(), uses: ./.github/actions/native-hooks-diagnose}
 
   # decision 0012's own substitute for "does the desktop window shell run at
   # all": starts the real release binary under Xvfb (a virtual, off-screen X
@@ -321,6 +333,8 @@ jobs:
           flutter-version: 3.47.0
           cache: true
 
+      - uses: ./.github/actions/native-hooks-cache
+
       - name: resolve workspace dependencies
         working-directory: client
         run: flutter pub get --enforce-lockfile
@@ -334,6 +348,8 @@ jobs:
           name: golden-references
           path: client/packages/design_system/test/goldens
           if-no-files-found: error
+
+      - {if: failure(), uses: ./.github/actions/native-hooks-diagnose}
 
   # The iOS half lives in client-ios-ci.yml. It costs 14 minutes on a macOS
   # runner against 5 for everything here, so it is gated on the paths that can
