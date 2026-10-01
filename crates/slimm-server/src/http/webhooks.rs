@@ -140,9 +140,7 @@ async fn deliver(
     };
 
     let principal_key = format!("u:{}", context.principal_id);
-    if !state.limiter.check(Class::Webhook, &principal_key) {
-        return Err(ApiError::TooManyRequests);
-    }
+    state.limiter.admit(Class::Webhook, &principal_key)?;
 
     let content = validate_content(body.content.as_deref().unwrap_or(""), false)?;
     let username = match body.username.as_deref().map(str::trim) {

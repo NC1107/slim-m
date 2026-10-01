@@ -46,6 +46,10 @@ pub(crate) enum ApiError {
     /// Like [`ApiError::Conflict`], naming the other party, which is only known at request time.
     ConflictDetail(String),
     TooManyRequests,
+    /// The rate limiter refused; says how long until the bucket has a token.
+    RateLimited {
+        retry_after_seconds: u64,
+    },
     /// A fresh send arrived before the channel's slow-mode interval elapsed
     /// since the author's own last message here. Carries how many seconds
     /// are left, echoed both as a `Retry-After` header (the same header
@@ -98,6 +102,9 @@ impl IntoResponse for ApiError {
             ApiError::SlowMode {
                 retry_after_seconds,
             } => Some(*retry_after_seconds),
+            ApiError::RateLimited {
+                retry_after_seconds,
+            } => i64::try_from(*retry_after_seconds).ok(),
             _ => None,
         };
         let missing_permissions = match &self {
@@ -118,6 +125,9 @@ impl IntoResponse for ApiError {
             ApiError::Conflict(message) => (StatusCode::CONFLICT, message.into()),
             ApiError::ConflictDetail(message) => (StatusCode::CONFLICT, message.into()),
             ApiError::TooManyRequests => {
+                (StatusCode::TOO_MANY_REQUESTS, "slow down and retry".into())
+            }
+            ApiError::RateLimited { .. } => {
                 (StatusCode::TOO_MANY_REQUESTS, "slow down and retry".into())
             }
             ApiError::SlowMode {
@@ -218,6 +228,14 @@ impl From<HashError> for ApiError {
                 tracing::error!(error = %e, "password hashing failed");
                 ApiError::Internal
             }
+        }
+    }
+}
+
+impl From<crate::ratelimit::RetryAfter> for ApiError {
+    fn from(wait: crate::ratelimit::RetryAfter) -> Self {
+        ApiError::RateLimited {
+            retry_after_seconds: wait.0,
         }
     }
 }

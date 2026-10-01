@@ -7690,7 +7690,17 @@ components:
           schema:
             $ref: "#/components/schemas/Error"
     TooManyRequests:
-      description: The caller is over its rate budget for this traffic class.
+      description: >
+        The caller is over its rate budget for this traffic class. Carries a
+        `Retry-After` header (whole seconds, at least 1) computed from the
+        class's own refill rate: the time until the caller's bucket holds one
+        more token. The same number is in the body's `retry_after_seconds`.
+      headers:
+        Retry-After:
+          description: Seconds to wait before retrying.
+          schema:
+            type: integer
+            minimum: 1
       content:
         application/json:
           schema:
@@ -7743,9 +7753,10 @@ components:
           format: int64
           description: >
             How many seconds remain before the request would succeed. Present
-            only on a slow-mode 429 from `sendMessage` (also echoed as a
-            `Retry-After` header on that same response); absent everywhere
-            else, including every other 429.
+            on a slow-mode 429 from `sendMessage` and on every rate-limiter
+            429 (both also echoed as a `Retry-After` header); absent
+            everywhere else, including the 429 of a two-factor lockout and of
+            the private-message budget.
         missing_permissions:
           type: integer
           format: int64
