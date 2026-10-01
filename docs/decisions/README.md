@@ -60,3 +60,4 @@ No number is used twice.
 | [0048](0048-totp-two-factor.md) | TOTP two-factor authentication | accepted |
 | [0049](0049-per-channel-notification-behaviour.md) | a per-channel notification override decides the badge too | accepted |
 | [0050](0050-watch-party-sync-authority-and-direct-play.md) | The watch party keeps its shared track and gains per-viewer direct play | accepted; stage 1 built |
+| [0051](0051-who-reacted.md) | Who left a reaction is readable on request, never on the wire | accepted |

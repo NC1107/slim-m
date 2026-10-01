@@ -171,7 +171,7 @@ pub use polls::{
     PollOption, PollTally, VoteError,
 };
 pub use push::{PushError, PushRegistration, PushTarget};
-pub use reactions::{MAX_EMOJI_BYTES, ReactError, ReactionSummary};
+pub use reactions::{MAX_EMOJI_BYTES, ReactError, ReactionSummary, ReactorCursor};
 pub use recovery::{ConsumeResetError, IssueResetError};
 pub use refresh_rotation::RefreshOutcome;
 pub use removals::{RemoveMemberError, SpaceRemoval};
