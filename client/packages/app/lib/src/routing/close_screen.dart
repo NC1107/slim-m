@@ -42,13 +42,20 @@ class BackToButton extends StatelessWidget {
   final String fallback;
 
   @override
-  Widget build(BuildContext context) => Padding(
-    padding: const EdgeInsets.symmetric(horizontal: AppSpacing.s8),
-    child: AppIconButton(
+  Widget build(BuildContext context) {
+    final button = AppIconButton(
       icon: AppIcons.back,
       semanticLabel: tooltip,
       tooltip: tooltip,
       onPressed: () => closeScreen(context, fallback),
-    ),
-  );
+    );
+    // An app bar gives its leading slot 56pt: the 44pt touch button plus the
+    // pointer layout's 8pt gutter does not fit, and squeezed the button to 40.
+    return AppTouchTargets.of(context)
+        ? Center(child: button)
+        : Padding(
+            padding: const EdgeInsets.symmetric(horizontal: AppSpacing.s8),
+            child: button,
+          );
+  }
 }

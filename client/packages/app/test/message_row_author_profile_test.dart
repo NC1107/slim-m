@@ -79,6 +79,11 @@ Future<bool> _tabToAvatar(WidgetTester tester) =>
 Future<bool> _tabToName(WidgetTester tester) =>
     _tabTo(tester, 'Priya, view profile');
 
+/// The target's own [Semantics], below the hit-area padding that wraps it and
+/// owns no node of its own.
+Finder _ownSemantics(Finder target) =>
+    find.descendant(of: target, matching: find.byType(Semantics)).first;
+
 void main() {
   testWidgets('tapping the avatar opens the author\'s profile popover', (
     tester,
@@ -205,10 +210,10 @@ void main() {
         final dump = owner.semanticsOwner!.rootSemanticsNode!.toStringDeep();
 
         final avatarNode = tester.getSemantics(
-          find.byType(AuthorProfileTapTarget).at(0),
+          _ownSemantics(find.byType(AuthorProfileTapTarget).at(0)),
         );
         final nameNode = tester.getSemantics(
-          find.byType(AuthorProfileTapTarget).at(1),
+          _ownSemantics(find.byType(AuthorProfileTapTarget).at(1)),
         );
 
         expect(
