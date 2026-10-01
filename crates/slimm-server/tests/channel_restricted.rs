@@ -134,12 +134,9 @@ async fn restricted_reflects_everyones_own_view_not_the_callers() {
     assert!(hidden_bits.contains(Permissions::VIEW_CHANNEL));
 }
 
-/// A response without the field (any route other than `listChannels`) must
-/// not be read by a client as "public" - it is asserted absent here, and
-/// [SlimmApi.listChannels]'s own Dart model treats a missing field on that
-/// route the same way for a server too old to send it.
+/// A create answers the true value, so a channel made private draws a lock at once.
 #[tokio::test]
-async fn restricted_is_absent_from_a_create_response() {
+async fn restricted_is_reported_on_a_create_response() {
     let (store, _guard) = new_store().await;
     let token = register_admin(&store, "admin").await;
     let app = app(store.clone());
@@ -158,8 +155,5 @@ async fn restricted_is_absent_from_a_create_response() {
         .unwrap();
     assert_eq!(response.status(), StatusCode::OK);
     let created = json_body(response).await;
-    assert!(
-        created.get("restricted").is_none(),
-        "create has no restricted channel property to report"
-    );
+    assert_eq!(created["restricted"], false);
 }

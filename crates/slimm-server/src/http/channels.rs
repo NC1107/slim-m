@@ -135,6 +135,16 @@ impl From<Channel> for ChannelDto {
     }
 }
 
+impl ChannelDto {
+    /// A channel row with the reader-independent `restricted` fact attached.
+    pub(crate) fn with_restricted(channel: Channel, restricted: bool) -> Self {
+        Self {
+            restricted: Some(restricted),
+            ..Self::from(channel)
+        }
+    }
+}
+
 #[derive(Deserialize)]
 struct CreateRequest {
     /// Client-generated UUIDv7 that makes the create idempotent on retry.
@@ -283,13 +293,14 @@ async fn create(
         )
         .await?;
     let channel = created.channel;
+    let restricted = state.store.channel_restricted(channel.id).await?;
     // An idempotent retry must not fan out again; see the note on `CreatedChannel::fresh`.
     if created.fresh {
         state
             .hub
-            .publish(Event::ChannelCreated(Arc::new(channel.clone())));
+            .publish(Event::ChannelCreated(Arc::new(channel.clone()), restricted));
     }
-    Ok(Json(channel.into()))
+    Ok(Json(ChannelDto::with_restricted(channel, restricted)))
 }
 
 /// Renames a channel, replaces its topic, and/or sets its slow-mode interval.
@@ -367,10 +378,11 @@ async fn update(
             .await?
             .ok_or(ApiError::NotFound("channel not found"))?;
     }
+    let restricted = state.store.channel_restricted(channel_id).await?;
     state
         .hub
-        .publish(Event::ChannelUpdated(Arc::new(channel.clone())));
-    Ok(Json(channel.into()))
+        .publish(Event::ChannelUpdated(Arc::new(channel.clone()), restricted));
+    Ok(Json(ChannelDto::with_restricted(channel, restricted)))
 }
 
 /// Soft-deletes a channel. Requires MANAGE_CHANNELS at the deployment level.

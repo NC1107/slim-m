@@ -40,6 +40,7 @@ mod channel_create;
 mod channel_join_muted;
 mod channel_notification_prefs;
 mod channel_order;
+mod channel_restricted;
 mod channel_slow_mode;
 mod channels;
 mod code_runs;

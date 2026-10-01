@@ -115,8 +115,8 @@ fn moves_permissions(event: &Event) -> bool {
         | Event::MemberRemoved(_)
         | Event::MemberRestored(_)
         | Event::OverwriteChanged { .. }
-        | Event::ChannelCreated(_)
-        | Event::ChannelUpdated(_)
+        | Event::ChannelCreated(..)
+        | Event::ChannelUpdated(..)
         | Event::ChannelDeleted { .. } => true,
         Event::MessageCreated { .. }
         | Event::MessageEdited { .. }
@@ -223,8 +223,8 @@ fn is_ephemeral(event: &Event) -> bool {
         | Event::MemberRestored(_)
         | Event::MemberJoined(_)
         | Event::OverwriteChanged { .. }
-        | Event::ChannelCreated(_)
-        | Event::ChannelUpdated(_)
+        | Event::ChannelCreated(..)
+        | Event::ChannelUpdated(..)
         | Event::ChannelDeleted { .. }
         | Event::CategoryChanged
         | Event::CanvasObjectPlaced { .. }
