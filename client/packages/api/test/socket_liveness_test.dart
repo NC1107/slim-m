@@ -49,6 +49,23 @@ void main() {
         expect(pings, 2);
       });
     });
+
+    test('a heard frame between silent beats restarts the count', () {
+      fakeAsync((async) {
+        var silent = 0;
+        final liveness = SocketLiveness(ping: () {}, onSilent: () => silent++)
+          ..start();
+        async.elapse(const Duration(seconds: 20));
+        async.elapse(const Duration(seconds: 20));
+        expect(silent, 0, reason: 'one silent beat so far');
+        liveness.heard();
+        async.elapse(const Duration(seconds: 20));
+        async.elapse(const Duration(seconds: 20));
+        expect(silent, 0, reason: 'the heard frame restarted the count');
+        async.elapse(const Duration(seconds: 20));
+        expect(silent, 1, reason: 'two consecutive silent beats since then');
+      });
+    });
   });
 
   group('EventConnection', () {

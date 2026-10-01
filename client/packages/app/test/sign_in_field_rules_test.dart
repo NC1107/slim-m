@@ -159,6 +159,21 @@ void main() {
     });
   });
 
+  group('the Trouble signing in link', () {
+    testWidgets('shows while signing in', (tester) async {
+      await _pumpSignIn(tester);
+
+      expect(find.text('Trouble signing in?'), findsOneWidget);
+    });
+
+    testWidgets('is absent on the create-account form', (tester) async {
+      await _pumpSignIn(tester);
+      await toCreateAccount(tester);
+
+      expect(find.text('Trouble signing in?'), findsNothing);
+    });
+  });
+
   test(
     'the password helper states the minimum the server actually enforces',
     () {
