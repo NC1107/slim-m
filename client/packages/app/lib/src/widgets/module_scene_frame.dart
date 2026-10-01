@@ -67,7 +67,7 @@ class ModuleSceneFrame extends StatelessWidget {
   /// of rects and text declares a height in arbitrary units, so a 300 unit
   /// board never met it and took the window share instead, 650px on a
   /// 1818x1071 desktop. This is the bound that holds for every scene.
-  static const maxInlineEdge = 560.0;
+  static const maxInlineEdge = 360.0;
 
   @override
   Widget build(BuildContext context) {

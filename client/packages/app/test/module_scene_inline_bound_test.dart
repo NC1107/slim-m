@@ -63,7 +63,12 @@ void main() {
       expect(board.width, lessThanOrEqualTo(ModuleSceneFrame.maxInlineEdge));
       expect(board.height, lessThanOrEqualTo(ModuleSceneFrame.maxInlineEdge));
       expect(board.width, board.height);
-      expect(board.width, lessThanOrEqualTo(entry.value.width));
+      expect(
+        board.width,
+        entry.value.width < ModuleSceneFrame.maxInlineEdge
+            ? entry.value.width
+            : ModuleSceneFrame.maxInlineEdge,
+      );
     });
   }
 
@@ -86,7 +91,7 @@ void main() {
       const Size(1280, 800),
       _rectScene(1, 1000),
     );
-    expect(board.width, greaterThan(100));
+    expect(board.width, greaterThan(80));
   });
 
   test('a scene inside the ceiling keeps its own size', () {

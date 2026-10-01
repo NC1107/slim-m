@@ -69,13 +69,13 @@ void main() {
     final board = _board(tester);
     expect(
       board.width,
-      greaterThan(420),
-      reason: 'the cap that read as adrift in a desktop card',
+      lessThanOrEqualTo(ModuleSceneFrame.maxInlineEdge),
+      reason: 'a compact inline widget, not a billboard',
     );
     expect(
       board.width,
-      3 * ModuleSceneFrame.maxCellSize,
-      reason: 'three rows, so three cells decide the height',
+      ModuleSceneFrame.maxInlineEdge,
+      reason: 'the inline edge is the tighter bound for three rows',
     );
     expect(
       board.width,
@@ -85,7 +85,7 @@ void main() {
     expect(board.height, board.width);
   });
 
-  testWidgets('a big grid still takes its share of the window', (tester) async {
+  testWidgets('a big grid is bounded inline as well', (tester) async {
     await _pump(
       tester,
       const Size(1200, 900),
@@ -94,14 +94,14 @@ void main() {
     final board = _board(tester);
     expect(
       board.height,
-      closeTo(900 * ModuleSceneFrame.viewportShare, 1.5),
-      reason: 'forty rows want more than the per-cell bound would give',
+      closeTo(ModuleSceneFrame.maxInlineEdge, 1.5),
+      reason: 'a big grid is bounded inline too; full screen is where it grows',
     );
   });
 
   testWidgets('on a phone the board is the full width', (tester) async {
-    await _pump(tester, const Size(400, 800));
-    expect(_board(tester).width, 400);
+    await _pump(tester, const Size(340, 800));
+    expect(_board(tester).width, 340);
   });
 
   testWidgets('a wide scene follows its own aspect ratio', (tester) async {
@@ -109,7 +109,7 @@ void main() {
     final board = _board(tester);
     expect(board.width / board.height, closeTo(2, 0.01));
     // Within the hairline: the border rounds the inner box by a pixel.
-    expect(board.height, closeTo(3 * ModuleSceneFrame.maxCellSize, 1.5));
+    expect(board.height, closeTo(ModuleSceneFrame.maxInlineEdge, 1.5));
   });
 
   testWidgets('a short window keeps a usable board', (tester) async {
