@@ -122,9 +122,10 @@ class _ResetCodeSheetState extends ConsumerState<_ResetCodeSheet>
     final issued = _issued;
 
     return Padding(
+      // The sheet supplies the top inset at every width; adding one here doubled it.
       padding: EdgeInsets.fromLTRB(
         AppSpacing.s16,
-        AppSpacing.s16,
+        0,
         AppSpacing.s16,
         MediaQuery.viewInsetsOf(context).bottom + AppSpacing.s16,
       ),
