@@ -7,6 +7,9 @@
 /// the call screen used to change nothing on screen and surface, stale, the
 /// next time the drawer opened. The routed screen here has no member pane at
 /// all, which is the case that went wrong.
+///
+/// A band above the app, not an overlay: it must not cover the screen under
+/// it, and must not remount the routed app when it appears.
 library;
 
 import 'package:flutter/material.dart';
@@ -16,7 +19,29 @@ import 'package:slimm_app/main.dart' show appChromeBuilder;
 import 'package:slimm_app/src/providers/member_moderation_error.dart';
 import 'package:slimm_design_system/design_system.dart';
 
+class _Screen extends StatefulWidget {
+  const _Screen();
+
+  static int mounts = 0;
+
+  @override
+  State<_Screen> createState() => _ScreenState();
+}
+
+class _ScreenState extends State<_Screen> {
+  @override
+  void initState() {
+    super.initState();
+    _Screen.mounts++;
+  }
+
+  @override
+  Widget build(BuildContext context) =>
+      const Scaffold(body: Center(child: Text('the call screen')));
+}
+
 Future<ProviderContainer> _pump(WidgetTester tester, Size size) async {
+  _Screen.mounts = 0;
   tester.view.physicalSize = size;
   tester.view.devicePixelRatio = 1.0;
   addTearDown(tester.view.reset);
@@ -28,7 +53,7 @@ Future<ProviderContainer> _pump(WidgetTester tester, Size size) async {
       child: MaterialApp(
         theme: buildTheme(Brightness.light, AppTokens.light),
         builder: appChromeBuilder,
-        home: const Scaffold(body: Center(child: Text('the call screen'))),
+        home: const _Screen(),
       ),
     ),
   );
@@ -58,13 +83,20 @@ void main() {
         isTrue,
         reason: 'fully on screen, not clipped or off the edge: $box',
       );
-      expect(box.width, lessThanOrEqualTo(size.width - 2 * AppSpacing.s16));
+      expect(box.top, lessThan(AppSpacing.s16 + 1));
       expect(box.height, lessThan(size.height / 3));
+      expect(
+        tester.getRect(find.byType(Scaffold)).top,
+        greaterThanOrEqualTo(box.bottom),
+        reason: 'the band pushes the app down instead of covering it',
+      );
+      expect(_Screen.mounts, 1, reason: 'the routed app must not remount');
 
       await tester.tap(find.text('Dismiss'));
       await tester.pump();
       expect(container.read(memberModerationErrorProvider), isNull);
       expect(find.byType(AppErrorState), findsNothing);
+      expect(_Screen.mounts, 1);
     });
   }
 }
