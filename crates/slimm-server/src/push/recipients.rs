@@ -16,6 +16,7 @@ use crate::presence::PresenceTracker;
 use crate::store::{Store, ThreadParent};
 
 use super::mention_grammar::{mentioned_role_names, mentioned_usernames};
+use crate::http::code_fences::prose_outside_code;
 
 /// The reserved mention naming every candidate viewer, never a real
 /// username: `validate_username` (`http/auth.rs`) refuses to register it for
@@ -146,6 +147,8 @@ pub(crate) async fn resolved_mentions(
     viewers: &[UserId],
     presence: &PresenceTracker,
 ) -> anyhow::Result<HashSet<UserId>> {
+    let prose = prose_outside_code(content);
+    let content = prose.as_str();
     let mut names = mentioned_usernames(content);
     let mentions_everyone = names.remove(EVERYONE_MENTION);
     let mentions_here = names.remove(HERE_MENTION);
