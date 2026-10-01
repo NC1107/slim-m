@@ -69,7 +69,8 @@ class MessageHoverToolbar extends StatelessWidget {
             color: tokens.surfaceRaised,
             border: Border.all(color: tokens.borderSubtle),
             borderRadius: BorderRadius.circular(AppRadii.control),
-            boxShadow: AppShadows.float,
+            // canvasTile, not float or menu: both spill 60 px or more over the neighbouring rows from a 30 px control.
+            boxShadow: AppShadows.canvasTile,
           ),
           child: Padding(
             padding: const EdgeInsets.symmetric(horizontal: AppSpacing.s4),
