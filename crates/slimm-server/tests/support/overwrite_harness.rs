@@ -85,6 +85,26 @@ pub async fn register(store: &Store, username: &str) -> (String, String) {
     (tokens.access_token, account.id.to_string())
 }
 
+/// The password [`register_with_password`] gives its account.
+pub const KNOWN_PASSWORD: &str = "correct-horse-battery";
+
+/// [`register`] with a real password hash, for the routes that ask the caller
+/// to confirm their password (deleting an account, turning two-factor on).
+pub async fn register_with_password(store: &Store, username: &str) -> (String, String) {
+    let hash = slimm_server::auth::Auth::new(2)
+        .unwrap()
+        .hash_password(KNOWN_PASSWORD.to_owned())
+        .await
+        .unwrap();
+    let account = store
+        .create_account(username, username, &hash)
+        .await
+        .unwrap();
+    store.bootstrap_deployment(account.id).await.unwrap();
+    let tokens = store.open_session(account.id, "cli").await.unwrap();
+    (tokens.access_token, account.id.to_string())
+}
+
 pub async fn general_channel_id(store: &Store) -> String {
     store
         .list_channels()

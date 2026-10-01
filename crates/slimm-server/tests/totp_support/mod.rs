@@ -100,7 +100,12 @@ pub async fn member(store: &Store, auth: &Auth, username: &str) -> (String, Stri
 pub async fn begin_enrolment(app: &Router, token: &str) -> String {
     let response = app
         .clone()
-        .oneshot(request("POST", "/auth/totp/enrol", Some(token), None))
+        .oneshot(request(
+            "POST",
+            "/auth/totp/enrol",
+            Some(token),
+            Some(json!({ "password": PASSWORD })),
+        ))
         .await
         .unwrap();
     assert_eq!(response.status(), StatusCode::OK, "enrolment should start");
@@ -127,7 +132,7 @@ pub async fn enrol_and_confirm(app: &Router, token: &str) -> (String, Vec<String
             "POST",
             "/auth/totp/confirm",
             Some(token),
-            Some(json!({ "code": code })),
+            Some(json!({ "code": code, "password": PASSWORD })),
         ))
         .await
         .unwrap();

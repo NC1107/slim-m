@@ -16,7 +16,9 @@ use tokio::sync::broadcast::Receiver;
 use tower::ServiceExt;
 
 mod support;
-use support::overwrite_harness::{new_store, register, request};
+use support::overwrite_harness::{
+    KNOWN_PASSWORD, new_store, register, register_with_password, request,
+};
 
 struct World {
     router: Router,
@@ -137,7 +139,15 @@ async fn account_deletion_and_reset_codes_are_in_the_audit_log() {
 #[tokio::test]
 async fn deleting_your_own_account_is_not_a_moderation_act() {
     let w = world().await;
-    let (status, _) = w.call("DELETE", "/account", &w.member.0, None).await;
+    let (token, _) = register_with_password(&w.store, "dee").await;
+    let (status, _) = w
+        .call(
+            "DELETE",
+            "/account",
+            &token,
+            Some(json!({ "password": KNOWN_PASSWORD })),
+        )
+        .await;
     assert_eq!(status, StatusCode::NO_CONTENT);
     assert!(w.audit_actions().await.is_empty());
 }

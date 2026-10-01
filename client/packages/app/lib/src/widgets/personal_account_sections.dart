@@ -22,6 +22,7 @@ import '../providers/sync_controller.dart';
 import '../providers/user_profiles.dart';
 import '../providers/voice_controller.dart';
 import 'confirm_dialog.dart';
+import 'reauth_sheet.dart';
 import 'run_guarded.dart';
 import 'settings_section_header.dart';
 
@@ -226,8 +227,39 @@ class _AccountSectionState extends ConsumerState<AccountSection> {
       confirmLabel: 'Delete permanently',
       cancelLabel: 'Keep my account',
     );
-    if (!confirmed) return;
+    if (!confirmed || !context.mounted) return;
 
+    final bool needsCode;
+    try {
+      needsCode = (await ref.read(apiProvider).totpStatus()).enabled;
+    } on api.ApiException catch (e) {
+      if (mounted) setState(() => _deleteError = e.message);
+      return;
+    }
+    if (!context.mounted) return;
+    setState(() => _deleteError = null);
+    await showReauthSheet(
+      context,
+      title: 'Confirm it is you',
+      description: needsCode
+          ? 'Enter your password and a current code from your authenticator '
+                'app to delete this account.'
+          : 'Enter your password to delete this account.',
+      submitLabel: 'Delete permanently',
+      askForCode: needsCode,
+      dangerous: true,
+      onSubmit: (password, code) => _deleteWith(ref, password, code),
+    );
+  }
+
+  /// Returns the sentence to keep the proof sheet open on, which is only a
+  /// refused password or code. Any other failure closes the sheet and lands in
+  /// [_deleteError], where it stays until retried or dismissed.
+  Future<String?> _deleteWith(
+    WidgetRef ref,
+    String password,
+    String? code,
+  ) async {
     /// All three read before the request, and sync and push restarted
     /// without consulting [mounted]: what they undo is app-global, so
     /// navigating away from this screen while the delete is in flight must
@@ -243,7 +275,8 @@ class _AccountSectionState extends ConsumerState<AccountSection> {
     await sync.stop();
     await push.unregister();
     try {
-      await ref.read(apiProvider).deleteAccount();
+      await ref.read(apiProvider).deleteAccount(password: password, code: code);
+      return null;
     } on api.ApiException catch (e) {
       /// Not on a 401: there the session is already gone, cleared by the
       /// refresh path before this catch runs, so restarting would race the
@@ -253,8 +286,13 @@ class _AccountSectionState extends ConsumerState<AccountSection> {
         unawaited(sync.start());
         unawaited(push.register());
       }
-      if (!mounted) return;
-      setState(() => _deleteError = e.message);
+      final refused =
+          e is api.ForbiddenException ||
+          e is api.BadRequestException ||
+          e is api.RateLimitedException;
+      if (refused) return reauthFailure(e);
+      if (mounted) setState(() => _deleteError = e.message);
+      return null;
     }
   }
 }

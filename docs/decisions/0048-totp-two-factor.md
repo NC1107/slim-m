@@ -119,11 +119,39 @@ Just under 100 bits survives the reformatting, which still bounds the offline ca
 They work at sign-in and for the two changes that need current proof (disabling, reissuing), because "my phone is gone" is exactly the case they exist for.
 Reissuing replaces the whole set: a set somebody has lost track of should not stay live beside the one they just wrote down.
 
+## Proof to turn it on, and to delete the account (amended 2026-10-01)
+
+**`POST /auth/totp/enrol`, `POST /auth/totp/confirm` and `DELETE /account` need the account password.**
+`DELETE /account` also needs a current code or an unused recovery code while a factor is enabled.
+A session token alone is refused with a 403, or a 400 when the code is the missing part.
+
+The first version asked for proof to turn the factor off and to reissue recovery codes, and for nothing to turn it on.
+That is backwards.
+Turning it on is the move that locks the owner out: with only a stolen access token, enrol and confirm returned the secret and ten recovery codes, and the real owner's next password login got a challenge only the token holder could answer.
+When that account was the sole administrator nobody could clear it.
+Deleting an account is the other irreversible move a bearer token could make alone, and it freed the username as well.
+Both now need the same kind of proof that turning the factor off needs, so a token is never worth more than the password behind it.
+
+A wrong password is a 403, not a 401, because a client reads a 401 as "your session ended" and signs the member out for a typo.
+The routes are rate limited on the password class (enrol and delete) and the TOTP class (confirm), so a stolen token cannot be used to guess the password.
+Confirming still does not revoke other sessions, for the reason in the section below: the sessions in question were minted by a password the member still holds.
+
+## The operator's way back (amended 2026-10-01)
+
+`slimm-server clear-totp <username>` clears a factor straight in the database.
+It exists for the one case nothing else covers: the only administrator lost the authenticator and the recovery codes, so there is no session left to call `DELETE /admin/users/{id}/totp` from.
+The image is distroless and the binary is the only tool in it, so the way back has to be in the binary.
+
+It does what the admin route does and nothing less: it removes the factor, its recovery codes and its challenges, revokes every session, and writes a `totp_cleared` row to the moderation audit log.
+The row has no actor, since nobody was signed in, and that absence is how an operator's clear is told apart from an administrator's.
+The username matches case-insensitively, the way login does.
+It needs file access to the database, which is the same trust as the database file itself, and it runs beside a live server for the reason `import-emoji` can.
+
 ## Sessions and device tokens
 
 **Turning the factor on does not revoke anything. Turning it off does not either. An administrator clearing it revokes everything.**
 
-Enrolling and disabling both happen from a session the member controls, having proved both factors.
+Enrolling happens from a session the member controls, having proved the password, and disabling having proved the factor.
 Signing their phone out for securing their account would be a penalty for good behaviour, and the sessions in question were minted by a password they still hold - the factor's job is to guard *future* sign-ins.
 A member who is enrolling *because* they think their password leaked has a better tool already: the devices list and its per-device sign-out.
 

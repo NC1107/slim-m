@@ -58,6 +58,8 @@ fn request_bytes(method: &str, uri: &str, token: &str, body: Vec<u8>) -> Request
         .unwrap()
 }
 
+const PASSWORD: &str = "correct-horse-battery";
+
 fn request_plain(method: &str, uri: &str, token: &str) -> Request<Body> {
     Request::builder()
         .method(method)
@@ -75,8 +77,13 @@ async fn json_body(response: axum::response::Response) -> serde_json::Value {
 }
 
 async fn register(store: &Store, username: &str) -> String {
+    let hash = Auth::new(2)
+        .unwrap()
+        .hash_password(PASSWORD.to_owned())
+        .await
+        .unwrap();
     let account = store
-        .create_account(username, username, "not-a-real-hash")
+        .create_account(username, username, &hash)
         .await
         .unwrap();
     store.bootstrap_deployment(account.id).await.unwrap();
@@ -310,7 +317,15 @@ async fn deleting_an_account_removes_its_avatar_file() {
 
     let deleted = app
         .clone()
-        .oneshot(request_plain("DELETE", "/account", &token))
+        .oneshot(
+            Request::builder()
+                .method("DELETE")
+                .uri("/account")
+                .header("authorization", format!("Bearer {token}"))
+                .header("content-type", "application/json")
+                .body(Body::from(format!(r#"{{"password":"{PASSWORD}"}}"#)))
+                .unwrap(),
+        )
         .await
         .unwrap();
     assert_eq!(deleted.status(), StatusCode::NO_CONTENT);

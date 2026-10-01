@@ -2,7 +2,8 @@
 //! slim-m home server binary. All logic lives in the `slimm_server` library;
 //! this only picks which entry point an invocation asked for.
 
-const USAGE: &str = "usage: slimm-server [--healthcheck | import-emoji <directory>]";
+const USAGE: &str =
+    "usage: slimm-server [--healthcheck | import-emoji <directory> | clear-totp <username>]";
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
@@ -16,6 +17,10 @@ async fn main() -> anyhow::Result<()> {
         Some("import-emoji") => match args.next() {
             Some(dir) => slimm_server::import_emoji(std::path::Path::new(&dir)).await,
             None => anyhow::bail!("import-emoji needs a directory\n{USAGE}"),
+        },
+        Some("clear-totp") => match args.next() {
+            Some(username) => slimm_server::clear_totp(&username).await,
+            None => anyhow::bail!("clear-totp needs a username\n{USAGE}"),
         },
         // Refused rather than ignored: an unrecognised argument silently
         // starting a server is how a typo becomes a no-op nobody notices.

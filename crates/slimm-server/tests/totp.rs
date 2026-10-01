@@ -17,8 +17,8 @@ mod support;
 mod totp_support;
 
 use totp_support::{
-    STEP_MS, app, begin_enrolment, enrol_and_confirm, json_body, login, login_for_challenge,
-    member, new_store, now_ms, request, verify,
+    PASSWORD, STEP_MS, app, begin_enrolment, enrol_and_confirm, json_body, login,
+    login_for_challenge, member, new_store, now_ms, request, verify,
 };
 
 // --- Enrolment ---
@@ -66,7 +66,7 @@ async fn confirming_with_a_wrong_code_leaves_the_factor_off() {
             "POST",
             "/auth/totp/confirm",
             Some(&token),
-            Some(json!({ "code": "000000" })),
+            Some(json!({ "code": "000000", "password": PASSWORD })),
         ))
         .await
         .unwrap();
@@ -113,7 +113,12 @@ async fn enrolling_again_over_a_live_factor_is_a_conflict() {
 
     let response = app
         .clone()
-        .oneshot(request("POST", "/auth/totp/enrol", Some(&token), None))
+        .oneshot(request(
+            "POST",
+            "/auth/totp/enrol",
+            Some(&token),
+            Some(json!({ "password": PASSWORD })),
+        ))
         .await
         .unwrap();
     assert_eq!(response.status(), StatusCode::CONFLICT);
@@ -236,7 +241,7 @@ async fn the_confirming_code_cannot_be_replayed_at_sign_in() {
             "POST",
             "/auth/totp/confirm",
             Some(&token),
-            Some(json!({ "code": code.clone() })),
+            Some(json!({ "code": code.clone(), "password": PASSWORD })),
         ))
         .await
         .unwrap();

@@ -74,6 +74,15 @@ struct LoginRequest {
     client_version: Option<String>,
 }
 
+/// A session token alone never deletes an account: it needs the password, and a
+/// current code while a second factor is on (decision 0048).
+#[derive(Deserialize)]
+struct DeleteAccountRequest {
+    password: String,
+    #[serde(default)]
+    code: Option<String>,
+}
+
 #[derive(Deserialize)]
 struct RefreshRequest {
     refresh_token: String,
@@ -329,9 +338,12 @@ async fn logout(
 /// Deletes the caller's own account: purge personal data, anonymize authored
 /// content, tombstone the user, and revoke every session (closing live sockets).
 async fn delete_account(
-    AuthedLimited(ctx): AuthedLimited<WRITE>,
+    AuthedLimited(ctx): AuthedLimited<PASSWORD>,
     State(state): State<AppState>,
+    Json(req): Json<DeleteAccountRequest>,
 ) -> Result<StatusCode, ApiError> {
+    super::reauth::require_password(&state, ctx.user_id, &req.password).await?;
+    super::reauth::require_current_code(&state, ctx.user_id, req.code.as_deref()).await?;
     let revoked = match state.store.delete_account(ctx.user_id).await {
         Ok(revoked) => revoked,
         // A refusal is the caller's situation, not a server fault, so it must

@@ -1,0 +1,20 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT id AS \"id!: UserId\" FROM users\n               WHERE lower(username) = lower(?) AND deleted_at IS NULL",
+  "describe": {
+    "columns": [
+      {
+        "name": "id!: UserId",
+        "ordinal": 0,
+        "type_info": "Blob"
+      }
+    ],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "2e4b19a849bf7a79f001b329890169bd31616090419cc39b5d3139b61c049a95"
+}

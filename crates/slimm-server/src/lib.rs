@@ -185,6 +185,37 @@ pub async fn import_emoji(dir: &std::path::Path) -> anyhow::Result<()> {
     Ok(())
 }
 
+/// Clears a member's second factor straight in the database, for an operator
+/// who has file access and no administrator able to sign in.
+///
+/// Does what `DELETE /admin/users/{id}/totp` does: removes the factor and its
+/// recovery codes, revokes every session, and writes a `totp_cleared` audit row
+/// with no actor, since nobody was signed in. Safe beside a running server for
+/// the same reason [`import_emoji`] is.
+pub async fn clear_totp(username: &str) -> anyhow::Result<()> {
+    init_tracing_to_stderr();
+    let config = config::Config::from_env()?;
+    let pool = db::connect(&config).await?;
+    let store = store::Store::new(pool);
+
+    let Some(user_id) = store.live_user_id_by_username(username).await? else {
+        anyhow::bail!("no account is named {username:?}");
+    };
+    match store.clear_totp_factor(None, user_id).await {
+        Ok(revoked) => {
+            println!(
+                "cleared two-factor for {username}; signed out {} session(s)",
+                revoked.len()
+            );
+            Ok(())
+        }
+        Err(store::TotpError::NotEnrolled) => {
+            anyhow::bail!("{username:?} has no two-factor authentication to clear")
+        }
+        Err(other) => anyhow::bail!("could not clear two-factor for {username:?}: {other:?}"),
+    }
+}
+
 /// Connects to the local server and confirms `/healthz` returns 200. Used by the
 /// container image's healthcheck, since distroless has no shell.
 pub async fn healthcheck() -> anyhow::Result<()> {
