@@ -13,6 +13,7 @@ library;
 
 import 'dart:convert';
 
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -98,6 +99,42 @@ Widget _harness(ProviderContainer container, Widget child) =>
     );
 
 void main() {
+  testWidgets('the menu marks the chosen notification mode with a check, '
+      'not only a tint', (tester) async {
+    final container = _container();
+    await tester.pumpWidget(
+      _harness(
+        container,
+        ChannelCategorySections(
+          channels: [_channel('c1', 'general')],
+          categories: const [],
+          selectedId: null,
+          onReorder: (_) {},
+        ),
+      ),
+    );
+    await tester.pump();
+    await container
+        .read(channelNotificationOverridesProvider.notifier)
+        .mentionsOnly('c1');
+    await tester.pump();
+
+    await tester.tapAt(
+      tester.getCenter(find.text('general')),
+      buttons: kSecondaryButton,
+      kind: PointerDeviceKind.mouse,
+    );
+    await tester.pumpAndSettle();
+
+    Finder checkIn(String label) => find.descendant(
+      of: find.widgetWithText(AppMenuItem, label),
+      matching: find.byIcon(AppIcons.check),
+    );
+    expect(checkIn('Mentions only'), findsOneWidget);
+    expect(checkIn('Mute channel'), findsNothing);
+    container.dispose();
+  });
+
   testWidgets('an unmuted channel carries no bell-off glyph', (tester) async {
     final container = _container();
     await tester.pumpWidget(
