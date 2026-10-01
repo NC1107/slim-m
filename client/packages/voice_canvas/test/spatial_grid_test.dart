@@ -310,4 +310,28 @@ void main() {
     grid.queryGrid(25, 25, 45, 45, found);
     expect(found.slots, [slot]);
   });
+
+  // Run with --platform chrome too: a 32-bit shift is zero in JavaScript and made a row one bucket.
+  test('a query touches only the cell it covers, not the whole row', () {
+    final grid = UniformGrid(cellSize: 100);
+    for (var column = 0; column < 50; column++) {
+      grid.insert(column * 100 + 10, 10, column * 100 + 20, 20);
+    }
+    final out = CullResult();
+    grid.queryGrid(710, 10, 720, 20, out);
+    expect(out.slots, hasLength(1));
+    expect(out.candidates, 1);
+  });
+
+  test('cells left of and above the origin keep their own buckets', () {
+    final grid = UniformGrid(cellSize: 100);
+    grid.insert(-190, -190, -180, -180);
+    grid.insert(-190, 110, -180, 120);
+    grid.insert(110, -190, 120, -180);
+    grid.insert(110, 110, 120, 120);
+    final out = CullResult();
+    grid.queryGrid(-190, -190, -180, -180, out);
+    expect(out.slots, hasLength(1));
+    expect(out.candidates, 1);
+  });
 }

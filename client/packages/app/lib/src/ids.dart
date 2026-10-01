@@ -4,6 +4,8 @@ library;
 
 import 'dart:math';
 
+import 'package:flutter/foundation.dart';
+
 /// Generates the UUIDv7 that identifies a message and makes its send
 /// idempotent. Time-ordered, which is what the server's storage assumes.
 ///
@@ -32,12 +34,18 @@ String newCanvasOpId() => _uuidV7();
 /// once the gesture ends.
 String newCanvasDraftId() => _uuidV7();
 
-String _uuidV7() {
-  final now = DateTime.now().millisecondsSinceEpoch;
-  final random = Random.secure();
+String _uuidV7() =>
+    uuidV7At(DateTime.now().millisecondsSinceEpoch, Random.secure());
+
+/// A UUIDv7 for the instant [now] in epoch milliseconds. Split out so a test
+/// can pin the timestamp bytes, which is the part that differs on the web.
+@visibleForTesting
+String uuidV7At(int now, Random random) {
+  // Compiled to JavaScript a shift sees only the low 32 bits, so the top two bytes come from a division.
+  final high = now ~/ 0x100000000;
   final bytes = <int>[
-    (now >> 40) & 0xff,
-    (now >> 32) & 0xff,
+    (high >> 8) & 0xff,
+    high & 0xff,
     (now >> 24) & 0xff,
     (now >> 16) & 0xff,
     (now >> 8) & 0xff,
