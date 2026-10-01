@@ -174,3 +174,19 @@ async fn deleting_an_account_with_a_factor_also_needs_a_current_code() {
     .await;
     assert_eq!(ok, StatusCode::NO_CONTENT);
 }
+
+#[tokio::test]
+async fn a_well_formed_request_without_a_password_is_a_400() {
+    let (store, auth, _guard) = new_store("slimm-reauth-missing").await;
+    let app = app(store.clone(), auth.clone());
+    let (token, _id) = member(&store, &auth, "ada").await;
+
+    for (method, uri, body) in [
+        ("POST", "/auth/totp/enrol", json!({})),
+        ("POST", "/auth/totp/confirm", json!({ "code": "123456" })),
+        ("DELETE", "/account", json!({})),
+    ] {
+        let status = status_of(&app, method, uri, &token, Some(body)).await;
+        assert_eq!(status, StatusCode::BAD_REQUEST, "{method} {uri}");
+    }
+}

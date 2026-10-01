@@ -78,7 +78,8 @@ struct LoginRequest {
 /// current code while a second factor is on (decision 0048).
 #[derive(Deserialize)]
 struct DeleteAccountRequest {
-    password: String,
+    #[serde(default)]
+    password: Option<String>,
     #[serde(default)]
     code: Option<String>,
 }
@@ -345,7 +346,7 @@ async fn delete_account(
     State(state): State<AppState>,
     Json(req): Json<DeleteAccountRequest>,
 ) -> Result<StatusCode, ApiError> {
-    super::reauth::require_password(&state, ctx.user_id, &req.password).await?;
+    super::reauth::require_password(&state, ctx.user_id, req.password.as_deref()).await?;
     super::reauth::require_current_code(&state, ctx.user_id, req.code.as_deref()).await?;
     let revoked = match state.store.delete_account(ctx.user_id).await {
         Ok(revoked) => revoked,

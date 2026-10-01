@@ -115,6 +115,23 @@ pub async fn begin_enrolment(app: &Router, token: &str) -> String {
         .to_owned()
 }
 
+async fn confirm_previous_step(
+    app: &Router,
+    token: &str,
+    secret: &str,
+) -> axum::response::Response {
+    let code = slimm_server::totp::code_at(secret, now_ms() - STEP_MS).unwrap();
+    app.clone()
+        .oneshot(request(
+            "POST",
+            "/auth/totp/confirm",
+            Some(token),
+            Some(json!({ "code": code, "password": PASSWORD })),
+        ))
+        .await
+        .unwrap()
+}
+
 /// Enrols and confirms, returning the secret and the recovery codes.
 ///
 /// Confirms with the *previous* step's code, which is inside the skew window and
@@ -125,17 +142,14 @@ pub async fn begin_enrolment(app: &Router, token: &str) -> String {
 /// rolled over, which is correct behaviour and useless to test against.
 pub async fn enrol_and_confirm(app: &Router, token: &str) -> (String, Vec<String>) {
     let secret = begin_enrolment(app, token).await;
-    let code = slimm_server::totp::code_at(&secret, now_ms() - STEP_MS).unwrap();
-    let response = app
-        .clone()
-        .oneshot(request(
-            "POST",
-            "/auth/totp/confirm",
-            Some(token),
-            Some(json!({ "code": code, "password": PASSWORD })),
-        ))
-        .await
-        .unwrap();
+    // The password check can take seconds on a loaded runner, long enough to step past the window, so a refused code is recomputed.
+    let mut response = confirm_previous_step(app, token, &secret).await;
+    for _ in 0..2 {
+        if response.status() != StatusCode::BAD_REQUEST {
+            break;
+        }
+        response = confirm_previous_step(app, token, &secret).await;
+    }
     assert_eq!(
         response.status(),
         StatusCode::OK,

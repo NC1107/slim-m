@@ -15,8 +15,11 @@ use crate::ids::UserId;
 pub(super) async fn require_password(
     state: &AppState,
     user_id: UserId,
-    password: &str,
+    password: Option<&str>,
 ) -> Result<(), ApiError> {
+    let Some(password) = password.filter(|password| !password.is_empty()) else {
+        return Err(ApiError::BadRequest("your password is required"));
+    };
     let Some(hash) = state.store.password_hash_for(user_id).await? else {
         return Err(ApiError::ForbiddenBecause(
             "this account has no password to confirm with",

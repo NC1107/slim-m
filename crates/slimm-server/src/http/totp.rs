@@ -69,13 +69,15 @@ struct EnrolmentResponse {
 
 #[derive(Deserialize)]
 struct EnrolRequest {
-    password: String,
+    #[serde(default)]
+    password: Option<String>,
 }
 
 #[derive(Deserialize)]
 struct ConfirmRequest {
     code: String,
-    password: String,
+    #[serde(default)]
+    password: Option<String>,
 }
 
 #[derive(Deserialize)]
@@ -124,7 +126,7 @@ async fn enrol(
     State(state): State<AppState>,
     Json(body): Json<EnrolRequest>,
 ) -> Result<Json<EnrolmentResponse>, ApiError> {
-    require_password(&state, ctx.user_id, &body.password).await?;
+    require_password(&state, ctx.user_id, body.password.as_deref()).await?;
     let account = state
         .store
         .user_profile(ctx.user_id)
@@ -151,7 +153,7 @@ async fn confirm(
     State(state): State<AppState>,
     Json(body): Json<ConfirmRequest>,
 ) -> Result<Json<RecoveryCodesResponse>, ApiError> {
-    require_password(&state, ctx.user_id, &body.password).await?;
+    require_password(&state, ctx.user_id, body.password.as_deref()).await?;
     let recovery_codes = state
         .store
         .confirm_totp_enrolment(ctx.user_id, body.code.trim())

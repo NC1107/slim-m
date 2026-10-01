@@ -339,7 +339,7 @@ paths:
         A session token alone is refused: the body carries the account
         password, and a current code while two-factor is on.
       requestBody:
-        required: true
+        required: false
         content:
           application/json:
             schema:
@@ -414,7 +414,7 @@ paths:
         factor is a 409 and has to be disabled first. Needs the account
         password, so a session token alone cannot turn the factor on.
       requestBody:
-        required: true
+        required: false
         content:
           application/json:
             schema:
@@ -8446,28 +8446,35 @@ components:
             authenticator apps mis-handle them when stated explicitly.
     TotpEnrolRequest:
       type: object
-      required: [password]
       properties:
         password:
           type: string
-          description: The account's current password.
+          description: >
+            The account's current password. Optional only so the schema stays
+            additive; a well-formed request without it is refused with 400, and the
+            server behaviour is the same as if it were required.
     TotpConfirmRequest:
       type: object
-      required: [code, password]
+      required: [code]
       properties:
         code:
           type: string
           description: A six-digit authenticator code from the new secret.
         password:
           type: string
-          description: The account's current password.
+          description: >
+            The account's current password. Optional only so the schema stays
+            additive; a well-formed request without it is refused with 400, and the
+            server behaviour is the same as if it were required.
     DeleteAccountRequest:
       type: object
-      required: [password]
       properties:
         password:
           type: string
-          description: The account's current password.
+          description: >
+            The account's current password. Optional only so the schema stays
+            additive; a well-formed request without it is refused with 400, and the
+            server behaviour is the same as if it were required.
         code:
           type: string
           description: >
