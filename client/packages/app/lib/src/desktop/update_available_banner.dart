@@ -58,8 +58,8 @@ class UpdateAvailableBanner extends ConsumerWidget {
           Expanded(
             child: Text(
               restartApplies
-                  ? '${update.version} is available. Restart to update.'
-                  : '${update.version} is available.',
+                  ? 'Version ${update.version} is available. Restart slim-m to update.'
+                  : 'Version ${update.version} is available.',
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
             ),
