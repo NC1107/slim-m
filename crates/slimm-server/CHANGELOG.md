@@ -1,5 +1,22 @@
 # Changelog
 
+## [0.78.0](https://github.com/Slim-m-org/slim-m/compare/server-v0.77.0...server-v0.78.0) (2026-10-01)
+
+
+### Features
+
+* hold a reaction to see who left it ([#1551](https://github.com/Slim-m-org/slim-m/issues/1551)) ([27d6660](https://github.com/Slim-m-org/slim-m/commit/27d6660f935cdfe548391bf06d80b53428248c07))
+
+
+### Bug Fixes
+
+* an unchanged read marker stops waking every socket, and appear-offline survives a relaunch ([#1555](https://github.com/Slim-m-org/slim-m/issues/1555)) ([b376f83](https://github.com/Slim-m-org/slim-m/commit/b376f83c5ecf10246f24b1b837e61e8cdb0f6afb))
+* **server,client:** a scene sweep delay near the ceiling no longer crashes the server ([#1538](https://github.com/Slim-m-org/slim-m/issues/1538)) ([b297620](https://github.com/Slim-m-org/slim-m/commit/b297620ac4895446e4328c0dd1b3f9aff8648c7a))
+* **server:** fourteen bugs found by using a live deployment as an admin, a member and a bot ([#1546](https://github.com/Slim-m-org/slim-m/issues/1546)) ([8c8832e](https://github.com/Slim-m-org/slim-m/commit/8c8832e2235535c37046c184aad6474a41ba9247))
+* **server:** key the module caller id so it cannot be turned back into a user id ([#1543](https://github.com/Slim-m-org/slim-m/issues/1543)) ([8f3f69b](https://github.com/Slim-m-org/slim-m/commit/8f3f69b2689e0328f6dfa517474bae3401f4c361))
+* **server:** purge two-factor data on account deletion, and queue racing writes instead of answering 500 ([#1535](https://github.com/Slim-m-org/slim-m/issues/1535)) ([287077e](https://github.com/Slim-m-org/slim-m/commit/287077e3fb2e6e02a11da50a07678525cd5341a1))
+* sign-in makes one read-marker request, not one per channel, and stops tripping the rate limiter ([#1554](https://github.com/Slim-m-org/slim-m/issues/1554)) ([cc32100](https://github.com/Slim-m-org/slim-m/commit/cc3210044dda2c42cf1e01ba67b9a9b7bb78531f))
+
 ## [0.77.0](https://github.com/Slim-m-org/slim-m/compare/server-v0.76.0...server-v0.77.0) (2026-09-30)
 
 
