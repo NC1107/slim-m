@@ -162,14 +162,16 @@ Owner input, 2026-09-03: "MFA is interesting, not sure how it would work out as 
 `off` refuses new enrolments and **keeps enforcing a factor somebody already enabled**.
 Flipping a deployment setting must not silently weaken an account that chose to be harder to break into, and the disable path stays open either way, so anybody already enrolled can leave under their own steam rather than being stranded.
 
-`required_for_elevated` is currently reported to the client rather than enforced, and that is deliberate rather than unfinished.
+`required_for_elevated` is enforced at the *use* of an elevated permission, not at sign-in.
 The obvious enforcement point - refusing a sign-in - would lock out the one administrator a fresh deployment has, before they could ever enrol, since enrolment needs a session.
-The enforcement point that works is the *use* of an elevated permission: a route requiring ADMINISTRATOR refuses, with a distinct reason, when the policy demands a factor and the actor has none.
-That cannot lock anybody out, because signing in and enrolling both stay open.
-It also touches the permission layer on every gated route, which is its own reviewable change; it is filed as a follow-up rather than smuggled into this one.
+So `http::extract::require_base_permission` refuses a caller who holds ADMINISTRATOR, has no confirmed factor, and is a person, with a 403 whose message says to turn on two-factor sign-in rather than "insufficient permissions".
+Signing in, enrolling and confirming never pass through it, so nobody can be locked out; recovery codes and reset codes behave as before.
+It covers the deployment-wide gates: `MANAGE_SERVER`, `MANAGE_ROLES`, member moderation, and the routes that name ADMINISTRATOR.
+A bot is never asked, because it has no way to enrol and a permission that silently disables a bot is a bug.
+Channel-scoped checks are not wired through it, so an unenrolled administrator still passes those by the administrator bypass.
+Someone holding moderator bits without ADMINISTRATOR is not asked either.
 
 ## What is not built
 
 - Passkeys. Still "later", as the research said.
-- Enforcement of `required_for_elevated`, per above.
 - A second factor on the WebSocket or on refresh. Neither needs one: a refresh token is already device-bound and single-use per rotation, and a connect ticket is minted from an access token that a factor already gated.

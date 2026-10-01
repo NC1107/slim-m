@@ -237,14 +237,8 @@ async fn admin_clear(
     Path(user_id): Path<String>,
     State(state): State<AppState>,
 ) -> Result<StatusCode, ApiError> {
-    if !state
-        .store
-        .base_permissions(ctx.user_id)
-        .await?
-        .contains(Permissions::ADMINISTRATOR)
-    {
-        return Err(ApiError::Forbidden);
-    }
+    super::extract::require_base_permission(&state, ctx.user_id, Permissions::ADMINISTRATOR)
+        .await?;
     let user_id = UserId(parse_uuid(&user_id)?);
     let revoked = state
         .store

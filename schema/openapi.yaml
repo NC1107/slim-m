@@ -8470,7 +8470,9 @@ components:
             What this deployment asks for. `off` refuses new enrolments and
             deliberately keeps enforcing a factor somebody already enabled, so
             the switch cannot silently weaken an account; the disable path stays
-            open either way.
+            open either way. `required_for_elevated` makes an administrator
+            without a factor get a 403 on administrator-gated routes; sign-in
+            and enrolment stay open, and a bot is never asked.
     SpaceSettings:
       type: object
       required: [join_policy]
