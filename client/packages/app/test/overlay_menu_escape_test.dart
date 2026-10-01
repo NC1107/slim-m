@@ -123,9 +123,7 @@ Future<void> _pumpPresenceMenu(WidgetTester tester) async {
       container: container,
       child: MaterialApp(
         theme: buildTheme(Brightness.dark, AppTokens.dark),
-        home: const Scaffold(
-          body: Center(child: PresenceMenuButton(presence: AppPresence.online)),
-        ),
+        home: const Scaffold(body: Center(child: PresenceMenuButton())),
       ),
     ),
   );

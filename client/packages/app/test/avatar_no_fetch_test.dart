@@ -46,7 +46,7 @@ Future<List<String>> _pumpAvatar(WidgetTester tester, int? updatedAt) async {
       child: MaterialApp(
         theme: buildTheme(Brightness.light, AppTokens.light),
         home: Scaffold(
-          body: UserAvatar(
+          body: UserAvatar.known(
             name: 'Dana',
             userId: 'u2',
             avatarUpdatedAt: updatedAt,

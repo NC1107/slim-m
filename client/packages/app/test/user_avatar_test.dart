@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
-/// Tests for [UserAvatar] and [AuthorAvatar]: the real picture is wired in
+/// Tests for [UserAvatar]: the real picture is wired in
 /// once its bytes resolve, and a user with none (or with an id not yet
 /// resolved) still falls back to the same initials [AppAvatar] always draws.
 library;
@@ -52,7 +52,7 @@ void main() {
     var requested = false;
     await tester.pumpWidget(
       _harness(
-        const UserAvatar(name: 'Priya Shah', size: 40),
+        const UserAvatar(name: 'Priya Shah', userId: null, size: 40),
         overrides: _apiOverrides((request) async {
           requested = true;
           return http.Response('', 404);
@@ -74,7 +74,7 @@ void main() {
     final bytes = Uint8List.fromList(const [1, 2, 3, 4]);
     await tester.pumpWidget(
       _harness(
-        const UserAvatar(
+        const UserAvatar.known(
           name: 'Priya Shah',
           userId: 'u1',
           avatarUpdatedAt: 42,
@@ -114,7 +114,7 @@ void main() {
     final bytes = Uint8List.fromList(const [1, 2, 3, 4]);
     await tester.pumpWidget(
       _harness(
-        const UserAvatar(
+        const UserAvatar.known(
           name: 'Priya Shah',
           userId: 'u1',
           avatarUpdatedAt: 42,
@@ -143,7 +143,7 @@ void main() {
   ) async {
     await tester.pumpWidget(
       _harness(
-        const UserAvatar(
+        const UserAvatar.known(
           name: 'Priya Shah',
           userId: 'u1',
           avatarUpdatedAt: 42,
@@ -158,13 +158,13 @@ void main() {
     expect(find.byType(Image), findsNothing);
   });
 
-  testWidgets('AuthorAvatar resolves the profile before fetching the picture', (
+  testWidgets('UserAvatar resolves the profile before fetching the picture', (
     tester,
   ) async {
     final bytes = Uint8List.fromList(const [9, 9, 9]);
     await tester.pumpWidget(
       _harness(
-        const AuthorAvatar(name: 'Kess', userId: 'u2', size: 36),
+        const UserAvatar(name: 'Kess', userId: 'u2', size: 36),
         overrides: _apiOverrides((request) async {
           if (request.url.path == '/users/u2') {
             return http.Response(
@@ -200,7 +200,7 @@ void main() {
   ) async {
     await tester.pumpWidget(
       _harness(
-        const AuthorAvatar(name: 'Deleted user', userId: null, size: 36),
+        const UserAvatar(name: 'Deleted user', userId: null, size: 36),
         overrides: _apiOverrides(
           (request) async =>
               throw StateError('unexpected request: ${request.url}'),

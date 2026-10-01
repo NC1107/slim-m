@@ -121,6 +121,46 @@ abstract final class AppSizes {
   static const double headerBar = 52;
 }
 
+/// The diameters a person's picture is drawn at. Every avatar in the app takes
+/// one of these, so the same size looks the same on every surface.
+///
+/// Below [s24] there is no room for a presence dot beside two initials, so no
+/// surface smaller than that carries one.
+abstract final class AppAvatarSize {
+  /// A voice participant in a rail row; no dot.
+  static const double s16 = 16;
+  static const double s20 = 20;
+
+  /// The smallest size that carries a presence dot: a DM row.
+  static const double s24 = 24;
+
+  /// A member row, the rail footer, a pinned or saved message.
+  static const double s28 = 28;
+  static const double s32 = 32;
+
+  /// A message row's author, and the default.
+  static const double s36 = 36;
+
+  /// The member card.
+  static const double s44 = 44;
+
+  /// A canvas presence bubble.
+  static const double s56 = 56;
+
+  /// The settings picker.
+  static const double s72 = 72;
+
+  /// An incoming-call overlay.
+  static const double s96 = 96;
+
+  /// The largest step from [s32] up that fits in [available], for a tile whose
+  /// room varies: the picture then snaps to a size every other surface uses.
+  static double largestWithin(double available) {
+    const steps = [s32, s36, s44, s56, s72, s96];
+    return steps.lastWhere((step) => step <= available, orElse: () => s32);
+  }
+}
+
 /// The shadows, for the few things that genuinely float.
 ///
 /// Elevation is otherwise carried entirely by a 1px hairline. A shadow here is

@@ -122,7 +122,6 @@ Future<void> _open(WidgetTester tester, ProviderContainer container) async {
       container: container,
       child: MemberProfileBody(
         profile: _other,
-        status: AppPresence.online,
         compact: false,
         channelId: _channelId,
         onDone: () {},

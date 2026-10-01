@@ -59,9 +59,7 @@ Future<void> _pump(WidgetTester tester, {required bool reduceMotion}) async {
       container: container,
       brightness: Brightness.dark,
       disableAnimations: reduceMotion,
-      child: const Center(
-        child: PresenceMenuButton(presence: AppPresence.online),
-      ),
+      child: const Center(child: PresenceMenuButton()),
     ),
   );
   await tester.pump();

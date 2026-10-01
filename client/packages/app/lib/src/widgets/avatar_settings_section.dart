@@ -37,7 +37,7 @@ import 'user_avatar.dart';
 /// Large enough on its own to clear the 44pt touch minimum, so the badge
 /// never needs a separately expanded hit target the way a small icon button
 /// would.
-const double _avatarSize = 72;
+const double _avatarSize = AppAvatarSize.s72;
 const double _badgeSize = 28;
 
 class AvatarSettingsSection extends ConsumerStatefulWidget {
@@ -177,7 +177,6 @@ class _AvatarSettingsSectionState extends ConsumerState<AvatarSettingsSection>
                             ExcludeSemantics(
                               child: UserAvatar(
                                 userId: me?.id,
-                                avatarUpdatedAt: me?.avatarUpdatedAt,
                                 name: me?.displayName ?? '',
                                 size: _avatarSize,
                               ),

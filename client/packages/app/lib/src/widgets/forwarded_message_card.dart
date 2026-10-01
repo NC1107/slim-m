@@ -37,7 +37,7 @@ import 'user_avatar.dart';
 
 /// The avatar beside a forwarded original, deliberately smaller than a
 /// message row's own: this is a quoted author, not the one speaking.
-const double _avatarSize = 20;
+const double _avatarSize = AppAvatarSize.s20;
 
 class ForwardedMessageCard extends ConsumerWidget {
   const ForwardedMessageCard({
@@ -260,7 +260,7 @@ class _Header extends StatelessWidget {
         Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            UserAvatar(
+            UserAvatar.known(
               name: name,
               userId: forwarded.authorId,
               avatarUpdatedAt: forwarded.authorAvatarUpdatedAt,

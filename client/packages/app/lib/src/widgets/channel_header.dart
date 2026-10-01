@@ -149,10 +149,10 @@ class ChannelHeader extends ConsumerWidget {
                         color: tokens.textSecondary,
                       )
                     else if (isDm)
-                      AuthorAvatar(
+                      UserAvatar(
                         name: name,
                         userId: dmParticipantId,
-                        size: 24,
+                        size: AppAvatarSize.s24,
                       )
                     else
                       ChannelKindIcon(

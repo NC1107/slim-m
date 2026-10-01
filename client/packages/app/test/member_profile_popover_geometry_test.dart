@@ -77,12 +77,7 @@ Widget _anchorRow(double top, api.UserProfile profile) => Positioned(
     height: 40,
     child: Consumer(
       builder: (context, ref, _) => TextButton(
-        onPressed: () => showMemberProfile(
-          context,
-          ref,
-          profile: profile,
-          status: AppPresence.online,
-        ),
+        onPressed: () => showMemberProfile(context, ref, profile: profile),
         child: const Text('open'),
       ),
     ),

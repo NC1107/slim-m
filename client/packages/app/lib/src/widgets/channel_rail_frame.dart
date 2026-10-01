@@ -11,7 +11,7 @@ import 'package:slimm_design_system/design_system.dart';
 import 'package:slimm_rtc/rtc.dart';
 
 import '../desktop/update_watch.dart';
-import '../providers/presence_controller.dart';
+import '../providers/presence_view.dart';
 import '../providers/providers.dart';
 import '../providers/sync_controller.dart';
 import '../providers/sync_failure.dart';
@@ -350,11 +350,9 @@ class RailUserFooter extends ConsumerWidget {
   /// deafen are not, since they control whichever call is live regardless of
   /// which channel is on screen.
   ///
-  /// This row's status line is always the person's own chosen presence now,
-  /// whatever the socket is doing: the Space's connection is
-  /// [SpaceConnectionDot]'s job in [RailHeader], not this one's, and
-  /// conflating the two here used to blank a chosen status behind
-  /// "connecting"/"offline" for the whole time a reconnect was in flight.
+  /// This row's status line is the person's own presence word from
+  /// [presenceForProvider], whatever the socket is doing: the Space's
+  /// connection is [SpaceConnectionDot]'s job in [RailHeader], not this one's.
   ///
   /// A typed status (`api.Me.statusText`) joins the presence word once one is
   /// set ("online · swagging"), the same pair the member pane's own row
@@ -366,7 +364,7 @@ class RailUserFooter extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final tokens = Theme.of(context).extension<AppTokens>()!;
     final me = ref.watch(meProvider);
-    final visibility = ref.watch(presenceVisibilityDisplayProvider);
+    final selfId = ref.watch(sessionProvider).tokens?.userId;
     final voice = ref.watch(voiceFlagsProvider);
     final voiceController = ref.read(voiceControllerProvider.notifier);
     final inCall = voice.state == VoiceSessionState.connected;
@@ -375,12 +373,15 @@ class RailUserFooter extends ConsumerWidget {
     final inCallElsewhere =
         inCall && callChannelId != null && callChannelId != activeChannelId;
 
-    final (statusLabel, presence) = presenceDisplayOf(visibility);
+    final statusLabel = selfId == null
+        ? null
+        : ref.watch(presenceForProvider(selfId)).word;
     // A typed status joins the presence word rather than replacing it, so both facts the member pane shows about you show here too (design review note 7).
     final statusText = me.valueOrNull?.statusText;
-    final secondLine = statusText != null && statusText.isNotEmpty
-        ? '$statusLabel · $statusText'
-        : statusLabel;
+    final secondLine = [
+      ?statusLabel,
+      if (statusText != null && statusText.isNotEmpty) statusText,
+    ].join(' · ');
 
     // Mirrors [RailHeader]: the raised bar and its top border bleed to the
     // screen edge while [SafeArea] lifts the content off the home indicator.
@@ -413,7 +414,7 @@ class RailUserFooter extends ConsumerWidget {
               ];
               return Row(
                 children: [
-                  PresenceMenuButton(presence: presence),
+                  const PresenceMenuButton(),
                   const SizedBox(width: 9),
                   // At ChannelRail.compactWidth the controls win, scaled down if a notch inset leaves too little; the presence dot still says who and how.
                   if (constraints.maxWidth < _footerNameMinWidth)

@@ -18,8 +18,11 @@ import 'package:slimm_api/api.dart' as api;
 import 'package:slimm_app/src/permissions.dart';
 import 'package:slimm_app/src/providers/admin_providers.dart';
 import 'package:slimm_app/src/providers/member_presence.dart';
+import 'package:slimm_app/src/providers/presence_controller.dart';
 import 'package:slimm_app/src/widgets/member_profile.dart';
 import 'package:slimm_design_system/design_system.dart';
+
+import 'support/call_header_fixture.dart' show FakePresence;
 
 const _other = api.UserProfile(
   id: 'user-maya',
@@ -47,8 +50,15 @@ Widget _harness(
   Widget child, {
   int permissions = 0,
   List<api.UserProfile> members = const [],
+  Map<String, api.PresenceState> presence = const {
+    'user-maya': api.PresenceState.online,
+  },
 }) => ProviderScope(
+  key: UniqueKey(),
   overrides: [
+    presenceControllerProvider.overrideWith(
+      (ref) => FakePresence(ref, presence),
+    ),
     myPermissionsProvider.overrideWithValue(permissions),
     membersProvider.overrideWith((ref) async => members),
     rolesProvider.overrideWith((ref) async => const <api.Role>[]),
@@ -63,7 +73,6 @@ Widget _harness(
 Widget _body(api.UserProfile profile, {String? mentionChannelName}) =>
     MemberProfileBody(
       profile: profile,
-      status: AppPresence.online,
       mentionChannelName: mentionChannelName,
       compact: false,
       onDone: () {},
@@ -200,27 +209,30 @@ void main() {
   testWidgets('presence is a word beside its dot, never the dot alone', (
     tester,
   ) async {
-    for (final (status, word) in const [
-      (AppPresence.online, 'online'),
-      (AppPresence.away, 'away'),
-      (AppPresence.dnd, 'do not disturb'),
-      (AppPresence.offline, 'offline'),
-      (AppPresence.hidden, 'appearing offline'),
+    for (final (state, word) in const [
+      (api.PresenceState.online, 'online'),
+      (api.PresenceState.away, 'away'),
+      (api.PresenceState.dnd, 'do not disturb'),
+      (api.PresenceState.offline, 'offline'),
     ]) {
       await tester.pumpWidget(
-        _harness(
-          MemberProfileBody(
-            profile: _other,
-            status: status,
-            compact: false,
-            onDone: () {},
-          ),
-        ),
+        _harness(_body(_other), presence: {_other.id: state}),
       );
       await tester.pump();
-      expect(find.text(word), findsOneWidget, reason: '$status');
-      expect(find.byType(AppStatusDot), findsWidgets, reason: '$status');
+      expect(find.text(word), findsOneWidget, reason: '$state');
+      expect(find.byType(AppStatusDot), findsWidgets, reason: '$state');
     }
+  });
+
+  testWidgets('nobody reported yet reads as no word and no dot', (
+    tester,
+  ) async {
+    await tester.pumpWidget(_harness(_body(_other), presence: const {}));
+    await tester.pump();
+    for (final word in ['online', 'away', 'offline', 'unknown']) {
+      expect(find.text(word), findsNothing);
+    }
+    expect(find.byType(AppStatusDot), findsNothing);
   });
 
   testWidgets('the compact presentation carries the same rows', (tester) async {
@@ -228,7 +240,6 @@ void main() {
       _harness(
         MemberProfileBody(
           profile: _other,
-          status: AppPresence.online,
           mentionChannelName: 'general',
           compact: true,
           onDone: () {},

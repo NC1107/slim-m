@@ -23,7 +23,6 @@ import 'package:slimm_app/src/providers/member_presence.dart';
 import 'package:slimm_app/src/providers/providers.dart';
 import 'package:slimm_app/src/widgets/member_profile.dart';
 import 'package:slimm_data/data.dart';
-import 'package:slimm_design_system/design_system.dart';
 import 'package:slimm_platform/platform.dart';
 
 import 'support/reduced_motion_harness.dart';
@@ -45,12 +44,7 @@ const _other = api.UserProfile(
 Widget _openPage(BuildContext context, GoRouterState state) => Scaffold(
   body: Consumer(
     builder: (context, ref, _) => GestureDetector(
-      onTap: () => showMemberProfile(
-        context,
-        ref,
-        profile: _other,
-        status: AppPresence.online,
-      ),
+      onTap: () => showMemberProfile(context, ref, profile: _other),
       child: const Text('open'),
     ),
   ),

@@ -227,10 +227,10 @@ class HeaderCell extends StatelessWidget {
                           size: AppSizes.icon16,
                           color: tokens.textSecondary,
                         )
-                      : AuthorAvatar(
+                      : UserAvatar(
                           name: column.label,
                           userId: column.id,
-                          size: 20,
+                          size: AppAvatarSize.s20,
                           shape: column.isBot
                               ? AppAvatarShape.square
                               : AppAvatarShape.circle,

@@ -13,6 +13,7 @@ import 'package:flutter/material.dart';
 import '../../app_metrics.dart';
 import '../../app_tokens.dart';
 import '../../app_typography.dart';
+import 'avatar_geometry.dart';
 import 'speaking_ring.dart';
 import 'status_dot.dart';
 
@@ -58,11 +59,6 @@ String initialsFor(String name) {
   return stripped.substring(0, take).toUpperCase();
 }
 
-double _atLeast9(double value) {
-  final rounded = value.round();
-  return rounded < 9 ? 9.0 : rounded.toDouble();
-}
-
 /// A light ink for the fixed, non-theme-swapped tint colours above. None of
 /// [AppTokens]'s existing text colours fit: they all invert with theme, and
 /// these tints do not, so [AppTokens.accentOn] would go illegible in dark and
@@ -89,7 +85,7 @@ class AppAvatar extends StatelessWidget {
     required this.name,
     this.tintKey,
     this.image,
-    this.size = 36,
+    this.size = AppAvatarSize.s36,
     this.shape = AppAvatarShape.circle,
     this.status,
     this.speaking = false,
@@ -112,13 +108,13 @@ class AppAvatar extends StatelessWidget {
   final String? tintKey;
   final ImageProvider? image;
 
-  /// Diameter. Avatars appear at several sizes across the app (a message
-  /// row, a member list, a full profile), so this is a plain double.
+  /// Diameter: one of the [AppAvatarSize] steps.
   final double size;
   final AppAvatarShape shape;
 
   /// Presence overlay, drawn bottom-right. Composes [AppStatusDot] rather
-  /// than duplicating its shape-per-state drawing.
+  /// than duplicating its shape-per-state drawing. Null and
+  /// [AppPresence.unknown] both draw nothing.
   final AppPresence? status;
 
   /// A live-speaking ring. Takes priority over [ringColor], matching the
@@ -149,13 +145,17 @@ class AppAvatar extends StatelessWidget {
     final round = shape == AppAvatarShape.circle;
     final radius = round ? size / 2 : AppRadii.control;
     final initials = round ? initialsFor(name) : '';
+    final geometry = AppAvatarGeometry(size);
+    final presence = status;
+    final dot = presence != null && presence != AppPresence.unknown;
 
     Widget content = image == null
         ? _Face(
             round: round,
             initials: initials,
             tokens: tokens,
-            size: size,
+            geometry: geometry,
+            withDot: dot,
             tintSource: tintKey ?? name,
             placeholder: placeholder)
         : Image(
@@ -168,7 +168,8 @@ class AppAvatar extends StatelessWidget {
               round: round,
               initials: initials,
               tokens: tokens,
-              size: size,
+              geometry: geometry,
+              withDot: dot,
               tintSource: tintKey ?? name,
               placeholder: placeholder,
             ),
@@ -196,15 +197,16 @@ class AppAvatar extends StatelessWidget {
         foregroundDecoration: BoxDecoration(
           shape: round ? BoxShape.circle : BoxShape.rectangle,
           borderRadius: round ? null : BorderRadius.circular(radius),
-          border: Border.all(color: ringColor!, width: 2),
+          border:
+              Border.all(color: ringColor!, width: AppAvatarGeometry.ringWidth),
         ),
         child: content,
       );
     }
 
-    final presence = status;
-    if (presence != null) {
-      final dotSize = _atLeast9(size * 0.3);
+    if (dot) {
+      final haloRadius = geometry.dotHaloRadius;
+      final center = geometry.dotCenter;
       content = SizedBox(
         width: size,
         height: size,
@@ -213,15 +215,15 @@ class AppAvatar extends StatelessWidget {
           children: [
             content,
             Positioned(
-              right: -2,
-              bottom: -2,
+              left: center.dx - haloRadius,
+              top: center.dy - haloRadius,
               child: Container(
-                padding: const EdgeInsets.all(2),
+                padding: const EdgeInsets.all(AppAvatarGeometry.dotHalo),
                 decoration: BoxDecoration(
                     color: tokens.surfaceBase, shape: BoxShape.circle),
                 child: AppStatusDot(
                     status: presence,
-                    size: dotSize,
+                    size: geometry.dotDiameter,
                     backgroundColor: tokens.surfaceBase),
               ),
             ),
@@ -253,7 +255,8 @@ class _Face extends StatelessWidget {
     required this.round,
     required this.initials,
     required this.tokens,
-    required this.size,
+    required this.geometry,
+    required this.withDot,
     required this.tintSource,
     required this.placeholder,
   });
@@ -261,7 +264,11 @@ class _Face extends StatelessWidget {
   final bool round;
   final String initials;
   final AppTokens tokens;
-  final double size;
+  final AppAvatarGeometry geometry;
+
+  /// Whether a presence dot sits on this avatar, which narrows the box the
+  /// initials may use.
+  final bool withDot;
 
   /// What [_tintFor] hashes: [AppAvatar.tintKey] resolved against the name.
   final String tintSource;
@@ -278,19 +285,29 @@ class _Face extends StatelessWidget {
       );
     }
 
-    final fontSize = _atLeast9(size * 0.36);
+    final box = geometry.initialsBox(withDot: withDot);
     return ColoredBox(
       color: _tintFor(tintSource),
       child: Center(
         child: initials.isEmpty
             ? null
-            : Text(
-                initials,
-                style: TextStyle(
-                  fontFamily: AppFonts.mono,
-                  fontSize: fontSize,
-                  fontWeight: AppWeights.medium,
-                  color: _avatarTintInk,
+            : SizedBox(
+                width: box.width,
+                height: box.height,
+                child: FittedBox(
+                  fit: BoxFit.scaleDown,
+                  child: Text(
+                    initials,
+                    maxLines: 1,
+                    softWrap: false,
+                    style: TextStyle(
+                      fontFamily: AppFonts.mono,
+                      fontSize: geometry.initialsFontSize,
+                      height: 1,
+                      fontWeight: AppWeights.medium,
+                      color: _avatarTintInk,
+                    ),
+                  ),
                 ),
               ),
       ),

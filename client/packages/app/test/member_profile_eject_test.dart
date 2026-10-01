@@ -158,12 +158,8 @@ void _giveDesktopMenuRoom(WidgetTester tester) {
   addTearDown(tester.view.reset);
 }
 
-Widget _body() => MemberProfileBody(
-  profile: _other,
-  status: AppPresence.online,
-  compact: false,
-  onDone: () {},
-);
+Widget _body() =>
+    MemberProfileBody(profile: _other, compact: false, onDone: () {});
 
 void main() {
   testWidgets('absent without KICK_MEMBERS, even while sharing the call', (
@@ -344,12 +340,8 @@ void main() {
             builder: (context, state) => Scaffold(
               body: Consumer(
                 builder: (context, ref, _) => TextButton(
-                  onPressed: () => showMemberProfile(
-                    context,
-                    ref,
-                    profile: _other,
-                    status: AppPresence.online,
-                  ),
+                  onPressed: () =>
+                      showMemberProfile(context, ref, profile: _other),
                   child: const Text('open'),
                 ),
               ),

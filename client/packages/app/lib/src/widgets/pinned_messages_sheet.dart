@@ -225,10 +225,10 @@ class PinnedMessageRow extends ConsumerWidget {
           messageId: pin.message.id,
         );
       },
-      leading: AuthorAvatar(
+      leading: UserAvatar(
         userId: pin.message.authorId,
         name: name,
-        size: AppSizes.icon28,
+        size: AppAvatarSize.s28,
       ),
       title: AuthorNameLine(name: name, profile: resolution.profile),
       subtitle: Text(

@@ -119,11 +119,11 @@ class _RoleMembersTabState extends ConsumerState<RoleMembersTab>
             ),
             for (final candidate in candidates)
               AppListRow(
-                leading: UserAvatar(
+                leading: UserAvatar.known(
                   name: candidate.displayName,
                   userId: candidate.id,
                   avatarUpdatedAt: candidate.avatarUpdatedAt,
-                  size: 26,
+                  size: AppAvatarSize.s28,
                   shape: candidate.isBot
                       ? AppAvatarShape.square
                       : AppAvatarShape.circle,
@@ -210,11 +210,11 @@ class _HolderGroup extends StatelessWidget {
           for (final holder in shown)
             AppListRow(
               key: ValueKey(holder.id),
-              leading: UserAvatar(
+              leading: UserAvatar.known(
                 name: holder.displayName,
                 userId: holder.id,
                 avatarUpdatedAt: holder.avatarUpdatedAt,
-                size: 26,
+                size: AppAvatarSize.s28,
                 shape: holder.isBot
                     ? AppAvatarShape.square
                     : AppAvatarShape.circle,

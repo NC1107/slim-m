@@ -129,8 +129,8 @@ void main() {
     await _pump(tester, hasAvatar: true);
     final avatar = tester.widget<AppAvatar>(find.byType(AppAvatar));
     expect(avatar.image, isNotNull);
-    expect(avatar.size, 20);
-    expect(avatar.status, AppPresence.offline);
+    expect(avatar.size, AppAvatarSize.s24);
+    expect(avatar.status, AppPresence.unknown);
   });
 
   testWidgets('a peer without a picture keeps initials on the id tint', (

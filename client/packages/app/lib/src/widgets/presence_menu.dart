@@ -14,15 +14,17 @@ import 'package:slimm_api/api.dart' as api;
 import 'package:slimm_design_system/design_system.dart';
 
 import '../providers/presence_controller.dart';
+import '../providers/presence_view.dart';
 import '../providers/providers.dart';
 import 'context_menu_focus.dart';
+import 'presence_indicator.dart';
 import 'presence_status_field.dart';
 import 'run_guarded.dart';
 import 'status_editor_sheet.dart';
 import 'user_avatar.dart';
 
 /// Every visibility a caller may choose, each with the label it is offered
-/// under and the silhouette [AppStatusDot] draws for it.
+/// under and the state it draws as.
 ///
 /// `hidden` is appear-offline, and it is deliberately one tap from the avatar
 /// rather than buried in settings: it is the only choice here with a privacy
@@ -33,35 +35,6 @@ const presenceOptions = <(api.PresenceVisibility, String, AppPresence)>[
   (api.PresenceVisibility.dnd, 'Do not disturb', AppPresence.dnd),
   (api.PresenceVisibility.hidden, 'Appear offline', AppPresence.hidden),
 ];
-
-/// The rail footer's status line and dot for a chosen [visibility]: the same
-/// label the menu offers, lowercased to match the footer's register and the
-/// member pane's own word for everyone else.
-///
-/// A null [visibility] is "no choice known this session", which is every launch
-/// until someone picks one, because there is no read-back endpoint (see
-/// [presenceVisibilityDisplayProvider]). It says so. It used to return
-/// `connected` and a green online dot for that case, and both were unearned:
-/// the word is the connection vocabulary `SpaceConnectionDot` owns, which is
-/// how the owner came to read the footer as a connection indicator and doubt
-/// it, and the green dot asserted a visibility to someone who may have chosen
-/// appear-offline on another device. Nothing on this line reports the socket
-/// now, so it cannot disagree with the header's dot.
-(String, AppPresence) presenceDisplayOf(api.PresenceVisibility? visibility) {
-  if (visibility == null) return (unknownPresenceLabel, AppPresence.offline);
-  final option = presenceOptions.firstWhere(
-    (option) => option.$1 == visibility,
-  );
-  return (option.$2.toLowerCase(), option.$3);
-}
-
-/// The footer's word for a visibility this client cannot read back.
-///
-/// Deliberately not a presence word and not a connection word: it is a
-/// statement about what this device knows, which is the only honest one here.
-/// One word because the footer's name column ellipsizes past about nine
-/// characters, and "status unkn..." says less than nothing.
-const unknownPresenceLabel = 'unknown';
 
 /// Sets the caller's own visibility, and puts the echo back if the server
 /// refuses it.
@@ -98,11 +71,7 @@ Future<bool> applyPresenceVisibility(
 /// uses, per `docs/design/desktop-vs-mobile.md`: an anchored surface under a
 /// thumb is a review defect.
 class PresenceMenuButton extends ConsumerStatefulWidget {
-  const PresenceMenuButton({super.key, required this.presence});
-
-  /// The dot drawn on the avatar. The footer derives it, because a device
-  /// that is not connected reports that instead of the chosen status.
-  final AppPresence presence;
+  const PresenceMenuButton({super.key});
 
   @override
   ConsumerState<PresenceMenuButton> createState() => _PresenceMenuButtonState();
@@ -201,11 +170,10 @@ class _PresenceMenuButtonState extends ConsumerState<PresenceMenuButton> {
                   duration: AppMotion.reduced(context, AppMotion.fast),
                   curve: AppMotion.entrance,
                   child: UserAvatar(
-                    userId: me.valueOrNull?.id,
-                    avatarUpdatedAt: me.valueOrNull?.avatarUpdatedAt,
+                    userId: ref.watch(sessionProvider).tokens?.userId,
                     name: me.valueOrNull?.displayName ?? '',
-                    size: 28,
-                    status: widget.presence,
+                    size: AppAvatarSize.s28,
+                    presence: true,
                   ),
                 ),
               ),
@@ -261,14 +229,14 @@ class _PresenceMenuItemsState extends ConsumerState<_PresenceMenuItems>
   @override
   Widget build(BuildContext context) {
     final tokens = Theme.of(context).extension<AppTokens>()!;
-    final selected = ref.watch(presenceVisibilityDisplayProvider);
+    final selfId = ref.watch(sessionProvider).tokens?.userId;
+    final current = selfId == null
+        ? AppPresence.unknown
+        : ref.watch(presenceForProvider(selfId));
     final currentStatus = ref.watch(meProvider).valueOrNull?.statusText ?? '';
     // Rule 2 of desktop-vs-mobile.md: status is a dropdown everywhere there is room for one, only compact still needs the sheet.
     final desktop = MediaQuery.sizeOf(context).width >= kCompactWidth;
 
-    // [selected] is null until a choice is made in this session, and then no
-    // item is marked current: ticking one would assert a stored value this
-    // client has no way to read back.
     return AppSheetMenu(
       width: 220,
       children: [
@@ -285,11 +253,11 @@ class _PresenceMenuItemsState extends ConsumerState<_PresenceMenuItems>
         for (final (visibility, label, presence) in presenceOptions)
           AppMenuItem(
             label: label,
-            selected: visibility == selected,
+            selected: presence == current,
             // surfaceRaised, not the default, because the dnd notch and the
             // appear-offline slash punch their mark here.
-            trailing: AppStatusDot(
-              status: presence,
+            trailing: PresenceIndicator(
+              presence: presence,
               backgroundColor: tokens.surfaceRaised,
             ),
             onTap: () => unawaited(_select(visibility)),

@@ -23,7 +23,6 @@ import 'package:slimm_app/src/providers/member_presence.dart';
 import 'package:slimm_app/src/providers/providers.dart';
 import 'package:slimm_app/src/providers/voice_controller.dart';
 import 'package:slimm_app/src/widgets/member_profile.dart';
-import 'package:slimm_design_system/design_system.dart';
 import 'package:slimm_platform/platform.dart';
 import 'package:slimm_rtc/rtc.dart';
 
@@ -131,12 +130,7 @@ void _giveDesktopMenuRoom(WidgetTester tester) {
 
 Widget _harness(ProviderContainer container) => reducedMotionApp(
   container: container,
-  child: MemberProfileBody(
-    profile: _other,
-    status: AppPresence.online,
-    compact: false,
-    onDone: () {},
-  ),
+  child: MemberProfileBody(profile: _other, compact: false, onDone: () {}),
 );
 
 void main() {

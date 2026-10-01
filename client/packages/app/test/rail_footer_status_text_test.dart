@@ -5,8 +5,9 @@
 /// ("online · swagging"), the same pair the member pane shows for everyone
 /// else (design review note 7).
 ///
-/// The generic word is `status unknown` rather than the `connected` it was:
-/// see `presenceDisplayOf`. Nothing on this line reports the socket.
+/// The generic word is the caller's own presence, `online` for a connected
+/// client that has not been told otherwise. Nothing on this line reports the
+/// socket.
 library;
 
 import 'dart:convert';
@@ -20,7 +21,6 @@ import 'package:slimm_api/api.dart' as api;
 import 'package:slimm_app/src/providers/providers.dart';
 import 'package:slimm_app/src/providers/sync_controller.dart';
 import 'package:slimm_app/src/widgets/channel_rail_frame.dart';
-import 'package:slimm_app/src/widgets/presence_menu.dart';
 import 'package:slimm_design_system/design_system.dart';
 import 'package:slimm_platform/platform.dart';
 
@@ -102,10 +102,7 @@ void main() {
     addTearDown(container.dispose);
     await _pumpFooter(tester, container);
 
-    expect(
-      find.text('$unknownPresenceLabel · heads down, back in an hour'),
-      findsOneWidget,
-    );
+    expect(find.text('online · heads down, back in an hour'), findsOneWidget);
   });
 
   testWidgets('with no status text set, the generic word still shows', (
@@ -115,7 +112,7 @@ void main() {
     addTearDown(container.dispose);
     await _pumpFooter(tester, container);
 
-    expect(find.text(unknownPresenceLabel), findsOneWidget);
+    expect(find.text('online'), findsOneWidget);
   });
 
   testWidgets('a status cleared back to empty falls back to the generic word', (
@@ -125,6 +122,6 @@ void main() {
     addTearDown(container.dispose);
     await _pumpFooter(tester, container);
 
-    expect(find.text(unknownPresenceLabel), findsOneWidget);
+    expect(find.text('online'), findsOneWidget);
   });
 }

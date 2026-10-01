@@ -12,6 +12,9 @@ import 'live_events.dart';
 import 'presence_activity.dart';
 import 'providers.dart';
 
+/// The most ids `GET /presence` accepts in one request.
+const _presenceBatchLimit = 100;
+
 /// Every user this session currently has a presence status for. A user
 /// absent from this map is simply unknown yet, never "offline": that
 /// distinction belongs to the caller, which is why this holds
@@ -46,13 +49,24 @@ class PresenceController extends StateNotifier<Map<String, api.PresenceState>> {
   }
 
   /// Batch-fetches presence for [userIds] and merges it into what is already
-  /// known. Best-effort: a failed refresh just leaves the map as it was
+  /// known, a request per [_presenceBatchLimit] ids because the server refuses
+  /// a longer list outright and one refusal used to leave a large roster all
+  /// unreported. Best-effort: a failed batch leaves its ids as they were
   /// rather than surfacing an error the member pane has nowhere to show.
   Future<void> refresh(Iterable<String> userIds) async {
     final ids = userIds.toList(growable: false);
-    if (ids.isEmpty) return;
+    for (var start = 0; start < ids.length; start += _presenceBatchLimit) {
+      final end = start + _presenceBatchLimit;
+      await _refreshBatch(
+        ids.sublist(start, end > ids.length ? ids.length : end),
+      );
+    }
+  }
+
+  Future<void> _refreshBatch(List<String> ids) async {
     try {
       final statuses = await _ref.read(apiProvider).listPresence(ids);
+      if (!mounted) return;
       state = {
         ...state,
         for (final status in statuses) status.userId: status.status,

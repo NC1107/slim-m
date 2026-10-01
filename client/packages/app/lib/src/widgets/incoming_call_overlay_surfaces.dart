@@ -29,11 +29,11 @@ class _CompactIncomingCall extends ConsumerWidget {
             child: Column(
               children: [
                 const Spacer(),
-                UserAvatar(
+                UserAvatar.known(
                   name: name,
                   userId: profile?.id,
                   avatarUpdatedAt: profile?.avatarUpdatedAt,
-                  size: 96,
+                  size: AppAvatarSize.s96,
                 ),
                 const SizedBox(height: AppSpacing.s16),
                 Text(
@@ -115,11 +115,11 @@ class _ExpandedIncomingCallRow extends ConsumerWidget {
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          UserAvatar(
+          UserAvatar.known(
             name: name,
             userId: profile?.id,
             avatarUpdatedAt: profile?.avatarUpdatedAt,
-            size: 32,
+            size: AppAvatarSize.s32,
           ),
           const SizedBox(width: AppSpacing.s8),
           Flexible(

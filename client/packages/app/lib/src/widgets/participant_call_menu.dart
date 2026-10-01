@@ -21,8 +21,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:slimm_design_system/design_system.dart';
 import 'package:slimm_rtc/rtc.dart';
 
-import '../providers/member_presence.dart' show membersProvider, presenceOf;
-import '../providers/presence_controller.dart';
+import '../providers/member_presence.dart' show membersProvider;
 import '../providers/voice_controller.dart';
 import 'member_moderation_gates.dart';
 import 'member_profile.dart';
@@ -79,12 +78,7 @@ List<Widget> participantCallMenuItems(
       leading: AppIcons.account,
       onTap: () {
         close();
-        showMemberProfile(
-          context,
-          ref,
-          profile: profile,
-          status: presenceOf(ref.read(presenceControllerProvider)[profile.id]),
-        );
+        showMemberProfile(context, ref, profile: profile);
       },
     ),
   );
@@ -103,9 +97,6 @@ List<Widget> participantCallMenuItems(
             context,
             ref,
             profile: profile,
-            status: presenceOf(
-              ref.read(presenceControllerProvider)[profile.id],
-            ),
             initiallyModerating: true,
           );
         },

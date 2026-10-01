@@ -131,18 +131,6 @@ final memberModerationWatcherProvider = Provider.autoDispose<void>((ref) {
   ref.onDispose(() => unawaited(sub.cancel()));
 });
 
-/// The design-system status a server [api.PresenceState] renders as. Both
-/// [PresenceState.away] and [PresenceState.dnd] still group under "online"
-/// below (see [groupMembersByPresence]): each is reachable in some capacity,
-/// which is the distinction that bucket exists to draw, and the row itself
-/// still shows the more specific dot shape/colour.
-AppPresence presenceOf(api.PresenceState? state) => switch (state) {
-  api.PresenceState.online => AppPresence.online,
-  api.PresenceState.away => AppPresence.away,
-  api.PresenceState.dnd => AppPresence.dnd,
-  api.PresenceState.offline || null => AppPresence.offline,
-};
-
 /// Away and do-not-disturb both count as "online" for grouping purposes:
 /// both are a live, connected session, just with a status layered on top,
 /// and grouping either under "Offline" would read as a lie the row's own
@@ -226,7 +214,7 @@ final memberProfileOverridesProvider =
 String reachablePresenceKey(Map<String, api.PresenceState> presence) {
   final ids = [
     for (final entry in presence.entries)
-      if (isReachablePresence(presenceOf(entry.value))) entry.key,
+      if (entry.value != api.PresenceState.offline) entry.key,
   ]..sort();
   return ids.join(',');
 }

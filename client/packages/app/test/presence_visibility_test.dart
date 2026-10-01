@@ -1,12 +1,11 @@
 // SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
-/// A fresh launch must not claim a presence visibility it cannot read back.
+/// A fresh launch shows the caller's own state from what the server reports.
 ///
 /// The preference is durable server-side (`users.presence_visibility`,
 /// migration 0008), and no endpoint returns it: `PATCH /presence` echoes only
 /// what it just set and `GET /presence` resolves the caller's own id to their
-/// true connection state. So the client genuinely does not know, and both the
-/// footer line and the menu tick used to assert "online" regardless, telling
-/// someone who chose appear-offline that they were visible.
+/// true connection state. So a fresh session reads the reported state, and a
+/// choice made this session wins over it so the footer answers the tap.
 library;
 
 import 'dart:convert';
@@ -176,30 +175,18 @@ void main() {
     );
   });
 
-  testWidgets('the footer says the status is unknown rather than claiming '
-      'online before any choice is made', (tester) async {
+  testWidgets('before any choice the footer reports what the server says '
+      'about the caller, never "unknown"', (tester) async {
     final container = _container();
     addTearDown(container.dispose);
     await _pumpFooter(tester, container);
 
-    expect(
-      find.text('online'),
-      findsNothing,
-      reason:
-          'a user who chose appear-offline last week is still hidden '
-          'server-side; telling them they are online is the privacy lie',
-    );
-    expect(
-      find.text('connected'),
-      findsNothing,
-      reason:
-          'connected is the connection vocabulary the header dot owns; it is '
-          'what made the owner read this row as a connection indicator',
-    );
-    expect(find.text(unknownPresenceLabel), findsOneWidget);
+    expect(find.text('unknown'), findsNothing);
+    expect(find.text('connected'), findsNothing);
+    expect(find.text('online'), findsOneWidget);
   });
 
-  testWidgets('the status menu marks nothing current until a choice is made', (
+  testWidgets('the status menu marks the caller\'s current state', (
     tester,
   ) async {
     final container = _container();
@@ -209,7 +196,6 @@ void main() {
     await tester.tap(find.byType(UserAvatar));
     await tester.pumpAndSettle();
 
-    // Filtered to the presence choices: this wide window's menu also carries the inline PresenceStatusField.
     final items = tester
         .widgetList<AppMenuItem>(
           find.descendant(
@@ -219,13 +205,9 @@ void main() {
         )
         .where((item) => presenceOptions.any((o) => o.$2 == item.label));
     expect(items, hasLength(presenceOptions.length));
-    expect(
-      items.where((item) => item.selected),
-      isEmpty,
-      reason:
-          'a tick here reads as "this is your current setting", which '
-          'is exactly what this client cannot know',
-    );
+    expect(items.where((item) => item.selected).map((i) => i.label), [
+      'Online',
+    ]);
   });
 
   testWidgets('a choice made in this session is shown as current', (
@@ -237,7 +219,7 @@ void main() {
         api.PresenceVisibility.hidden;
     await _pumpFooter(tester, container);
 
-    expect(find.text('appear offline'), findsOneWidget);
+    expect(find.text('appearing offline'), findsOneWidget);
 
     await tester.tap(find.byType(UserAvatar));
     await tester.pumpAndSettle();

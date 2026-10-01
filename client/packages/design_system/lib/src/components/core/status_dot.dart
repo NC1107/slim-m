@@ -15,10 +15,29 @@ import 'package:flutter/material.dart';
 import '../../app_motion.dart';
 import '../../app_tokens.dart';
 
+/// Every state a person can be drawn in, each with the one word that names
+/// it.
+///
 /// [hidden] is "appearing offline": a deliberate privacy choice, not a real
 /// disconnect. It has no colour of its own in [AppStatusColors] and reuses
 /// [AppStatusColors.offline] on purpose; only the shape tells the two apart.
-enum AppPresence { online, away, dnd, offline, hidden }
+///
+/// [unknown] is "nothing has been reported yet": it draws nothing and has no
+/// word, because a grey ring would claim offline and a word would claim
+/// something this client has not been told.
+enum AppPresence {
+  online('online'),
+  away('away'),
+  dnd('do not disturb'),
+  offline('offline'),
+  hidden('appearing offline'),
+  unknown(null);
+
+  const AppPresence(this.word);
+
+  /// How the state is spoken and written beside a name; null for [unknown].
+  final String? word;
+}
 
 /// The silhouette each [AppPresence] renders as, independent of colour.
 enum AppStatusShape {
@@ -65,14 +84,6 @@ class AppStatusDot extends StatelessWidget {
     AppPresence.hidden: AppStatusShape.slashedRing,
   };
 
-  static const Map<AppPresence, String> _labelOf = {
-    AppPresence.online: 'Online',
-    AppPresence.away: 'Away',
-    AppPresence.dnd: 'Do not disturb',
-    AppPresence.offline: 'Offline',
-    AppPresence.hidden: 'Appearing offline',
-  };
-
   Color _colorOf(AppStatusColors colors) => switch (status) {
         AppPresence.online => colors.online,
         AppPresence.away => colors.away,
@@ -81,14 +92,17 @@ class AppStatusDot extends StatelessWidget {
         // No dedicated token: hidden is a privacy choice layered on top of
         // "offline", not a sixth colour, so it reuses offline's.
         AppPresence.hidden => colors.offline,
+        AppPresence.unknown => colors.offline,
       };
 
   @override
   Widget build(BuildContext context) {
+    final shape = shapeOf[status];
+    if (shape == null) return SizedBox.square(dimension: size);
     final tokens = Theme.of(context).extension<AppTokens>()!;
 
     return Semantics(
-      label: _labelOf[status],
+      label: status.word,
       // A presence flip cross-fades; the state key means rebuilds swap nothing.
       child: AnimatedSwitcher(
         duration: AppMotion.reduced(context, AppMotion.fast),
@@ -96,7 +110,7 @@ class AppStatusDot extends StatelessWidget {
           key: ValueKey(status),
           size: Size.square(size),
           painter: AppStatusDotPainter(
-            shape: shapeOf[status]!,
+            shape: shape,
             color: _colorOf(tokens.status),
             backgroundColor: backgroundColor ?? tokens.surfaceBase,
           ),

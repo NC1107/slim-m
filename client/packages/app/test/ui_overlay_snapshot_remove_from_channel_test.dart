@@ -68,7 +68,6 @@ Future<void> _capture(WidgetTester tester, double width, String name) async {
                 key: snapshotBoundary,
                 child: MemberProfileBody(
                   profile: _other,
-                  status: AppPresence.online,
                   compact: width < 400,
                   channelId: _channelId,
                   onDone: () {},

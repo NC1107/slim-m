@@ -99,7 +99,7 @@ void main() {
       await tester.pump();
 
       expect(_trailingCount(tester), isNull);
-      expect(find.byType(AuthorAvatar), findsNothing);
+      expect(find.byType(UserAvatar), findsNothing);
     },
   );
 
@@ -128,7 +128,7 @@ void main() {
       await tester.pump();
 
       expect(_trailingCount(tester), '1');
-      expect(find.byType(AuthorAvatar), findsOneWidget);
+      expect(find.byType(UserAvatar), findsOneWidget);
     },
   );
 
@@ -166,7 +166,7 @@ void main() {
             'this device is not in the call; the roster reporting its '
             'own stale entry must not be read as though it were',
       );
-      expect(find.byType(AuthorAvatar), findsNothing);
+      expect(find.byType(UserAvatar), findsNothing);
     },
   );
 
@@ -186,7 +186,7 @@ void main() {
     await tester.pump();
 
     expect(_trailingCount(tester), isNull);
-    expect(find.byType(AuthorAvatar), findsNothing);
+    expect(find.byType(UserAvatar), findsNothing);
   });
 
   testWidgets(

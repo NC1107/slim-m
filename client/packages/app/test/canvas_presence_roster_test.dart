@@ -33,7 +33,7 @@ VoiceParticipant _remote(String id, String name) => VoiceParticipant(
   isScreenSharing: false,
 );
 
-// AuthorAvatar reads userProfileProvider and avatarBytesProvider; both fixed to null so this test needs no real api/session chain.
+// UserAvatar reads userProfileProvider and avatarBytesProvider; both fixed to null so this test needs no real api/session chain.
 Widget _wrap(Widget child) => ProviderScope(
   overrides: [
     userProfileProvider.overrideWith((ref, id) async => null),

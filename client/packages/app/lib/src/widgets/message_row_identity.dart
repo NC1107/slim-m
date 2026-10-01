@@ -20,7 +20,7 @@ import 'user_avatar.dart';
 
 /// The avatar column's width, and therefore also the continuation gutter's:
 /// the design's 36px message-row avatar, named once so both agree.
-const double _avatarSize = 36;
+const double _avatarSize = AppAvatarSize.s36;
 
 /// `HH:mm` or a 12-hour equivalent, following [use24Hour]. Fixed width
 /// matters here: a grouped message puts its time in a 36px gutter, and a
@@ -247,7 +247,7 @@ class MessageRowLeading extends ConsumerWidget {
       authorId: message.authorId,
       semanticLabel: 'View profile',
       decorativeWhenUnresolved: true,
-      child: AuthorAvatar(
+      child: UserAvatar(
         userId: message.authorId,
         name: authorLabelResolved(
           authorId: message.authorId,

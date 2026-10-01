@@ -147,9 +147,8 @@ class CallParticipantTile extends StatelessWidget {
   Widget build(BuildContext context) {
     final tokens = Theme.of(context).extension<AppTokens>()!;
     final height = width * _kCallTileAspect;
-    final avatarSize = (height - _kCallTileLabelBand - AppSpacing.s8).clamp(
-      32.0,
-      96.0,
+    final avatarSize = AppAvatarSize.largestWithin(
+      height - _kCallTileLabelBand - AppSpacing.s8,
     );
     // This build's own context, so a popover anchors to this tile - see [onTap]'s doc.
     final onTapHere = onTap == null ? null : () => onTap!(context);
@@ -201,7 +200,7 @@ class CallParticipantTile extends StatelessWidget {
                               top: 0,
                               bottom: _kCallTileLabelBand,
                               child: Center(
-                                child: AuthorAvatar(
+                                child: UserAvatar(
                                   name: participant.name,
                                   userId: participant.identity,
                                   size: avatarSize,

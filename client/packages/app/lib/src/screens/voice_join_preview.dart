@@ -391,10 +391,10 @@ class _WhoIsHere extends StatelessWidget {
           spacing: AppSpacing.s4,
           children: [
             for (final participant in roster.take(8))
-              AuthorAvatar(
+              UserAvatar(
                 name: participant.displayName,
                 userId: participant.userId,
-                size: 28,
+                size: AppAvatarSize.s28,
               ),
           ],
         ),

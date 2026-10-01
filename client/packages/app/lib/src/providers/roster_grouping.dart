@@ -14,6 +14,7 @@ import 'package:slimm_design_system/design_system.dart';
 
 import 'member_presence.dart';
 import 'presence_controller.dart';
+import 'presence_view.dart';
 
 /// Online members whose top hoisted role is [roleId], listed under [name].
 typedef RoleSection = ({
@@ -166,10 +167,8 @@ final rosterEntriesProvider = Provider.autoDispose
           ? ref.watch(membersProvider)
           : ref.watch(channelMembersProvider(channelId));
       ref.watch(presenceControllerProvider.select(reachablePresenceKey));
-      final presence = ref.read(presenceControllerProvider);
-      final statusOf = {
-        for (final entry in presence.entries)
-          entry.key: presenceOf(entry.value),
-      };
-      return rosterEntries(groupRoster(members.valueOrNull ?? [], statusOf));
+      ref.watch(presenceVisibilityDisplayProvider);
+      final roster = members.valueOrNull ?? [];
+      final statusOf = presenceOfAll(ref, roster.map((m) => m.id));
+      return rosterEntries(groupRoster(roster, statusOf));
     });
