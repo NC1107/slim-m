@@ -73,6 +73,14 @@ class InviteDialogState extends ConsumerState<InviteDialog> {
   }
 
   Future<void> _verify() async {
+    if (looksLikeWebAddress(_code.text)) {
+      setState(
+        () => _error =
+            'That looks like a web address. Paste an invite link that '
+            'starts with slimm://join, or just the code.',
+      );
+      return;
+    }
     final address = Uri.tryParse(_server.text.trim());
     if (address == null || !address.hasScheme || address.host.isEmpty) {
       setState(() => _error = 'That does not look like a server address.');
