@@ -33,6 +33,7 @@ Each section below is named for its workflow file.
 | `update-manifest` | called by `desktop-clients` after its archives attach, and by hand with a tag input | signs a manifest (versions, artifact URLs, sha256s) of the desktop artifacts on a client release with the `UPDATE_SIGNING_KEY` secret, for the self-updater in decision 0041. Skips with a warning while the secret is unset |
 | `release` | pushes to `main`, and by hand on a `server-v*` / `client-v*` tag ref | the whole publish pipeline, including the web image under the server's version |
 | `release-tag-watchdog` | an hourly schedule, and by hand | every release-please manifest's version has a matching git tag, catching a release PR that merged with no tag ever following it, and no merged release PR is still labelled `autorelease: pending`, which silently fails every later release run; and, in a second job, re-dispatches `release.yml` on the tag once when the release run's verify failed and the commit's required checks have since gone green |
+| `release-asset-watchdog` | an hourly schedule, and by hand | nothing. It checks every `client-v*` and `server-v*` release from the last 3 days against the asset set its kind always carries, and opens a deduplicated `release-incomplete` issue (and fails its own run) when one older than 90 minutes is missing a file |
 | `red-streak-watchdog` | a daily schedule, and by hand | opens a GitHub issue once `e2e` or `main-builds` has failed 3 consecutive completed runs on `main`, closes it once that workflow is green again; does not gate anything |
 | `main-builds` | changes under `client/`, `crates/`, `packaging/` or the web image's own files on every push to `main`, excluding a release commit's own files; and by hand, with a boolean per side | a Fedora COPR snapshot, an Android artifact, `latest` on the live server image, `latest` on the web image after a client change, and continuous TestFlight unless the repo variable `CONTINUOUS_TESTFLIGHT` is `false`, in which case iOS builds only from a client release in `release`, or when this is run by hand; never a version bump, changelog or GitHub Release |
 | `flatpak-ci` | changes to the flatpak manifest or its vendored shared-modules, on pull requests and every push to `main`; and by hand | builds the flatpak for real, installs it, and checks a headless launch does not fail with a missing shared library, the failure class `release.yml` cannot catch before a `client-v*` tag |
@@ -809,6 +810,26 @@ That reasoning names a different trigger as the answer, and this is it.
 
 It gates nothing, and it does not report by its own colour: a scheduled workflow that only fails itself is a red tab nobody opens, which is the failure `red-streak-watchdog` already exists to correct.
 It opens a deduplicated GitHub issue instead, and closes it once the tree is clean again.
+
+## release-asset-watchdog
+
+release-please publishes the GitHub Release before any asset job runs, so a release is public, and `latest`, from the first second while its builds can still fail.
+Client 0.89.0 shipped that way on 2026-09-30: the Windows job failed, `update-manifest` skipped behind it, and the release had no Windows zip and no `manifest.json` until a hand dispatch backfilled them an hour later.
+Nothing noticed, because `verify-release-checks` judges check-runs before publish and `update-manifest.py --require` only runs inside the job that was skipped.
+
+`scripts/check-release-assets.py` lists releases through `gh api` (GET only) and compares each release's asset names with the set for its kind, kept in one `REQUIRED` table in the script.
+A `client-v*` release must hold `manifest.json`, `manifest.json.sig`, `SHA256SUMS`, `SHA256SUMS.android`, the rpm, the linux tarball, the flatpak, the macOS and Windows zips and the apk.
+A `server-v*` release must hold `SHA256SUMS` and the linux amd64 and arm64 binaries.
+`schema-v*` tags are anchors with no assets by design and are ignored.
+Names that carry the version are patterns filled from the tag, and an asset with size 0 counts as absent.
+The sets were derived from `client-v0.89.0` (10 assets) and `server-v0.77.0` (3), not from memory; change the table when a workflow changes what it attaches.
+
+A release younger than the grace period (90 minutes, `--grace-minutes`) is reported as pending and does not fail, since the asset jobs take about an hour.
+The workflow runs the script hourly over `--recent 3` days and hands the result to `scripts/report-advisory-issue.sh`, the same open, dedupe and close flow `advisory-watchdog` uses, with the label `release-incomplete`.
+Unlike the advisory check it also fails its own run, because an incomplete release is something to act on rather than to read later.
+Releases older than the window are not rechecked, so a release left incomplete for more than 3 days stops alerting; run the script by hand with `--recent` for a longer look.
+It does not check that `manifest.json` lists every platform whose archive is attached; client 0.88.0's manifest once omitted linux-x64 while the tarball arrived later.
+`scripts/lib/test_check_release_assets.py` drives the comparison with fake asset lists.
 
 ## verify-release-checks
 

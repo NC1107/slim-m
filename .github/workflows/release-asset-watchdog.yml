@@ -1,0 +1,52 @@
+# SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
+name: release-asset-watchdog
+
+# Hourly check that every recent client and server release carries its full asset set; opens a deduplicated issue otherwise (docs/ci.md).
+
+on:
+  schedule:
+    - cron: "41 * * * *"
+  workflow_dispatch:
+
+# Read-only on the repo; the reporting step needs issues: write and nothing else.
+permissions:
+  contents: read
+  issues: write
+
+# No concurrency group: hourly, and issue dedup by label makes overlapping runs harmless.
+
+jobs:
+  check:
+    name: recent releases have every asset
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      # continue-on-error so an incomplete release reaches the reporting step instead of ending the job silently.
+      - id: scan
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+        run: python3 scripts/check-release-assets.py --recent 3 | tee release-assets.txt
+
+      - name: open or close the incomplete-release issue
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          ADVISORY_STATUS: ${{ steps.scan.outcome == 'success' && 'clean' || 'found' }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          WATCHDOG_LABEL: release-incomplete
+          WATCHDOG_TITLE: a published release is missing assets
+          WATCHDOG_LABEL_DESCRIPTION: a published release is missing assets it always carries
+          WATCHDOG_CLOSE_COMMENT: Every recent release has its full asset set again; closing.
+        run: |
+          WATCHDOG_BODY="$(printf '%s\n\n%s\n' \
+            'scripts/check-release-assets.py found a release older than its grace period that lacks assets the pipeline always attaches. Rerun the failed asset job or dispatch release.yml / desktop-clients.yml for the tag. This issue closes itself once the set is complete.' \
+            "$(grep '^INCOMPLETE' release-assets.txt || true)")"
+          export WATCHDOG_BODY
+          bash scripts/report-advisory-issue.sh
+
+      - name: fail the run so the tab is red as well as the issue open
+        if: steps.scan.outcome == 'failure'
+        run: exit 1

@@ -30,7 +30,9 @@ exit 0
 """
 
 
-def run(tmp_path: Path, status: str, existing: str = "") -> list[str]:
+def run(
+    tmp_path: Path, status: str, existing: str = "", extra: dict[str, str] | None = None
+) -> list[str]:
     """Runs the script with a fake `gh`, returning that fake's recorded calls."""
     bin_dir = tmp_path / "bin"
     bin_dir.mkdir(exist_ok=True)
@@ -49,6 +51,7 @@ def run(tmp_path: Path, status: str, existing: str = "") -> list[str]:
         ADVISORY_STATUS=status,
         RUN_URL="https://example.invalid/run/1",
     )
+    env.update(extra or {})
     subprocess.run(["bash", str(SCRIPT)], env=env, check=True, capture_output=True)
     return [line for line in calls.read_text().splitlines() if line]
 
@@ -62,6 +65,22 @@ def test_a_found_advisory_does_not_open_a_second_issue(tmp_path: Path) -> None:
     """The check runs daily; without this it would file one issue per day."""
     calls = run(tmp_path, "found", existing="42")
     assert not any(c.startswith("issue create") for c in calls), calls
+
+
+def test_another_watchdog_can_supply_its_own_label_and_body(tmp_path: Path) -> None:
+    calls = run(
+        tmp_path,
+        "found",
+        extra={
+            "WATCHDOG_LABEL": "release-incomplete",
+            "WATCHDOG_TITLE": "a release is missing assets",
+            "WATCHDOG_BODY": "INCOMPLETE client-v9.9.9",
+        },
+    )
+    created = next(c for c in calls if c.startswith("issue create"))
+    assert "--label release-incomplete" in created, created
+    assert "INCOMPLETE client-v9.9.9" in created, created
+    assert "cargo deny" not in created, created
 
 
 def test_a_clean_scan_closes_an_open_issue(tmp_path: Path) -> None:
