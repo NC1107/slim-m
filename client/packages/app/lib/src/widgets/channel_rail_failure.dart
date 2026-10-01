@@ -15,13 +15,21 @@ import '../providers/sync_failure.dart';
 /// A failure the rail is willing to show, with the recovery that actually
 /// applies to it.
 ///
-/// [retryable] is false for a refusal: the button would send the same request
-/// to a server that already said no, so offering it is a false promise.
+/// A refusal is not [retryable]: asking again would send the same request to a
+/// server that already said no. Its control is [retryLabel] "Sign in again".
 class RailFailure {
-  const RailFailure({required this.message, required this.retryable});
+  const RailFailure({
+    required this.message,
+    required this.retryable,
+    this.retryLabel = 'Retry',
+  });
 
   final String message;
   final bool retryable;
+
+  /// What the one recovery control says: a refusal is not fixed by asking
+  /// again, so its control signs out instead of retrying.
+  final String retryLabel;
 }
 
 /// The rail's failure when the local store would not open.
@@ -65,6 +73,7 @@ RailFailure? emptyRailFailure(SyncFailure? failure) => switch (failure) {
         'The server refused this session, so it sent no channels. '
         'Sign in again.',
     retryable: false,
+    retryLabel: 'Sign in again',
   ),
 };
 
@@ -80,10 +89,12 @@ class RailFailureNotice extends StatelessWidget {
     super.key,
     required this.failure,
     required this.onRetry,
+    required this.onSignInAgain,
   });
 
   final RailFailure failure;
   final VoidCallback onRetry;
+  final VoidCallback onSignInAgain;
 
   @override
   Widget build(BuildContext context) {
@@ -94,7 +105,8 @@ class RailFailureNotice extends StatelessWidget {
         child: AppErrorState(
           key: const Key('rail-failure'),
           message: failure.message,
-          onRetry: failure.retryable ? onRetry : null,
+          retryLabel: failure.retryLabel,
+          onRetry: failure.retryable ? onRetry : onSignInAgain,
         ),
       ),
     );
