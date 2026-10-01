@@ -40,28 +40,17 @@ const presenceOptions = <(api.PresenceVisibility, String, AppPresence)>[
 ///
 /// A null [visibility] is "no choice known this session", which is every launch
 /// until someone picks one, because there is no read-back endpoint (see
-/// [presenceVisibilityDisplayProvider]). It says so. It used to return
-/// `connected` and a green online dot for that case, and both were unearned:
-/// the word is the connection vocabulary `SpaceConnectionDot` owns, which is
-/// how the owner came to read the footer as a connection indicator and doubt
-/// it, and the green dot asserted a visibility to someone who may have chosen
-/// appear-offline on another device. Nothing on this line reports the socket
-/// now, so it cannot disagree with the header's dot.
-(String, AppPresence) presenceDisplayOf(api.PresenceVisibility? visibility) {
-  if (visibility == null) return (unknownPresenceLabel, AppPresence.offline);
+/// [presenceVisibilityDisplayProvider]). The label is then null: the footer
+/// says nothing rather than a word that is not true (it once said "connected"
+/// and a green dot, and then "unknown", which read as a fault on a lone
+/// account). The dot stays the neutral offline one, which claims no choice.
+(String?, AppPresence) presenceDisplayOf(api.PresenceVisibility? visibility) {
+  if (visibility == null) return (null, AppPresence.offline);
   final option = presenceOptions.firstWhere(
     (option) => option.$1 == visibility,
   );
   return (option.$2.toLowerCase(), option.$3);
 }
-
-/// The footer's word for a visibility this client cannot read back.
-///
-/// Deliberately not a presence word and not a connection word: it is a
-/// statement about what this device knows, which is the only honest one here.
-/// One word because the footer's name column ellipsizes past about nine
-/// characters, and "status unkn..." says less than nothing.
-const unknownPresenceLabel = 'unknown';
 
 /// Sets the caller's own visibility, and puts the echo back if the server
 /// refuses it.

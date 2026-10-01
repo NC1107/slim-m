@@ -103,15 +103,8 @@ Future<void> _pumpFooter(
   await tester.pumpAndSettle();
 }
 
-/// Every second line the footer can render, which is the presence vocabulary
-/// plus the one word for a choice this client cannot read back.
-const _footerWords = [
-  'online',
-  'away',
-  'do not disturb',
-  'appear offline',
-  unknownPresenceLabel,
-];
+/// Every second line the footer can render: the presence vocabulary alone.
+const _footerWords = ['online', 'away', 'do not disturb', 'appear offline'];
 
 void main() {
   test('every visibility gets the member pane\'s own word, and no visibility '
@@ -134,7 +127,7 @@ void main() {
     ));
     expect(
       presenceDisplayOf(null),
-      (unknownPresenceLabel, AppPresence.offline),
+      (null, AppPresence.offline),
       reason:
           'null is every launch: it must claim neither a visibility it cannot '
           'read back nor a connection it does not own',
@@ -157,11 +150,6 @@ void main() {
             'question, which is how "connected" ended up in the footer',
       );
     }
-    expect(
-      connectionWords,
-      isNot(contains(unknownPresenceLabel)),
-      reason: 'the unknown case is about a preference, never about the socket',
-    );
   });
 
   test('a refused session never reads as a connection worth waiting out', () {
@@ -187,7 +175,7 @@ void main() {
     addTearDown(container.dispose);
     await _pumpFooter(tester, container);
 
-    expect(find.text(unknownPresenceLabel), findsOneWidget);
+    expect(find.text('unknown'), findsNothing);
     for (final status in SyncStatus.values) {
       for (final failure in [null, ...SyncFailure.values]) {
         expect(
