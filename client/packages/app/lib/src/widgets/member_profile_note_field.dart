@@ -139,7 +139,7 @@ class _MemberProfileNoteFieldState
           const SizedBox(height: 2),
           Text(
             'only you',
-            style: AppText.micro.copyWith(color: tokens.textDisabled),
+            style: AppText.micro.copyWith(color: tokens.textSecondary),
           ),
         ],
       ),

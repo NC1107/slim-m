@@ -320,7 +320,7 @@ class GroupHeaderRow extends StatelessWidget {
           child: Text(
             title.toUpperCase(),
             style: AppText.micro.copyWith(
-              color: tokens.textDisabled,
+              color: tokens.textSecondary,
               fontWeight: AppWeights.medium,
             ),
           ),
