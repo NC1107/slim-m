@@ -70,12 +70,13 @@ jobs:
         working-directory: client
         run: flutter pub get --enforce-lockfile
 
+      # pwsh, never bash: Git Bash rewrites the job's slash-leading CL value into a path and CMake then finds no compiler.
       - name: flutter build windows --release
         working-directory: client/packages/app
-        shell: bash
+        shell: pwsh
         env:
           SLIMM_SPOTIFY_CLIENT_ID: ${{ vars.SLIMM_SPOTIFY_CLIENT_ID }}
-        run: flutter build windows --release --dart-define=SLIMM_SPOTIFY_CLIENT_ID="${SLIMM_SPOTIFY_CLIENT_ID}"
+        run: flutter build windows --release "--dart-define=SLIMM_SPOTIFY_CLIENT_ID=$env:SLIMM_SPOTIFY_CLIENT_ID"
 
       # The launcher is what makes "which version runs" data instead of a path (decision 0041); the runner image's Go builds it.
       - name: test and build the launcher
