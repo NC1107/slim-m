@@ -57,7 +57,7 @@ void main() {
                   if (!isNewer(latest, currentVersion)) return null;
                   final file = File('${root.path}/.staging/pkg-$latest.tar.gz')
                     ..createSync(recursive: true);
-                  return VerifiedUpdate(
+                  return VerifiedUpdate.forTest(
                     version: latest,
                     tag: 'client-v$latest',
                     file: file,

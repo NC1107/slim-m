@@ -233,9 +233,8 @@ pub struct Channel {
     pub name: String,
     pub kind: String,
     /// A one-line description shown beside the name in the client's channel
-    /// header. `None` for no topic, distinct from an empty string: clearing
-    /// it back to `None` is what an edit to a blank value normalizes to, the
-    /// same way an empty topic and no topic render identically to a viewer.
+    /// header. `None` for no topic; an edit to a blank value normalizes to
+    /// `None`, since an empty topic and no topic render the same.
     pub topic: Option<String>,
     /// Sort key among the deployment's live, non-DM channels: lower sorts
     /// first. Deployment-wide, not per-device - see

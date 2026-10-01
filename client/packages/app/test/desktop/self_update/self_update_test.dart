@@ -235,7 +235,15 @@ void main() {
   });
 
   test('a signed version that is not plain digits names nothing', () async {
-    for (final version in ['9.9.9-/../../x', '9.9.9-rc1', '9.9.9+b', '1.2', '1.0.0-../x', '1.0.0+a/b', '1.0.0-rc.1']) {
+    for (final version in [
+      '9.9.9-/../../x',
+      '9.9.9-rc1',
+      '9.9.9+b',
+      '1.2',
+      '1.0.0-../x',
+      '1.0.0+a/b',
+      '1.0.0-rc.1',
+    ]) {
       final client = await _server(_Release(key: key, version: version));
       expect(
         await failureOf(run(client)),
