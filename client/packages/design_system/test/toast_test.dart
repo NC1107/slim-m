@@ -44,4 +44,31 @@ void main() {
     await tester.pumpWidget(_wrap(const AppToast(message: 'Auto only')));
     expect(find.byIcon(AppIcons.dismiss), findsNothing);
   });
+
+  testWidgets(
+      'draws in the token font with no decoration when no Material '
+      'ancestor exists', (tester) async {
+    final theme = buildTheme(Brightness.light, AppTokens.light);
+    await tester.pumpWidget(
+      Directionality(
+        textDirection: TextDirection.ltr,
+        child: Theme(
+          data: theme,
+          child: const Center(child: AppToast(message: 'Saved')),
+        ),
+      ),
+    );
+
+    final rich = tester.widget<RichText>(
+      find.descendant(
+        of: find.text('Saved'),
+        matching: find.byType(RichText),
+      ),
+    );
+    final style = rich.text.style!;
+    expect(style.decoration, anyOf(isNull, TextDecoration.none));
+    expect(style.fontFamily, theme.textTheme.bodyMedium!.fontFamily);
+    expect(style.fontFamily, isNotNull);
+    expect(style.fontSize, AppText.body.fontSize);
+  });
 }

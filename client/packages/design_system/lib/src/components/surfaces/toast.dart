@@ -89,10 +89,11 @@ class AppToast extends StatelessWidget {
       ),
     );
 
+    // Overlays have no Material above; without one the text gets a yellow underline.
     final semantic = Semantics(
       liveRegion: true,
       container: true,
-      child: card,
+      child: Material(type: MaterialType.transparency, child: card),
     );
 
     if (onDismiss == null) return semantic;
