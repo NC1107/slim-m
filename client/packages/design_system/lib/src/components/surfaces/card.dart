@@ -61,7 +61,7 @@ class AppCard extends StatelessWidget {
       clipBehavior: Clip.antiAlias,
       decoration: BoxDecoration(
         color: sunken ? tokens.surfaceSunken : tokens.surfaceRaised,
-        border: Border.all(color: tokens.borderSubtle),
+        border: Border.all(color: tokens.borderStrong),
         borderRadius: BorderRadius.circular(AppRadii.card),
         boxShadow: floating ? AppShadows.float : null,
       ),

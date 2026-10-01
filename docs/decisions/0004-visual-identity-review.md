@@ -312,3 +312,12 @@ A selected stroke sets `selectedObjectId` exactly the way an image does, so `bri
 It never sets `elevatedObjectId` and never starts a `_drag`: a freehand mark has no box a person expects to relocate the way a placed image's is, and `SelectionPainter` already draws no handles for a non-image kind, so a selected stroke reads as "here, and reorderable" with nothing suggesting it can be picked up and moved.
 This is the real answer to the moderation case the task named directly: a drawing an image now covers can be brought back above it by tapping whatever part of the stroke still pokes out past the image's own box (an image's hit test is its box, a stroke's is its own path, so the exposed part of the line is reachable even though the covered part is not) and choosing "Bring to front."
 A stroke entirely enclosed inside an image's box has no exposed tap target at all; the residual workaround is to select and send the image to the back first, which is a real but rare two-step cost, named here rather than solved, since closing it fully would need a z-order-aware hit test this change did not build.
+
+### Addendum 2026-10-01: the hairline question is answered
+
+A separator hairline is incidental and stays `borderSubtle`.
+The edge of a control or a container a person has to find is a UI component under WCAG 1.4.11 and meets 3:1.
+Text inputs (`AppInput` and the theme's `InputDecorationTheme`) and `AppCard` now draw their edge in `borderStrong`.
+Dividers, card header rules, chips and menu separators keep the hairline.
+`borderStrong` on light was darkened from `#898E93` to `#858A8F` because the old value reached only 2.92:1 on `surfaceSunken`.
+It now measures 3.08 to 3.48 in light, 3.41 to 4.04 in dark and 4.16 to 4.48 on true black, and `component_boundary_contrast_test.dart` computes this from the tokens.

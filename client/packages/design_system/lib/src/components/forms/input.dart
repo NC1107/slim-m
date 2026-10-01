@@ -141,7 +141,7 @@ class _AppInputState extends State<AppInput> {
             ? tokens.dangerBorder
             : _focused
                 ? tokens.accentFill
-                : tokens.borderSubtle;
+                : tokens.borderStrong;
 
     final field = Container(
       height: _height,

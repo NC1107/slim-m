@@ -175,7 +175,7 @@ class AppTokens extends ThemeExtension<AppTokens> {
     surfaceRaised: Color(0xFFFFFFFF),
     borderSubtle: Color(0xFFDCE0E5),
     // Was #C4CAD1 until 2026-08-25; see this token's own doc for the ratio.
-    borderStrong: Color(0xFF898E93),
+    borderStrong: Color(0xFF858A8F),
     textPrimary: Color(0xFF1B1E22),
     textSecondary: Color(0xFF5B6169),
     textDisabled: Color(0xFF8A929B),
