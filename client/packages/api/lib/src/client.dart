@@ -85,11 +85,19 @@ class SessionStore {
     }
   }
 
+  /// The [lastEndReason] of a sign-out the person asked for themselves.
+  static const signedOutByUser = 'signed out';
+
+  /// Whether the session last ended without the person asking: a refresh the
+  /// server rejected, for instance after another device signed this one out.
+  bool get endedByServer =>
+      _lastEndReason != null && _lastEndReason != signedOutByUser;
+
   /// Ends the session. [reason] is recorded on [lastEndReason] and announced
   /// on [endings] so the app can say *why* somebody was signed out - the one
   /// thing a person who has just been thrown back to the sign-in screen
   /// cannot otherwise find out.
-  void clear({String reason = 'signed out'}) {
+  void clear({String reason = signedOutByUser}) {
     _lastEndReason = reason;
     _endings.add(reason);
     set(null);

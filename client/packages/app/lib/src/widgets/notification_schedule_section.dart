@@ -235,8 +235,8 @@ class _NotificationScheduleSectionState
             ],
             onChanged: (mode) => _setMode(mode, current, start, end),
           ),
-          const Padding(
-            padding: EdgeInsets.fromLTRB(
+          Padding(
+            padding: const EdgeInsets.fromLTRB(
               AppSpacing.s16,
               0,
               AppSpacing.s16,
@@ -245,7 +245,9 @@ class _NotificationScheduleSectionState
             child: Text(
               'Calls still ring even outside your hours; only chat '
               'notifications follow this schedule.',
-              style: AppText.caption,
+              style: AppText.caption.copyWith(
+                color: Theme.of(context).extension<AppTokens>()!.textSecondary,
+              ),
             ),
           ),
           NotificationScheduleAllowedPeople(
@@ -382,6 +384,7 @@ class _SnoozeRow extends StatelessWidget {
             ),
           );
         }
+        final tokens = Theme.of(context).extension<AppTokens>()!;
         return Padding(
           padding: const EdgeInsets.fromLTRB(
             AppSpacing.s16,
@@ -391,7 +394,13 @@ class _SnoozeRow extends StatelessWidget {
           ),
           child: Wrap(
             spacing: AppSpacing.s8,
+            runSpacing: AppSpacing.s8,
+            crossAxisAlignment: WrapCrossAlignment.center,
             children: [
+              Text(
+                'Snooze notifications for',
+                style: AppText.body.copyWith(color: tokens.textPrimary),
+              ),
               AppButton(
                 label: '30m',
                 size: AppButtonSize.sm,

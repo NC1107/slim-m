@@ -162,6 +162,13 @@ class _TotpCodeSheetState extends State<_TotpCodeSheet> {
               disabled: _busy || _code.isEmpty,
               onPressed: _submit,
             ),
+            const SizedBox(height: AppSpacing.s8),
+            AppButton(
+              label: 'Cancel',
+              variant: AppButtonVariant.ghost,
+              full: true,
+              onPressed: () => Navigator.of(context).pop(),
+            ),
           ],
         ),
       ),

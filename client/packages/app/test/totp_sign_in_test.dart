@@ -238,4 +238,19 @@ void main() {
     expect(results, [false]);
     expect(server.verifyBodies, isEmpty);
   });
+
+  testWidgets(
+    'the sheet has a Cancel button that closes it without a session',
+    (tester) async {
+      final server = _Server();
+      final results = await _pump(tester, server);
+
+      await tester.tap(find.text('Cancel'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Enter your code'), findsNothing);
+      expect(results, [false]);
+      expect(server.verifyBodies, isEmpty);
+    },
+  );
 }
