@@ -20,6 +20,7 @@ export 'models_call_record.dart';
 export 'models_voice.dart';
 export 'models_attachments.dart';
 export 'models_dms.dart';
+export 'models_read_states.dart';
 export 'models_dock.dart';
 export 'models_components.dart';
 export 'models_embeds.dart';

@@ -1,6 +1,10 @@
 // SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 part of 'client.dart';
 
+/// Most ids `GET /users` takes in one request; mirrors `MAX_USER_BATCH` in
+/// `crates/slimm-server/src/http/users.rs`, which answers 400 past it.
+const _maxUserIdsPerRequest = 100;
+
 /// Profiles, the caller's own account, and the deployment's member list: the
 /// `users` tag in schema/openapi.yaml.
 extension SlimmApiUsers on SlimmApi {
@@ -42,12 +46,26 @@ extension SlimmApiUsers on SlimmApi {
   /// Batch-fetches public profiles by id. An id with nothing live to report
   /// (never existed, or deleted) is simply absent from the result, so match
   /// by id rather than by position.
+  ///
+  /// More than the server's per-request cap is split across requests, which
+  /// the server would otherwise refuse outright with a 400.
   Future<List<UserProfile>> listUsers(List<String> ids) async {
-    final json = await _send(
-      'GET',
-      '/users',
-      query: ids.isEmpty ? null : {'ids': ids.join(',')},
-    );
+    final unique = ids.toSet().toList(growable: false);
+    final pages = [
+      for (var i = 0; i < unique.length; i += _maxUserIdsPerRequest)
+        unique.sublist(
+          i,
+          i + _maxUserIdsPerRequest > unique.length
+              ? unique.length
+              : i + _maxUserIdsPerRequest,
+        ),
+    ];
+    final answers = await Future.wait(pages.map(_listUsersPage));
+    return [for (final page in answers) ...page];
+  }
+
+  Future<List<UserProfile>> _listUsersPage(List<String> ids) async {
+    final json = await _send('GET', '/users', query: {'ids': ids.join(',')});
     return (json as List<dynamic>)
         .map((u) => UserProfile.fromJson(u as Map<String, dynamic>))
         .toList(growable: false);

@@ -235,14 +235,16 @@ void main() {
             baseUrl: Uri.parse('http://localhost:8080'),
             session: ref.watch(sessionProvider),
             httpClient: MockClient((request) async {
-              if (request.url.path == '/users/user-blocked') {
+              if (request.url.path == '/users') {
                 return http.Response(
-                  jsonEncode({
-                    'id': 'user-blocked',
-                    'username': 'kit',
-                    'display_name': 'Kit',
-                    'created_at': 0,
-                  }),
+                  jsonEncode([
+                    {
+                      'id': 'user-blocked',
+                      'username': 'kit',
+                      'display_name': 'Kit',
+                      'created_at': 0,
+                    },
+                  ]),
                   200,
                   headers: {'content-type': 'application/json'},
                 );

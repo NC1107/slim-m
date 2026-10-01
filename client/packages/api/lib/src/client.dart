@@ -249,6 +249,16 @@ class SlimmApi {
     return ReadState.fromJson(json as Map<String, dynamic>);
   }
 
+  /// The caller's marker in every channel they can read, one request instead
+  /// of a [readState] per channel. A channel never opened is answered with a
+  /// zero marker, so absence means the caller cannot read it.
+  Future<List<ChannelReadState>> listReadStates() async {
+    final json = await _send('GET', '/read-states');
+    return (json as List<dynamic>)
+        .map((r) => ChannelReadState.fromJson(r as Map<String, dynamic>))
+        .toList(growable: false);
+  }
+
   /// Advances the read marker. Monotonic: a lower seq is ignored by the server.
   Future<ReadState> markRead({
     required String channelId,
