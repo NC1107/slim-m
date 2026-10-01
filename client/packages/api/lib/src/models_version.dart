@@ -25,6 +25,7 @@ class Version {
     required this.protocol,
     this.pushEnabled,
     this.inviteRequired,
+    this.claimed,
     this.gifSearchEnabled,
     this.linkPreviewsEnabled,
     this.screenShareMaxHeight,
@@ -48,6 +49,12 @@ class Version {
   /// older than 0.14.2, which is "unknown": the sign-up screen stays quiet
   /// rather than promising either way.
   final bool? inviteRequired;
+
+  /// Whether the first account has registered. False means the next
+  /// registration claims the deployment as its admin. Null on a server older
+  /// than this field, which is "unknown": the client treats it as claimed and
+  /// opens on sign-in.
+  final bool? claimed;
 
   /// Whether this deployment can search and attach GIFs at all. Null on a
   /// server too old to report it, and a client treats that the same as
@@ -111,6 +118,7 @@ class Version {
         protocol: json['protocol'] as int,
         pushEnabled: json['push_enabled'] as bool?,
         inviteRequired: json['invite_required'] as bool?,
+        claimed: json['claimed'] as bool?,
         gifSearchEnabled: json['gif_search_enabled'] as bool?,
         linkPreviewsEnabled: json['link_previews_enabled'] as bool?,
         screenShareMaxHeight: json['screen_share_max_height'] as int?,

@@ -268,3 +268,23 @@ async fn version_reports_whether_a_code_is_needed() {
     .await;
     assert_eq!(after["invite_required"], false);
 }
+
+#[tokio::test]
+async fn version_reports_whether_the_deployment_is_claimed() {
+    let (store, _guard) = new_store().await;
+    let app = app(store);
+
+    let version = || async {
+        json_body(
+            app.clone()
+                .oneshot(request("GET", "/version", None, None))
+                .await
+                .unwrap(),
+        )
+        .await
+    };
+    assert_eq!(version().await["claimed"], false);
+
+    claim(&app).await;
+    assert_eq!(version().await["claimed"], true);
+}

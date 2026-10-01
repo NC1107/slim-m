@@ -74,6 +74,9 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
   final _displayName = TextEditingController();
 
   bool _creatingAccount = false;
+
+  /// Set once the person picks a mode, so a late probe never switches it.
+  bool _modeChosen = false;
   bool _busy = false;
 
   /// The current failure and the field it belongs to; see [signInErrorFor].
@@ -98,12 +101,8 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
   @override
   void initState() {
     super.initState();
-    // Somebody arriving with an invite code, or via "Join the official
-    // Space" with no invite, has no account here yet, so the screen opens on
-    // creating one rather than asserting "Sign in" at someone it cannot
-    // apply to. The toggle still offers the other mode. The provider is
-    // consumed and reset after this build, so a later sign-out on this same
-    // address - which skips onboarding entirely - always starts on "Sign in".
+    // An invite or "Join the official Space" means no account here yet, so open on creating one.
+    // The flag is consumed after this build so a later sign-out on this address starts on "Sign in".
     final assumedNew = ref.read(assumeNewAccountProvider);
     if (assumedNew) {
       // A provider cannot be written mid-build; this runs right after it, guarded because a screen disposed before that turn leaves the flag stale true, at worst opening a later visit on "Create an account" - recoverable via the toggle below.
@@ -207,6 +206,7 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
       setState(() {
         _probed = answer;
         _identityStatus = status;
+        if (answer?.claimed == false && !_modeChosen) _creatingAccount = true;
       });
     }
   }
@@ -438,8 +438,8 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
           // First of the three: the other two are about convenience,
           // this one is about whether you have any recourse here.
           if (_probed case final version?) ServerSafetyNotice(version: version),
-          if (_creatingAccount && _probed?.inviteRequired == true)
-            const InviteRequiredNotice(),
+          if (_creatingAccount && _probed != null)
+            InviteRequiredNotice(version: _probed!),
           if (_probed?.pushEnabled == false)
             const ServerNotice(
               icon: AppIcons.notificationsOff,
@@ -486,6 +486,7 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
             busy: _busy,
             onToggleCreating: () => setState(() {
               _creatingAccount = !_creatingAccount;
+              _modeChosen = true;
               _error = null;
             }),
             onUseDifferentSpace: () => context.go(Routes.onboarding),
