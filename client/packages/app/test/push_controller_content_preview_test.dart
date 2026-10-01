@@ -42,6 +42,7 @@ ProviderContainer _container({
   required http.Client httpClient,
   SessionStore? session,
   ApnsTokenChannel? channel,
+  List<Override> extra = const [],
 }) {
   return ProviderContainer(
     overrides: [
@@ -57,6 +58,7 @@ ProviderContainer _container({
         return api;
       }),
       if (channel != null) apnsTokenChannelProvider.overrideWithValue(channel),
+      ...extra,
     ],
   );
 }
@@ -164,6 +166,68 @@ void main() {
 
       expect(requests, hasLength(2));
       expect(requests[1]['include_content'], isTrue);
+    });
+
+    test('a persisted opt-in survives a cold start and the sign-in that '
+        'follows it', () async {
+      SharedPreferences.setMockInitialValues({pushIncludeContentKey: true});
+      final requests = <Map<String, dynamic>>[];
+      _mock((call) async => call.method == 'getToken' ? 'abcd1234' : null);
+      addTearDown(() => _mock(null));
+
+      final session = SessionStore();
+      final container = _container(
+        session: session,
+        httpClient: MockClient((request) async {
+          if (request.method == 'PUT' && request.url.path == '/push') {
+            requests.add(jsonDecode(request.body) as Map<String, dynamic>);
+          }
+          return http.Response('', 204);
+        }),
+        channel: ApnsTokenChannel(isIOS: true),
+      );
+      addTearDown(container.dispose);
+
+      container.read(pushControllerProvider);
+      session.set(_tokens);
+      await Future<void>.delayed(const Duration(milliseconds: 50));
+
+      expect(requests, isNotEmpty);
+      expect(requests.every((r) => r['include_content'] == true), isTrue);
+      expect(container.read(pushContentPreviewSettingsProvider), isTrue);
+    });
+
+    test('a preferences read that fails once does not pin the opt-in off '
+        'for the rest of the process', () async {
+      SharedPreferences.setMockInitialValues({pushIncludeContentKey: true});
+      var reads = 0;
+      final requests = <Map<String, dynamic>>[];
+      _mock((call) async => call.method == 'getToken' ? 'abcd1234' : null);
+      addTearDown(() => _mock(null));
+
+      final container = _container(
+        session: SessionStore(tokens: _tokens),
+        httpClient: MockClient((request) async {
+          if (request.method == 'PUT' && request.url.path == '/push') {
+            requests.add(jsonDecode(request.body) as Map<String, dynamic>);
+          }
+          return http.Response('', 204);
+        }),
+        channel: ApnsTokenChannel(isIOS: true),
+        extra: [
+          preferencesProvider.overrideWith((ref) async {
+            if (reads++ == 0) throw StateError('storage not readable yet');
+            return SharedPreferences.getInstance();
+          }),
+        ],
+      );
+      addTearDown(container.dispose);
+
+      await container.read(pushControllerProvider.notifier).register();
+      await container.read(pushControllerProvider.notifier).register();
+
+      expect(requests.last['include_content'], isTrue);
+      expect(container.read(pushContentPreviewSettingsProvider), isTrue);
     });
   });
 }
