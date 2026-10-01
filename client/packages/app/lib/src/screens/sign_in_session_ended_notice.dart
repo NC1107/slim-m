@@ -21,11 +21,14 @@ class SessionEndedNotice extends ConsumerWidget {
     if (!ref.watch(sessionProvider).endedByServer) {
       return const SizedBox.shrink();
     }
-    return const ServerNotice(
-      icon: AppIcons.signOut,
-      message:
-          'You were signed out. This device was signed out from another '
-          'device, or its session expired. Sign in again to carry on.',
+    return const Padding(
+      padding: EdgeInsets.only(bottom: AppSpacing.s8),
+      child: ServerNotice(
+        icon: AppIcons.signOut,
+        message:
+            'You were signed out. This device was signed out from another '
+            'device, or its session expired. Sign in again to carry on.',
+      ),
     );
   }
 }

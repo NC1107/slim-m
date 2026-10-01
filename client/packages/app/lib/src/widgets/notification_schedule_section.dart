@@ -237,9 +237,9 @@ class _NotificationScheduleSectionState
           ),
           Padding(
             padding: const EdgeInsets.fromLTRB(
-              AppSpacing.s16,
+              AppSpacing.s8,
               0,
-              AppSpacing.s16,
+              AppSpacing.s8,
               AppSpacing.s8,
             ),
             child: Text(
@@ -387,9 +387,9 @@ class _SnoozeRow extends StatelessWidget {
         final tokens = Theme.of(context).extension<AppTokens>()!;
         return Padding(
           padding: const EdgeInsets.fromLTRB(
-            AppSpacing.s16,
             AppSpacing.s8,
-            AppSpacing.s16,
+            AppSpacing.s8,
+            AppSpacing.s8,
             AppSpacing.s8,
           ),
           child: Wrap(
