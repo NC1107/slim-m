@@ -93,6 +93,7 @@ mod role_hierarchy;
 mod role_hoist;
 mod role_mentions;
 mod role_reorder;
+mod role_update;
 mod roles;
 mod safety;
 mod saved_messages;
