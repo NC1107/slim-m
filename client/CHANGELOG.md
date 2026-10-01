@@ -1,5 +1,29 @@
 # Changelog
 
+## [0.90.0](https://github.com/Slim-m-org/slim-m/compare/client-v0.89.0...client-v0.90.0) (2026-10-01)
+
+
+### Features
+
+* hold a reaction to see who left it ([#1551](https://github.com/Slim-m-org/slim-m/issues/1551)) ([27d6660](https://github.com/Slim-m-org/slim-m/commit/27d6660f935cdfe548391bf06d80b53428248c07))
+
+
+### Bug Fixes
+
+* an unchanged read marker stops waking every socket, and appear-offline survives a relaunch ([#1555](https://github.com/Slim-m-org/slim-m/issues/1555)) ([b376f83](https://github.com/Slim-m-org/slim-m/commit/b376f83c5ecf10246f24b1b837e61e8cdb0f6afb))
+* **client:** message links keep their channel, drafts survive a reload, and the viewer answers the keyboard ([#1548](https://github.com/Slim-m-org/slim-m/issues/1548)) ([13e5fc3](https://github.com/Slim-m-org/slim-m/commit/13e5fc34e86d27cb0fc15b4f164f568c53aea35a))
+* **client:** nine first-run and account screen bugs found by driving the real app ([#1545](https://github.com/Slim-m-org/slim-m/issues/1545)) ([e12ba9b](https://github.com/Slim-m-org/slim-m/commit/e12ba9b9436bcd8af0506a3d6092ebfedb0009a1))
+* **client:** one avatar and one presence rule everywhere, and the footer stops saying unknown ([#1553](https://github.com/Slim-m-org/slim-m/issues/1553)) ([f7861c4](https://github.com/Slim-m-org/slim-m/commit/f7861c4794d3e932923833ae92551eee581cc1e2))
+* **client:** open an existing local database on ios instead of failing forever ([#1537](https://github.com/Slim-m-org/slim-m/issues/1537)) ([13a4584](https://github.com/Slim-m-org/slim-m/commit/13a4584858dd704774a4a60d4e2841b0596123e7))
+* **client:** readable caption contrast, one dialog inset, and seven more measured ui defects ([#1549](https://github.com/Slim-m-org/slim-m/issues/1549)) ([d9a9108](https://github.com/Slim-m-org/slim-m/commit/d9a910881ddf8ac55cd118b32b98ce9d3a0abcf8))
+* **client:** split the conversation pane out of the home shell to restore the file budget ([#1550](https://github.com/Slim-m-org/slim-m/issues/1550)) ([9752c12](https://github.com/Slim-m-org/slim-m/commit/9752c127d95ae78c972f3feb38d63ed5485f7077))
+* **client:** tablet-width member list, settings that survive a resize, and five more layout bugs ([#1547](https://github.com/Slim-m-org/slim-m/issues/1547)) ([16e941f](https://github.com/Slim-m-org/slim-m/commit/16e941fbfb299f5e249007099a7d143d88d227a7))
+* **client:** the channel drawer follows your finger, and a long-pressed message stops looking pressed ([#1552](https://github.com/Slim-m-org/slim-m/issues/1552)) ([a6a4d1d](https://github.com/Slim-m-org/slim-m/commit/a6a4d1d39aeed1dded80bc91c5bcaf0bbe5df684))
+* **client:** web ids carry their real timestamp, and the canvas grid keeps one bucket per cell ([#1540](https://github.com/Slim-m-org/slim-m/issues/1540)) ([f05a979](https://github.com/Slim-m-org/slim-m/commit/f05a979e103f081e9792fce9aae603b13b8d361a))
+* **server,client:** a scene sweep delay near the ceiling no longer crashes the server ([#1538](https://github.com/Slim-m-org/slim-m/issues/1538)) ([b297620](https://github.com/Slim-m-org/slim-m/commit/b297620ac4895446e4328c0dd1b3f9aff8648c7a))
+* **server:** fourteen bugs found by using a live deployment as an admin, a member and a bot ([#1546](https://github.com/Slim-m-org/slim-m/issues/1546)) ([8c8832e](https://github.com/Slim-m-org/slim-m/commit/8c8832e2235535c37046c184aad6474a41ba9247))
+* sign-in makes one read-marker request, not one per channel, and stops tripping the rate limiter ([#1554](https://github.com/Slim-m-org/slim-m/issues/1554)) ([cc32100](https://github.com/Slim-m-org/slim-m/commit/cc3210044dda2c42cf1e01ba67b9a9b7bb78531f))
+
 ## [0.89.0](https://github.com/Slim-m-org/slim-m/compare/client-v0.88.0...client-v0.89.0) (2026-09-30)
 
 
