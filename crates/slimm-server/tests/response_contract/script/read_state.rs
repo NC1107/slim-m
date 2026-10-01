@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
-//! The read-state trio, in call order.
+//! The read-state routes, in call order.
 //!
 //! Order is the point rather than an accident. `markUnread` runs after
 //! `markRead` so its answer is a channel that has been read and marked unread
@@ -31,4 +31,5 @@ pub(crate) async fn read_state(c: &mut Contract, root: &str, channel: &str, seq:
         root,
     )
     .await;
+    c.get("listReadStates", "/read-states", root).await;
 }

@@ -11,6 +11,7 @@ import 'package:slimm_api/api.dart';
 import 'package:slimm_data/data.dart';
 
 import 'dms.dart';
+import 'rate_limit_retry.dart';
 
 /// Refreshes both channel listings the server keeps apart, and hydrates
 /// their read markers, deduplicating a concurrent caller into the refresh
@@ -52,8 +53,9 @@ class ChannelRefresher {
     SlimmApi api,
     MessageStore store, {
     required bool Function() isCurrent,
+    RateLimitWait wait = sleepFor,
   }) async {
-    // Three independent reads issued concurrently, then awaited together (see this method's own per-channel Future.wait below); Future.wait rethrows the first failure and consumes the rest, abandoning the write as the sequential version did.
+    // Three independent reads issued concurrently, then awaited together; Future.wait rethrows the first failure and consumes the rest, abandoning the write.
     final channelsFuture = api.listChannels();
     final categoriesFuture = api.listCategories();
     final dmsFuture = api.listDirectMessages();
@@ -70,10 +72,50 @@ class ChannelRefresher {
     await store.replaceChannels(all);
     await store.replaceCategories(categories);
 
-    /// Per channel: the server has no bulk read-state endpoint, and one
-    /// channel's failure must not stop the rest from hydrating.
+    await _hydrateReadMarkers(api, store, isCurrent: isCurrent, wait: wait);
+  }
+
+  /// One `GET /read-states` for every channel, not one request per channel:
+  /// each of those spends an `AuthedRead` token, and a deployment past about
+  /// forty channels ran the bucket dry on the sign-in alone. Best-effort, as
+  /// the per-channel reads were: a failure leaves every channel reading
+  /// unread until the next refresh.
+  Future<void> _hydrateReadMarkers(
+    SlimmApi api,
+    MessageStore store, {
+    required bool Function() isCurrent,
+    required RateLimitWait wait,
+  }) async {
+    final List<ChannelReadState> states;
+    try {
+      states = await retryWhenRateLimited(api.listReadStates, wait: wait);
+    } on NotFoundException {
+      await _hydratePerChannel(api, store, isCurrent: isCurrent);
+      return;
+    } on ApiException {
+      return;
+    }
+    for (final read in states) {
+      if (!isCurrent()) return;
+      await store.setReadMarker(
+        read.channelId,
+        read.state.lastReadSeq,
+        manuallyUnread: read.state.manuallyUnread,
+      );
+    }
+  }
+
+  /// A server that predates `GET /read-states` answers 404 to it, and only
+  /// the per-channel route can hydrate its markers. One channel's failure
+  /// must not stop the rest.
+  Future<void> _hydratePerChannel(
+    SlimmApi api,
+    MessageStore store, {
+    required bool Function() isCurrent,
+  }) async {
+    final channels = await store.allChannels();
     await Future.wait(
-      all.map((channel) async {
+      channels.map((channel) async {
         try {
           final read = await api.readState(channel.id);
           if (!isCurrent()) return;

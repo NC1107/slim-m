@@ -56,10 +56,11 @@ class BadRequestException extends ApiException {
 class RateLimitedException extends ApiException {
   const RateLimitedException(super.message, {this.retryAfter});
 
-  /// How long the response itself said to wait, parsed from a `Retry-After`
-  /// header carrying a delay in seconds. Null when the response carried no
-  /// such header (the server does not send one today) or one this could not
-  /// parse, in which case a caller falls back to its own backoff.
+  /// How long the response itself said to wait: a `Retry-After` header in
+  /// seconds, else the body's `retry_after_seconds`. The body is read too
+  /// because a browser hides the header from a cross-origin page unless the
+  /// server exposes it. Null when neither is present or parseable, in which
+  /// case a caller falls back to its own backoff.
   final Duration? retryAfter;
 }
 

@@ -205,6 +205,7 @@ extension SlimmApiTransport on SlimmApi {
   ApiException _errorFor(http.Response response) {
     var reason = 'request failed';
     int? missingPermissions;
+    Duration? bodyRetryAfter;
     try {
       final decoded = jsonDecode(response.body);
       if (decoded is Map<String, dynamic> && decoded['error'] is String) {
@@ -213,6 +214,13 @@ extension SlimmApiTransport on SlimmApi {
       if (decoded is Map<String, dynamic> &&
           decoded['missing_permissions'] is int) {
         missingPermissions = decoded['missing_permissions'] as int;
+      }
+      if (decoded is Map<String, dynamic> &&
+          decoded['retry_after_seconds'] is int &&
+          (decoded['retry_after_seconds'] as int) >= 0) {
+        bodyRetryAfter = Duration(
+          seconds: decoded['retry_after_seconds'] as int,
+        );
       }
     } catch (_) {
       // A non-JSON body is not itself an error worth surfacing; the status is.
@@ -228,7 +236,7 @@ extension SlimmApiTransport on SlimmApi {
       409 => ConflictException(reason),
       429 => RateLimitedException(
           reason,
-          retryAfter: _retryAfter(response),
+          retryAfter: _retryAfter(response) ?? bodyRetryAfter,
         ),
       501 => NotConfiguredException(reason),
       503 => UnavailableException(reason),
@@ -248,9 +256,9 @@ String _withoutDotSegment(String segment) => (segment == '.' || segment == '..')
 /// The delay a `Retry-After` header names, or null if there is none or it
 /// does not parse.
 ///
-/// Only the delta-seconds form (RFC 9110 10.2.3) is read. `sendMessage`'s own
-/// slow-mode 429 sends this header; every other 429 on this server still
-/// does not, so a caller with no value here falls back to its own backoff.
+/// Only the delta-seconds form (RFC 9110 10.2.3) is read. A server older than
+/// the rate-limit hint sends it on a slow-mode 429 only, so a caller with no
+/// value here falls back to its own backoff.
 /// The alternative HTTP-date form is deliberately not parsed: nothing this
 /// server or a caller of it would ever send needs it.
 Duration? _retryAfter(http.Response response) {
