@@ -31,10 +31,7 @@ Future<bool> promptForTotpCode(
   final done = await showTotpCodeSheet(
     context,
     title: 'Enter your code',
-    description:
-        'This account asks for a code as well as a password. Open your '
-        'authenticator app, or use one of your recovery codes if you no longer '
-        'have that phone.',
+    description: 'Enter a code from your authenticator, or a recovery code.',
     submitLabel: 'Sign in',
     onSubmit: (code) async {
       try {

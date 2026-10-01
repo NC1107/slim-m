@@ -295,9 +295,7 @@ class _ActionsCard extends StatelessWidget {
           children: [
             SettingsToggleRow(
               label: 'Enabled',
-              description:
-                  'Off leaves it installed but inactive: its config and '
-                  'permission grants stay in place.',
+              description: 'Off keeps it installed but inactive.',
               value: installed.enabled,
               onChanged: busy ? null : onSetEnabled,
               semanticLabel: installed.enabled

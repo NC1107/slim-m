@@ -158,8 +158,7 @@ class _RoleDisplayTabState extends ConsumerState<RoleDisplayTab>
           SettingsSectionCard(
             title: 'Mentions',
             description:
-                'Whether any member may wake this role with @[Role Name] with no '
-                'permission of their own.',
+                'Anyone can mention this role, whatever their permissions.',
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               Row(
@@ -183,9 +182,7 @@ class _RoleDisplayTabState extends ConsumerState<RoleDisplayTab>
           const SizedBox(height: AppSpacing.s12),
           SettingsSectionCard(
             title: 'Member list',
-            description:
-                'Give this role its own heading in the member pane, above '
-                'Online.',
+            description: 'Gives this role its own heading above Online.',
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               Row(

@@ -69,11 +69,8 @@ class ActivityFeed {
 }
 
 final _listeningFeed = ActivityFeed(
-  label: 'Show what I am listening to',
-  description:
-      'Reads the track from any player on this computer and shows it on '
-      'your profile card and member row. It clears when you pause, stop or '
-      'quit.',
+  label: 'Show what I\'m listening to',
+  description: 'Shows the track from any player on this computer.',
   enabled: shareListeningProvider,
   available: nowPlayingSourceProvider.select((source) => source != null),
   open: (ref) => ref
@@ -85,11 +82,8 @@ final _listeningFeed = ActivityFeed(
 );
 
 final _gameFeed = ActivityFeed(
-  label: 'Show the game I am playing',
-  description:
-      'Checks what is running against the list of games below and nothing '
-      'else. A program that is not on the list is never reported, stored or '
-      'logged. It clears when the game quits.',
+  label: 'Show my current game',
+  description: 'Only games on the list below are ever shown.',
   enabled: shareGameProvider,
   available: gameSourceProvider.select((source) => source != null),
   open: (ref) => ref
@@ -99,12 +93,8 @@ final _gameFeed = ActivityFeed(
 );
 
 final _spotifyFeed = ActivityFeed(
-  label: 'Show what I am playing on Spotify',
-  description:
-      'Links your Spotify account so the track shows even when you play on '
-      'another device, like a phone. It asks Spotify only what is playing '
-      'and keeps the token on this device. Turning it off deletes the '
-      'token here; to remove slim-m on Spotify too, use spotify.com/account/apps.',
+  label: 'Show my Spotify track',
+  description: 'Shows your track even when you play on another device.',
   enabled: shareSpotifyProvider,
   available: spotifyClientIdProvider.select((id) => id.isNotEmpty),
   open: (ref) => ref

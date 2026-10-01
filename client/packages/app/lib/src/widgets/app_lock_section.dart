@@ -29,17 +29,11 @@ class AppLockSection extends ConsumerWidget {
     final enabled = ref.watch(appLockPreferenceProvider);
     return SettingsSectionCard(
       title: 'App lock',
-      description:
-          "Not a second login - the server never sees your face or your "
-          "fingerprint, so this only gates slim-m once you're already "
-          "signed in. After a real sign-out you still need your password.",
+      description: 'Locks slim-m on this device, separate from your password.',
       children: [
         SettingsToggleRow(
-          label: 'Require Face ID or a fingerprint to open slim-m',
-          description:
-              'Stops someone holding your unlocked device from opening '
-              'slim-m and reading your messages. Falls back to your device '
-              'passcode if biometrics fail or are not set up.',
+          label: 'Require Face ID or fingerprint',
+          description: 'Uses your device passcode if biometrics fail.',
           value: enabled,
           semanticLabel: 'Require Face ID or a fingerprint to open slim-m',
           onChanged: (next) =>

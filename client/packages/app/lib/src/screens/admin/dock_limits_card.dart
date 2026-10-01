@@ -38,8 +38,7 @@ class DockLimitsCard extends StatelessWidget {
               AppSpacing.s8,
             ),
             child: Text(
-              'It asks for no access to your space. It only answers its own '
-              'commands.',
+              'Needs no access to your space.',
               style: AppText.caption.copyWith(color: tokens.textSecondary),
             ),
           ),

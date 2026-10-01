@@ -42,9 +42,7 @@ class AppearanceSettingsSection extends ConsumerWidget {
             for (final option in AppThemeChoice.values)
               SettingsChoice(value: option, label: _themeLabel(option)),
           ],
-          sheetFootnote:
-              'System follows your device. Pick True black for a pure black '
-              'background.',
+          sheetFootnote: 'System follows your device.',
           onChanged: (next) =>
               ref.read(themeControllerProvider.notifier).select(next),
         ),
@@ -56,7 +54,7 @@ class AppearanceSettingsSection extends ConsumerWidget {
             for (final option in TimeFormatPreference.values)
               SettingsChoice(value: option, label: _timeFormatLabel(option)),
           ],
-          sheetFootnote: 'System follows what your device\'s own clock reads.',
+          sheetFootnote: 'System follows your device clock.',
           onChanged: (next) =>
               ref.read(timeFormatControllerProvider.notifier).select(next),
         ),
@@ -68,8 +66,7 @@ class AppearanceSettingsSection extends ConsumerWidget {
             for (final option in MotionOverride.values)
               SettingsChoice(value: option, label: _motionLabel(option)),
           ],
-          sheetFootnote:
-              'System follows your device\'s own reduce-motion setting.',
+          sheetFootnote: 'System follows your device motion setting.',
           onChanged: (next) => ref
               .read(motionPreferenceControllerProvider.notifier)
               .select(next),

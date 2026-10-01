@@ -32,8 +32,7 @@ class ActivitySharingSection extends ConsumerWidget {
         const SettingsSectionHeader(
           'Activity',
           description:
-              'Shown only to people who can already see your status, and '
-              'never while you appear offline.',
+              'Shown to people who see your status, never when appearing offline.',
         ),
         SettingsSectionCard(
           children: [

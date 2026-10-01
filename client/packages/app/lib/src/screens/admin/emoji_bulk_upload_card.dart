@@ -236,8 +236,7 @@ class _EmojiBulkUploadCardState extends ConsumerState<EmojiBulkUploadCard> {
         title: 'Bulk import from a zip',
         children: [
           Text(
-            'Each image inside becomes an emoji named after its file, '
-            'Discord-style: party_blob.gif becomes :party_blob:.',
+            'Each image becomes an emoji named after its file.',
             style: AppText.caption.copyWith(color: tokens.textSecondary),
           ),
           const SizedBox(height: AppSpacing.s12),

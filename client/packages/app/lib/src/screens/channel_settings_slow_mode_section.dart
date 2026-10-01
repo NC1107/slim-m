@@ -76,21 +76,14 @@ class _ChannelSlowModeSectionState extends ConsumerState<ChannelSlowModeSection>
 
   @override
   Widget build(BuildContext context) {
-    final tokens = Theme.of(context).extension<AppTokens>()!;
     final current = _optimisticSeconds ?? widget.channel.slowModeSeconds;
     final selectedIndex = slowModeOptions.indexWhere((o) => o.$2 == current);
 
     return SettingsSectionCard(
       title: 'Slow mode',
+      description: 'How long a member waits between their own messages.',
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Text(
-          'How long a member must wait between their own messages here. '
-          'Off by default. A member who can manage this channel is never '
-          'slow-moded.',
-          style: AppText.caption.copyWith(color: tokens.textSecondary),
-        ),
-        const SizedBox(height: AppSpacing.s12),
         AppSegmentedControl.inline(
           semanticLabel: 'Slow mode interval',
           options: [

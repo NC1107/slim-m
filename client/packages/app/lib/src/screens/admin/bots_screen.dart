@@ -109,9 +109,7 @@ class _BotsPaneState extends ConsumerState<BotsPane>
           children: [
             LabeledField(
               label: 'Username',
-              helper:
-                  'Letters, digits, _ . and - only. Up to 32 characters, the '
-                  'same as a person.',
+              helper: 'Letters, digits, _ . and - only, up to 32 characters.',
               child: AppInput(
                 controller: _username,
                 autocorrect: false,
@@ -126,8 +124,7 @@ class _BotsPaneState extends ConsumerState<BotsPane>
             ),
             const SizedBox(height: AppSpacing.s4),
             Text(
-              'Grant only what the bot documents needing. You can never '
-              'grant more than you hold yourself.',
+              'Grant only what the bot needs.',
               style: AppText.caption.copyWith(color: tokens.textSecondary),
             ),
             const SizedBox(height: AppSpacing.s4),

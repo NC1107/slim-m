@@ -43,10 +43,7 @@ class BlockedSection extends ConsumerWidget {
 
     return SettingsSectionCard(
       title: 'People you blocked',
-      description:
-          'They are not told. You stop seeing their messages, reactions '
-          'and typing, and stop being notified about them. They stay in '
-          'the member list. Unblocking restores everything.',
+      description: 'You stop seeing and hearing from them; they are not told.',
       children: [
         if (!blocks.settled)
           const Padding(
@@ -155,9 +152,7 @@ class _AccountSectionState extends ConsumerState<AccountSection> {
   Widget build(BuildContext context) {
     return SettingsSectionCard(
       title: 'Account',
-      description:
-          'Removes you from this Space and signs out every device. '
-          'Cannot be undone.',
+      description: 'Permanently removes you and signs out every device.',
       children: [
         // Matches channel_settings_danger_zone.dart's own "Delete channel":
         // an irreversible action reads as a button, not a navigation row.
@@ -233,8 +228,7 @@ class _AccountSectionState extends ConsumerState<AccountSection> {
       context,
       title: 'Confirm it is you',
       description: needsCode
-          ? 'Enter your password and a current code from your authenticator '
-                'app to delete this account.'
+          ? 'Enter your password and a current code to delete this account.'
           : 'Enter your password to delete this account.',
       submitLabel: 'Delete permanently',
       askForCode: needsCode,

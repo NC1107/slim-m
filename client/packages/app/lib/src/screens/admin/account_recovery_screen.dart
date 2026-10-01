@@ -64,10 +64,7 @@ class AccountRecoveryPane extends ConsumerWidget {
     if (!canIssue) {
       return const SettingsNotice(
         message: 'Issuing a reset code needs the administrator permission.',
-        detail:
-            'Somebody locked out of their account gets back in with a '
-            'one-time code an administrator issues them. There is no '
-            'recovery email.',
+        detail: 'Locked-out members get back in with a one-time code.',
       );
     }
 
@@ -78,10 +75,7 @@ class AccountRecoveryPane extends ConsumerWidget {
         SettingsSectionCard(
           title: 'Reset codes',
           description:
-              'There is no recovery email. Somebody locked out of their '
-              'account gets back in with a one-time code an administrator '
-              'issues them, spent through "Trouble signing in?" on the '
-              'sign-in screen.',
+              'Locked-out members get back in with an administrator\'s one-time code.',
           children: [
             AppListRow(
               label: ActionLabels.createResetCode,

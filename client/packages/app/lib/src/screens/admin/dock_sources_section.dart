@@ -54,8 +54,7 @@ class DockCommunitySection extends StatelessWidget {
     return SettingsSectionCard(
       title: 'Community source: $repo',
       description:
-          'Not the official registry. Each module still shows what it adds '
-          'and asks you to approve what it can do.',
+          'Not the official registry, so review what each module can do.',
       children: [
         if (section.failed)
           Padding(
@@ -165,9 +164,8 @@ class _AddSourceSheetState extends ConsumerState<_AddSourceSheet> {
           ),
           const SizedBox(height: AppSpacing.s4),
           Text(
-            'A GitHub repo in the form owner/repo that publishes an '
-            'index.json like the official one. Its modules are not reviewed '
-            'by the slim-m team.',
+            'A GitHub repo (owner/repo) with an index.json; its modules are '
+            'unreviewed.',
             style: AppText.caption.copyWith(color: tokens.textSecondary),
           ),
           const SizedBox(height: AppSpacing.s16),

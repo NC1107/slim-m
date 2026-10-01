@@ -90,7 +90,6 @@ class _CanvasCapSectionState extends ConsumerState<CanvasCapSection>
 
   @override
   Widget build(BuildContext context) {
-    final tokens = Theme.of(context).extension<AppTokens>()!;
     final cap = ref.watch(spaceCanvasCapProvider);
     ref.listen(spaceCanvasCapProvider, (previous, next) {
       if (next.hasValue && !next.isLoading && _optimisticCap != null) {
@@ -102,14 +101,8 @@ class _CanvasCapSectionState extends ConsumerState<CanvasCapSection>
 
     return SettingsSectionCard(
       title: 'Canvas object cap',
+      description: 'The most objects one channel canvas can hold.',
       children: [
-        Text(
-          'The most objects one channel\'s canvas may hold before a new one is '
-          'refused. Applies to every client: a lower cap keeps a busy canvas '
-          'lighter to load and draw.',
-          style: AppText.caption.copyWith(color: tokens.textSecondary),
-        ),
-        const SizedBox(height: AppSpacing.s12),
         AppSegmentedControl.inline(
           semanticLabel: 'Canvas object cap',
           options: [

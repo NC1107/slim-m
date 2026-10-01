@@ -45,10 +45,7 @@ class SpaceSettingsScreen extends ConsumerWidget {
         backFallback: Routes.channels,
         child: SettingsNotice(
           message: 'None of your roles grant access to anything here.',
-          detail:
-              'Space settings covers moderation, invites, roles and how this '
-              'Space is configured. An administrator can grant you one of '
-              'those.',
+          detail: 'An administrator can grant you access.',
         ),
       );
     }

@@ -78,9 +78,7 @@ class _MediaCapabilitySectionState
     return SettingsSectionCard(
       title: 'Device capabilities',
       description:
-          'Whether this build can actually open a microphone or '
-          'camera, or capture your screen here. Checking may prompt '
-          'for permission, so nothing runs until you ask.',
+          'Checks whether the microphone, camera and screen capture work.',
       children: [
         AppButton(
           label: _buttonLabel(),

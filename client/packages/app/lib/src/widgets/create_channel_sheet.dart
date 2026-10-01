@@ -235,8 +235,7 @@ class _CreateChannelSheetState extends ConsumerState<_CreateChannelSheet> {
             if (_kind == 'voice')
               SettingsToggleRow(
                 label: 'Join muted',
-                description:
-                    'Members start with their mic off. They can unmute.',
+                description: 'Members start with their mic off and can unmute.',
                 value: _joinMuted,
                 onChanged: (v) => setState(() => _joinMuted = v),
                 semanticLabel: 'Members join this channel muted',

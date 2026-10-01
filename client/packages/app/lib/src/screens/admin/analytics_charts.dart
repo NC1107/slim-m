@@ -135,8 +135,7 @@ class MemoryCard extends StatelessWidget {
         title: 'Server memory use',
         children: [
           Text(
-            'Not enough data yet. A reading is taken each time this screen '
-            'loads, at most once every five minutes, so check back shortly.',
+            'Not enough data yet; check back shortly.',
             style: AppText.caption.copyWith(color: tokens.textSecondary),
           ),
         ],

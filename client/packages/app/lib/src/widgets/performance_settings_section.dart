@@ -40,10 +40,7 @@ class PerformanceSettingsSection extends ConsumerWidget {
             for (final value in MediaAutoDownload.values)
               SettingsChoice(value: value, label: value.label),
           ],
-          sheetFootnote:
-              'Whether images fetch as they scroll into view or wait for a '
-              'tap. Only when tapped saves data on a metered connection; '
-              'nothing downloads until you ask.',
+          sheetFootnote: 'Whether images load as you scroll or wait for a tap.',
           onChanged: (next) => ref
               .read(mediaAutoDownloadControllerProvider.notifier)
               .select(next),
@@ -56,12 +53,7 @@ class PerformanceSettingsSection extends ConsumerWidget {
             for (final value in GifAutoplay.values)
               SettingsChoice(value: value, label: value.label),
           ],
-          sheetFootnote:
-              'Whether gifs animate on their own. On hover or tap holds each '
-              'on its first frame until you point at it or tap it, which saves '
-              'battery and CPU since an animating gif re-decodes every frame '
-              'the whole time. Either way, gifs pause while this window is in '
-              'the background.',
+          sheetFootnote: 'Whether gifs move on their own.',
           onChanged: (next) =>
               ref.read(gifAutoplayControllerProvider.notifier).select(next),
         ),
@@ -73,10 +65,7 @@ class PerformanceSettingsSection extends ConsumerWidget {
             for (final quality in AttachmentPreviewQuality.values)
               SettingsChoice(value: quality, label: quality.label),
           ],
-          sheetFootnote:
-              'How sharply images and gifs are drawn inline. A lower setting '
-              'decodes each preview smaller, so far more of them fit in the '
-              'image cache at once; opening one always shows it full resolution.',
+          sheetFootnote: 'How sharply attachments are drawn in messages.',
           onChanged: (next) => ref
               .read(attachmentPreviewQualityControllerProvider.notifier)
               .select(next),
@@ -94,10 +83,7 @@ class PerformanceSettingsSection extends ConsumerWidget {
                     : '$mb MB',
               ),
           ],
-          sheetFootnote:
-              'How much memory to spend keeping recently-seen images ready to '
-              'show instantly. A lower limit saves memory; images you scroll '
-              'back to redraw a moment slower, and are never re-downloaded.',
+          sheetFootnote: 'How much memory recent images may use.',
           onChanged: (next) =>
               ref.read(imageCacheLimitControllerProvider.notifier).select(next),
         ),
@@ -109,10 +95,7 @@ class PerformanceSettingsSection extends ConsumerWidget {
             for (final value in MessagePageSize.values)
               SettingsChoice(value: value, label: value.label),
           ],
-          sheetFootnote:
-              'How many older messages to load each time you scroll back. A '
-              'smaller page is a lighter, snappier request; a larger one reads '
-              'a long history in fewer steps.',
+          sheetFootnote: 'How many messages load when you scroll back.',
           onChanged: (next) =>
               ref.read(messagePageSizeControllerProvider.notifier).select(next),
         ),
@@ -135,10 +118,7 @@ class PerformanceSettingsSection extends ConsumerWidget {
           for (final value in SplashDuration.values)
             SettingsChoice(value: value, label: value.label),
         ],
-        sheetFootnote:
-            'A brief splash while slim-m starts, instead of the window opening '
-            'straight into its real size. The value is a minimum: a slower '
-            'start is never held back further.',
+        sheetFootnote: 'The shortest time the splash stays up at startup.',
         onChanged: (next) =>
             ref.read(splashDurationControllerProvider.notifier).select(next),
       ),

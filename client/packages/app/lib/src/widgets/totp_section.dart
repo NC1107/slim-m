@@ -86,17 +86,12 @@ class _TotpBody extends ConsumerWidget {
 
   String get _description {
     if (status.enabled) {
-      return 'Signing in on a new device asks for a code from your '
-          'authenticator app as well as your password.';
+      return 'New devices ask for a code as well as your password.';
     }
     if (status.policy == api.TotpPolicy.requiredForElevated) {
-      return 'A code from an authenticator app, as well as your password. '
-          'This server expects it of anyone who can moderate or administer '
-          'it, so a leaked password alone is not enough to take over.';
+      return 'Required here for anyone who moderates or administers.';
     }
-    return 'A code from an authenticator app, as well as your password, when '
-        'you sign in on a new device. Nothing changes until you have proved '
-        'a code works, so you cannot lock yourself out setting it up.';
+    return 'Asks for an authenticator code on new-device sign-in.';
   }
 }
 
@@ -145,8 +140,7 @@ class _RecoveryCodesRow extends ConsumerWidget {
       context,
       title: 'New recovery codes',
       description:
-          'Enter a code from your authenticator, or one of your current '
-          'recovery codes. The codes you have now will stop working.',
+          'Enter a code; your current recovery codes will stop working.',
       submitLabel: 'Replace codes',
       onSubmit: (code) async {
         try {
@@ -185,8 +179,7 @@ class _DisableRow extends ConsumerWidget {
         context,
         title: 'Turn off two-factor authentication',
         description:
-            'Enter a code from your authenticator, or one of your recovery '
-            'codes if you no longer have that phone.',
+            'Enter a code from your authenticator, or a recovery code.',
         submitLabel: 'Turn off',
         dangerous: true,
         onSubmit: (code) async {

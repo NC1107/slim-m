@@ -147,7 +147,6 @@ class _RetentionSectionState extends ConsumerState<_RetentionSection>
 
   @override
   Widget build(BuildContext context) {
-    final tokens = Theme.of(context).extension<AppTokens>()!;
     final retention = ref.watch(spaceRetentionProvider);
     ref.listen(spaceRetentionProvider, (previous, next) {
       if (next.hasValue && !next.isLoading && _optimisticDays != null) {
@@ -162,13 +161,8 @@ class _RetentionSectionState extends ConsumerState<_RetentionSection>
 
     return SettingsSectionCard(
       title: 'Message retention',
+      description: 'How long messages are kept before they are deleted.',
       children: [
-        Text(
-          'How long a message is kept before it is pruned. Off by default: '
-          'nothing is ever deleted unless a window is set here.',
-          style: AppText.caption.copyWith(color: tokens.textSecondary),
-        ),
-        const SizedBox(height: AppSpacing.s12),
         AppSegmentedControl.inline(
           semanticLabel: 'Message retention window',
           options: [
