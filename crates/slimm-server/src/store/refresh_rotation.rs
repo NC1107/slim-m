@@ -120,7 +120,7 @@ impl Store {
             return Ok(RefreshOutcome::Denied);
         }
 
-        super::sessions::touch_device(&mut tx, session.device_id, now).await?;
+        super::safety::touch_device(&mut tx, session.device_id, now).await?;
 
         let access_token = generate_secret();
         let refresh_token = generate_secret();

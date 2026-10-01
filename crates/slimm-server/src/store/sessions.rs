@@ -530,10 +530,9 @@ impl Store {
         let Some(claimed) = claimed else {
             return Ok(None);
         };
-        touch_device(&mut tx, claimed.device_id, now).await?;
+        super::safety::touch_device(&mut tx, claimed.device_id, now).await?;
 
-        // A live ticket for a revoked session should not exist (revocation
-        // deletes the session's tickets), but reject it if one somehow does.
+        // Revocation deletes a session's tickets, so a live one here is rejected anyway.
         let session = sqlx::query!(
             r#"SELECT revoked_at FROM sessions WHERE id = ?"#,
             claimed.session_id
@@ -611,23 +610,6 @@ pub(super) async fn revoke_session_rows(
         session_id
     )
     .execute(&mut *conn)
-    .await?;
-    Ok(())
-}
-
-/// Records that a device was just used. Called on sign-in, refresh and socket
-/// connect only, never per request, so listing devices costs no write load.
-pub(super) async fn touch_device(
-    tx: &mut sqlx::Transaction<'_, sqlx::Sqlite>,
-    device_id: DeviceId,
-    now: i64,
-) -> anyhow::Result<()> {
-    sqlx::query!(
-        "UPDATE devices SET last_seen_at = ? WHERE id = ?",
-        now,
-        device_id
-    )
-    .execute(&mut **tx)
     .await?;
     Ok(())
 }
