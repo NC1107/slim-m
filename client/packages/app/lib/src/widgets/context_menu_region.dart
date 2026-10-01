@@ -158,24 +158,28 @@ class ContextMenuRegionState extends State<ContextMenuRegion> {
   /// so the anchor is only taken on the first of the two: recomputing it on
   /// the second call, which carries no position, would throw the real one away.
   void _setOpen(bool open, {bool pinRow = true, Offset? pointerGlobal}) {
-    widget.onVisibilityChanged?.call(open);
-    if (pinRow || !open) widget.onOpenChanged?.call(open);
     if (LayoutClass.of(context) == LayoutClass.compact) {
-      _setSheetOpen(open);
+      _setSheetOpen(open, pinRow: pinRow);
       return;
     }
+    widget.onVisibilityChanged?.call(open);
+    if (pinRow || !open) widget.onOpenChanged?.call(open);
     if (open && !_controller.isShowing) _anchor = _anchorOffset(pointerGlobal);
     _watchScroll(open);
     open ? _controller.show() : _controller.hide();
   }
 
-  void _setSheetOpen(bool open) {
+  /// The sheet closes by scrim tap, drag, back gesture or an item, none of
+  /// which pass through here, so "closed" is told when its future completes.
+  void _setSheetOpen(bool open, {required bool pinRow}) {
     if (!open) {
       if (_sheetOpen) Navigator.of(context).maybePop();
       return;
     }
     if (_sheetOpen) return;
     _sheetOpen = true;
+    widget.onVisibilityChanged?.call(true);
+    if (pinRow) widget.onOpenChanged?.call(true);
     showAppSheet<void>(
       context,
       bare: true,
@@ -188,7 +192,14 @@ class ContextMenuRegionState extends State<ContextMenuRegion> {
           ),
         ),
       ),
-    ).whenComplete(() => _sheetOpen = false);
+    ).whenComplete(_onSheetClosed);
+  }
+
+  void _onSheetClosed() {
+    _sheetOpen = false;
+    if (!mounted) return;
+    widget.onVisibilityChanged?.call(false);
+    widget.onOpenChanged?.call(false);
   }
 
   void _closeOnScroll() {

@@ -1,0 +1,76 @@
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
+/// The phone shell's scaffold: the channel rail as a start drawer, the roster
+/// as an end drawer, both dragged by finger from their own edge.
+library;
+
+import 'package:flutter/gestures.dart' show DragStartBehavior;
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
+
+import '../providers/member_selection.dart';
+import '../routing/routes.dart';
+import 'channel_rail_drawer.dart';
+import 'compact_channel_app_bar.dart';
+import 'drawer_edge_drag.dart';
+import 'member_pane.dart';
+
+class CompactDrawerScaffold extends ConsumerWidget {
+  const CompactDrawerScaffold({
+    required this.channelId,
+    required this.body,
+    required this.showAppBar,
+    required this.showRail,
+    required this.showMembers,
+    super.key,
+  });
+
+  final String channelId;
+  final Widget body;
+  final bool showAppBar;
+
+  /// False where the pane above also claims the left edge itself (the canvas).
+  final bool showRail;
+
+  final bool showMembers;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final edgeWidth = drawerEdgeDragWidth(context);
+    return DrawerEdgeDrag(
+      builder: (context, restore) => Scaffold(
+        appBar: showAppBar
+            ? PreferredSize(
+                preferredSize: const Size.fromHeight(
+                  CompactChannelAppBar.height,
+                ),
+                child: restore(
+                  CompactChannelAppBar(
+                    channelId: channelId,
+                    onBack: () => context.go(Routes.channels),
+                  ),
+                ),
+              )
+            : null,
+        drawer: showRail
+            ? restore(CompactChannelRailDrawer(selectedChannelId: channelId))
+            : null,
+        drawerEdgeDragWidth: edgeWidth,
+        // Down, not start (both drawers): the drawer then follows from the first pixel instead of from where the touch slop was crossed.
+        drawerDragStartBehavior: DragStartBehavior.down,
+        onEndDrawerChanged: (open) => endSelectionOnDrawerClose(ref, open),
+        // The roster slides in from the right: the conversation is the only pane at this width.
+        endDrawer: showMembers
+            ? restore(
+                Drawer(
+                  width: AppMemberPane.width,
+                  child: SafeArea(child: AppMemberPane(channelId: channelId)),
+                ),
+              )
+            : null,
+        // No rail here, so the connection bar mounts under the app bar; one SafeArea wraps the whole column, so no child insets itself and opens a gap or a dead band.
+        body: restore(SafeArea(child: body)),
+      ),
+    );
+  }
+}

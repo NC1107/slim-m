@@ -13,6 +13,7 @@ library;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:slimm_app/src/desktop/desktop_chrome.dart';
 import 'package:slimm_app/src/desktop/desktop_window_shell.dart';
 import 'package:slimm_app/src/widgets/channel_rail.dart';
 import 'package:slimm_app/src/widgets/compact_channel_app_bar.dart';
@@ -37,6 +38,7 @@ Future<({ProviderContainer container, SlimmDatabase db})> _pumpAtWidth(
       container: fixture.container,
       child: MaterialApp.router(
         debugShowCheckedModeBanner: false,
+        builder: (context, child) => DesktopChrome(child: child!),
         theme: buildTheme(
           Brightness.dark,
           AppTokens.dark,
@@ -101,7 +103,7 @@ void main() {
       final fixture = await _pumpAtWidth(tester, 500, TargetPlatform.linux);
       expect(find.byType(ChannelRail), findsNothing);
 
-      // Inside the resize handle's band: a resize grab, not a drawer open.
+      // Inside the real resize handle's band: a resize grab, not a drawer open.
       await tester.dragFrom(const Offset(2, 300), const Offset(300, 0));
       await tester.pumpAndSettle();
       expect(find.byType(ChannelRail), findsNothing);

@@ -41,11 +41,9 @@ import '../widgets/app_panel_reveal.dart';
 import '../widgets/channel_grouping.dart';
 import '../widgets/call_mini_player.dart';
 import '../widgets/channel_rail.dart';
-import '../widgets/channel_rail_drawer.dart';
 import '../widgets/channel_rail_frame.dart';
 import '../widgets/command_palette.dart';
-import '../widgets/compact_channel_app_bar.dart';
-import '../widgets/drawer_edge_swipe.dart';
+import '../widgets/compact_drawer_scaffold.dart';
 import '../widgets/member_pane.dart';
 import '../widgets/new_device_banner_host.dart';
 import '../widgets/push_to_talk_listener.dart';
@@ -222,35 +220,12 @@ class HomeShell extends ConsumerWidget {
             if (showVoiceStrip && !keyboardUp) const VoiceStripIndicator(),
           ],
         );
-        return Scaffold(
-          appBar: replacesHeader || notFound
-              ? null
-              : CompactChannelAppBar(
-                  channelId: channelId,
-                  onBack: () => context.go(Routes.channels),
-                ),
-          // Only the start drawer's own drag; DrawerEdgeSwipe replaces it.
-          drawerEnableOpenDragGesture: false,
-          // Withheld only where the pane above also claims the edge itself.
-          drawer: hidesRailAccess
-              ? null
-              : CompactChannelRailDrawer(selectedChannelId: channelId),
-          onEndDrawerChanged: (open) => endSelectionOnDrawerClose(ref, open),
-          // The roster slides in from the right instead of docking beside the
-          // conversation, which is the only pane there is at this width.
-          endDrawer: isDm || notFound
-              ? null
-              : Drawer(
-                  width: AppMemberPane.width,
-                  child: SafeArea(child: AppMemberPane(channelId: channelId)),
-                ),
-          // No rail here, so the connection bar mounts under the app bar; one SafeArea wraps the whole column, so no child insets itself and opens a gap or a dead band.
-          body: SafeArea(
-            // Withheld the same way as the drawer above: nothing to swipe open.
-            child: hidesRailAccess
-                ? compactBody
-                : DrawerEdgeSwipe(child: compactBody),
-          ),
+        return CompactDrawerScaffold(
+          channelId: channelId,
+          showAppBar: !(replacesHeader || notFound),
+          showRail: !hidesRailAccess,
+          showMembers: !(isDm || notFound),
+          body: compactBody,
         );
       }
 
