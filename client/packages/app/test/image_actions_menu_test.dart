@@ -8,7 +8,6 @@ library;
 
 import 'dart:convert';
 import 'dart:typed_data';
-import 'dart:ui' show Rect;
 
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
