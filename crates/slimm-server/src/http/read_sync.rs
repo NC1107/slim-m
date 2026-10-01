@@ -9,20 +9,22 @@ use crate::ids::{ChannelId, UserId};
 /// Advances `user_id`'s marker in `channel_id` and fans the result out to that
 /// account's own sessions, so a badge clears on every device and not only the
 /// one that read. The frame carries the stored marker, which is monotonic and
-/// clamped, not the requested `seq`.
+/// clamped, not the requested `seq`. A mark that moves nothing publishes
+/// nothing: the frame wakes every socket on the shared channel.
 pub(super) async fn advance_and_announce(
     state: &AppState,
     user_id: UserId,
     channel_id: ChannelId,
     seq: i64,
 ) -> Result<(), ApiError> {
-    state.store.mark_read(user_id, channel_id, seq).await?;
-    let last_read_seq = state.store.last_read_seq(user_id, channel_id).await?;
-    state.hub.publish(Event::ReadStateChanged {
-        user_id,
-        channel_id,
-        last_read_seq,
-    });
+    let moved = state.store.mark_read(user_id, channel_id, seq).await?;
+    if let Some(last_read_seq) = moved {
+        state.hub.publish(Event::ReadStateChanged {
+            user_id,
+            channel_id,
+            last_read_seq,
+        });
+    }
     Ok(())
 }
 
