@@ -267,6 +267,48 @@ const List<WhatsNewEntry> whatsNewEntries = [
       ),
     ],
   ),
+  WhatsNewEntry(
+    version: '0.90.0',
+    headline:
+        'See who reacted, a channel list that follows your finger, and '
+        'statuses that tell the truth',
+    points: [
+      WhatsNewPoint(
+        'Hold a reaction to see who left it. On desktop, hovering shows the '
+        'first few names and a right-click opens the full list. Anyone you '
+        'have blocked is left out, the same way they are left out of the '
+        'count.',
+      ),
+      WhatsNewPoint(
+        'On a phone the channel list now follows your finger when you drag '
+        'in from the left edge, and settles open or shut when you let go. '
+        'The member list does the same from the right. A message also stops '
+        'looking pressed once you close its menu.',
+      ),
+      WhatsNewPoint(
+        'Your own status no longer reads "unknown". Pictures and status dots '
+        'are drawn one way everywhere, initials are no longer cut off by the '
+        'dot, and if you chose to appear offline the app still knows that '
+        'when you open it again.',
+      ),
+      WhatsNewPoint(
+        'iPhones that updated from an older build could show "The channel '
+        'list saved on this device could not be opened." and stay that way. '
+        'That is fixed, and nothing saved on the phone was lost.',
+        warn: true,
+      ),
+      WhatsNewPoint(
+        'A link to a message keeps you in its channel, a link to a channel '
+        'you cannot see says so, a half-typed message survives reloading '
+        'the page, the full-screen image viewer answers Escape and the arrow '
+        'keys, and at tablet width the member list has its button back.',
+      ),
+      WhatsNewPoint(
+        'Signing in to a Space with many channels is quicker, and no longer '
+        'stalls on "Could not load earlier messages".',
+      ),
+    ],
+  ),
 ];
 
 /// Parses a dot-separated version like `0.17.2` into its numeric segments,
