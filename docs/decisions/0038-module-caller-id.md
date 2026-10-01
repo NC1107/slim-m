@@ -19,10 +19,11 @@ No record said so, and "a module knows nothing about who is asking" was an assum
 
 The request a module receives gains one additive field: `caller: { "id": "<hex>" }`.
 
-- The id is `sha256("slim-module-caller-v1" NUL module_id NUL user_id)` in lowercase hex.
+- The id is `HMAC-SHA256(key, "slim-module-caller-v2" NUL module_id NUL user_id)` in lowercase hex, where `key` is derived from the deployment's identity secret and never leaves the server.
   It is stable per person per module, so a module can dedupe against itself.
   It differs between modules, so two modules cannot be joined up to follow one person.
-  It is not the user id, and the user id is not recoverable from it in practice.
+  It is not the user id, and the user id is not recoverable from it.
+  It was first shipped unkeyed; see "Amended 2026-09-30" below for why that did not deliver the two lines above.
 - Nothing else is added: no display name, no channel, no space, no roles, no permissions.
   A module only runs when the caller holds its permission, so that answer is always yes and carries no information.
 - No manifest capability gates it.
@@ -44,7 +45,19 @@ The request a module receives gains one additive field: `caller: { "id": "<hex>"
 
 ## Consequences
 
-- The id is unkeyed, so someone who already knows a user id and a module id can compute it.
-  That reveals nothing they did not already have, and a per-deployment key would change every id on a secret rotation.
+- The id is keyed by a secret derived from the server identity, so it changes if that identity is ever regenerated.
+  Nothing regenerates it today, and a client that pinned the old fingerprint would refuse the deployment long before a module noticed.
 - Deleting and recreating an account gives a new user id and so a new caller id.
 - Existing modules are unaffected.
+
+## Amended 2026-09-30
+
+The id shipped as a bare `sha256` of the module id and the user id, on the reasoning that somebody who already knew both learned nothing by computing it.
+That reasoning looked at the wrong direction.
+A module id is public in the registry and every member can list every user id, so a module author hashes the member list once and has the person behind each id it was handed, and the same table links one person across every module.
+An audit did exactly that against a running deployment and recovered a member's user id from the id a module echoed.
+
+So the id is keyed now, with a key derived from the identity secret for this one purpose, which is what "opaque" needed all along.
+The cost named above was that a key makes ids change on rotation; the identity secret does not rotate, so that cost is theoretical.
+The real cost is one-off: every caller id changed once when this deployed, so a module that had stored state against the old ids no longer recognises those people.
+No module in the registry declared `kv.store` at the time, and a poll left open across the deploy could be voted on a second time.

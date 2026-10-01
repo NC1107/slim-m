@@ -125,7 +125,7 @@ A module is told who is asking by `caller.id` and nothing else.
 There is no display name, no user id, no channel, no space, no roles and no permissions in the request.
 The id is a lowercase hex string derived from the module and the user.
 It is the same for one person across runs of the same module, differs between people, and differs between modules for the same person.
-It is not a user id and cannot be turned back into one.
+It is not a user id and cannot be turned back into one: it is keyed with a secret only the deployment holds, so it also differs between deployments.
 
 Use it to dedupe against yourself, for example "one vote per person" in a poll.
 Do not treat it as authentication or as a way to act as the person.

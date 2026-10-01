@@ -169,6 +169,22 @@ pub async fn load_or_create(pool: &SqlitePool) -> anyhow::Result<ServerIdentity>
     }
 }
 
+/// A 32-byte key derived from the identity secret for one named purpose.
+///
+/// Derived rather than the seed itself, so the signing key is never also a
+/// MAC key and two purposes never share one. It never leaves the server.
+pub async fn derived_key(pool: &SqlitePool, purpose: &[u8]) -> anyhow::Result<[u8; 32]> {
+    use hmac::{Hmac, Mac};
+
+    load_or_create(pool).await?;
+    let seed: Vec<u8> = sqlx::query_scalar("SELECT secret_key FROM server_identity WHERE id = 1")
+        .fetch_one(pool)
+        .await?;
+    let mut mac = <Hmac<Sha256>>::new_from_slice(&seed).context("keying the derivation")?;
+    mac.update(purpose);
+    Ok(mac.finalize().into_bytes().into())
+}
+
 async fn read(pool: &SqlitePool) -> anyhow::Result<Option<ServerIdentity>> {
     let row =
         sqlx::query!(r#"SELECT public_key AS "public_key!" FROM server_identity WHERE id = 1"#)

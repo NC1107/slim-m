@@ -81,6 +81,7 @@ mod messages;
 mod messages_bulk;
 mod messages_bulk_window;
 mod metrics;
+mod module_caller;
 mod module_commands;
 mod module_host;
 mod module_permissions;

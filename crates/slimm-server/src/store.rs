@@ -470,6 +470,12 @@ impl Store {
         crate::identity::load_or_create(&self.pool).await
     }
 
+    /// The secret a module's caller id is keyed with, so the id cannot be
+    /// recomputed from a module id and a user id, both of which are public.
+    pub async fn module_caller_key(&self) -> anyhow::Result<[u8; 32]> {
+        crate::identity::derived_key(&self.pool, b"slim-module-caller-key-v2").await
+    }
+
     /// This deployment's display name, shown to a prospective joiner (invite
     /// metadata) before they have an account.
     ///
