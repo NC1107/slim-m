@@ -399,10 +399,10 @@ impl Store {
 
         let mut tx = self.begin_write().await?;
         let created = sqlx::query!(
-            "INSERT INTO devices (id, user_id, name, created_at, client_kind, client_version)
-             SELECT ?, ?, ?, ?, ?, ? WHERE EXISTS (SELECT 1 FROM users WHERE id = ? AND deleted_at IS NULL)
+            "INSERT INTO devices (id, user_id, name, created_at, last_seen_at, client_kind, client_version)
+             SELECT ?, ?, ?, ?, ?, ?, ? WHERE EXISTS (SELECT 1 FROM users WHERE id = ? AND deleted_at IS NULL)
                AND NOT EXISTS (SELECT 1 FROM space_removals WHERE user_id = ?)",
-            device_id, user_id, device_name, now, client_kind, client_version, user_id, user_id
+            device_id, user_id, device_name, now, now, client_kind, client_version, user_id, user_id
         )
         .execute(&mut *tx)
         .await?
@@ -547,6 +547,7 @@ impl Store {
         let Some(claimed) = claimed else {
             return Ok(None);
         };
+        touch_device(&mut tx, claimed.device_id, now).await?;
 
         // A live ticket for a revoked session should not exist (revocation
         // deletes the session's tickets), but reject it if one somehow does.
@@ -627,6 +628,23 @@ pub(super) async fn revoke_session_rows(
         session_id
     )
     .execute(&mut *conn)
+    .await?;
+    Ok(())
+}
+
+/// Records that a device was just used. Called on sign-in, refresh and socket
+/// connect only, never per request, so listing devices costs no write load.
+pub(super) async fn touch_device(
+    tx: &mut sqlx::Transaction<'_, sqlx::Sqlite>,
+    device_id: DeviceId,
+    now: i64,
+) -> anyhow::Result<()> {
+    sqlx::query!(
+        "UPDATE devices SET last_seen_at = ? WHERE id = ?",
+        now,
+        device_id
+    )
+    .execute(&mut **tx)
     .await?;
     Ok(())
 }
