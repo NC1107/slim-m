@@ -152,9 +152,8 @@ class _CompactChannelRailDrawerState extends State<CompactChannelRailDrawer> {
   /// How far past open a drag has to carry before it commits to the
   /// full-screen list.
   ///
-  /// The same 80 [DrawerEdgeSwipe] uses to decide an edge drag meant the
-  /// drawer at all, so opening and going the rest of the way ask for the same
-  /// travel rather than two numbers a hand would have to learn separately.
+  /// Deliberate travel on top of an already open drawer, so a drag that is only
+  /// settling the drawer never reads as "go to the full-screen list".
   static const double _commitDistance = 80;
 
   void _onPointerMove(PointerMoveEvent event) {
