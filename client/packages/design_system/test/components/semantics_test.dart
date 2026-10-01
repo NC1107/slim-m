@@ -117,7 +117,7 @@ void main() {
       (tester) async {
     // The dot has no text, so the label is the only thing carrying its state to
     // a screen reader; "green circle" describes pixels and says nothing.
-    for (final status in AppPresence.values) {
+    for (final status in AppStatusDot.shapeOf.keys) {
       await tester.pumpWidget(_host(AppStatusDot(status: status)));
       final semantics = tester.getSemantics(find.byType(AppStatusDot));
       expect(

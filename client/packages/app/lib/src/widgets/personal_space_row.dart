@@ -122,7 +122,7 @@ class _PersonalSpaceRowState extends ConsumerState<PersonalSpaceRow>
             selected: widget.selected,
             unread: indicator.unread,
             mentioned: indicator.mentioned,
-            // Matches AppAvatar(size: 20)'s 20x20 footprint; a bare 16px icon left the label 4dp misaligned.
+            // Matches a 20px avatar's footprint; a bare 16px icon left the label 4dp misaligned.
             leading: SizedBox(
               width: 20,
               height: 20,

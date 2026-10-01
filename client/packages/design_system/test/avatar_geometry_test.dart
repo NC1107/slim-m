@@ -25,11 +25,11 @@ const _sizes = [
 ];
 
 List<Offset> _corners(Rect r) => [
-  r.topLeft,
-  r.topRight,
-  r.bottomLeft,
-  r.bottomRight,
-];
+      r.topLeft,
+      r.topRight,
+      r.bottomLeft,
+      r.bottomRight,
+    ];
 
 Future<Rect> _pumpAvatar(
   WidgetTester tester,
@@ -108,7 +108,8 @@ void main() {
     });
   }
 
-  testWidgets('an unknown presence draws no dot and leaves the initials whole', (
+  testWidgets('an unknown presence draws no dot and leaves the initials whole',
+      (
     tester,
   ) async {
     final avatar = await _pumpAvatar(

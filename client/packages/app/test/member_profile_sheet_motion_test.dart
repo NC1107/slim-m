@@ -21,11 +21,23 @@ import 'package:slimm_api/api.dart' as api;
 import 'package:slimm_app/src/providers/admin_providers.dart';
 import 'package:slimm_app/src/providers/member_presence.dart';
 import 'package:slimm_app/src/providers/providers.dart';
+import 'package:slimm_app/src/providers/sync_controller.dart';
 import 'package:slimm_app/src/widgets/member_profile.dart';
 import 'package:slimm_data/data.dart';
 import 'package:slimm_platform/platform.dart';
 
 import 'support/reduced_motion_harness.dart';
+
+/// Keeps the real controller's websocket and its retry timer out of a test
+/// that only needs presence providers to resolve.
+class _NoSocketSync extends SyncController {
+  _NoSocketSync(super.ref) {
+    state = SyncStatus.live;
+  }
+
+  @override
+  Future<void> start() async {}
+}
 
 const _tokens = api.TokenPair(
   userId: 'me',
@@ -75,6 +87,7 @@ Future<void> _openCompact(
     overrides: [
       keyStoreProvider.overrideWithValue(InMemoryKeyStore()),
       sessionProvider.overrideWithValue(api.SessionStore(tokens: _tokens)),
+      syncControllerProvider.overrideWith(_NoSocketSync.new),
       databaseProvider.overrideWith((ref) async => db),
       myPermissionsProvider.overrideWithValue(0),
       membersProvider.overrideWith((ref) async => [_other]),

@@ -101,10 +101,7 @@ Future<void> _pumpFooter(
 }
 
 /// Every second line the footer can render: the presence vocabulary.
-final _footerWords = [
-  for (final state in AppPresence.values) ?state.word,
-  'appear offline',
-];
+final _footerWords = [for (final state in AppPresence.values) ?state.word];
 
 void main() {
   test('nothing the footer can say is something the connection indicator '

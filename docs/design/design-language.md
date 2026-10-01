@@ -56,6 +56,10 @@ The reasoning, including that the review's own stated argument for the move turn
 The Design Brief Prompt further down still quotes the teal, deliberately: it is a verbatim record of what was asked for, not a statement of what is.
 
 Status dots keep the conventional traffic-light palette (green online, amber away, red do-not-disturb, gray offline), since that convention is load-bearing for recognition; each also carries a distinct shape so state never depends on color alone.
+A person is drawn one way everywhere: `UserAvatar` for the picture and its dot, at one of the `AppAvatarSize` steps, with the state from `presenceForProvider`.
+A person nothing has been reported about yet draws no dot at all, because a grey ring would claim offline.
+The signed-in user is never unknown to themself: an unreported self reads online.
+Dots start at the 24px step; a smaller avatar carries none, so two initials never sit under one.
 Canvas participant cursors get their own categorical set, spaced away from the accent and status hues.
 Rejected: deriving dark mode by inverting light-mode lightness, which produces harsh surfaces; every dark value above is hand-tuned instead.
 Risk: a two-tone system limits how much "brand" marketing pages can carry, mitigated by letting the website use the accent more freely, since the token system governs the product, not every asset.

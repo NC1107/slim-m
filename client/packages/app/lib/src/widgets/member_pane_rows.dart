@@ -19,6 +19,7 @@ import '../providers/member_presence.dart';
 import '../providers/member_selection.dart';
 import '../providers/presence_activity.dart';
 import '../providers/presence_view.dart';
+import '../providers/status_text.dart';
 import 'member_profile.dart';
 import 'user_avatar.dart';
 
@@ -110,6 +111,9 @@ class MemberRow extends ConsumerWidget {
         ) ??
         profile;
     final activity = ref.watch(memberActivityProvider(profile.id));
+    final statusText = ref.watch(
+      statusTextProvider((userId: profile.id, snapshot: profile.statusText)),
+    );
     // One slot only in a 236px pane; bot beats a role, whose names are a tap away.
     final badge = displayed.isBot
         ? 'Bot'
@@ -139,13 +143,11 @@ class MemberRow extends ConsumerWidget {
         : null;
 
     final row = AppListRow(
-      // Taller than a channel row: a 26px avatar's corner status dot crops at the default height.
+      // Taller than a channel row: a 28px avatar's corner status dot crops at the default height.
       height: 36,
       label: displayed.displayName,
-      // What they are playing wins over a typed status; the card shows both.
-      subtitle: activity == null
-          ? displayed.statusText
-          : describeActivity(activity),
+      // What they are playing wins over a typed status; the card shows the activity.
+      subtitle: personLine(activity, statusText),
       subtitleIcon: activity == null ? null : activityIcon(activity.kind),
       muted: status == AppPresence.offline,
       // On screen presence is only a dot and an opacity; this is how it is spoken.

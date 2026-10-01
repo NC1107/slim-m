@@ -13,6 +13,7 @@ import 'package:slimm_rtc/rtc.dart';
 import '../desktop/update_watch.dart';
 import '../providers/presence_view.dart';
 import '../providers/providers.dart';
+import '../providers/status_text.dart';
 import '../providers/sync_controller.dart';
 import '../providers/sync_failure.dart';
 import '../providers/voice_controller.dart';
@@ -377,10 +378,12 @@ class RailUserFooter extends ConsumerWidget {
         ? null
         : ref.watch(presenceForProvider(selfId)).word;
     // A typed status joins the presence word rather than replacing it, so both facts the member pane shows about you show here too (design review note 7).
-    final statusText = me.valueOrNull?.statusText;
+    final statusText = selfId == null
+        ? null
+        : ref.watch(statusTextProvider((userId: selfId, snapshot: null)));
     final secondLine = [
       ?statusLabel,
-      if (statusText != null && statusText.isNotEmpty) statusText,
+      ?statusText,
     ].join(' · ');
 
     // Mirrors [RailHeader]: the raised bar and its top border bleed to the
