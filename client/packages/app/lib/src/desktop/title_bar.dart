@@ -38,6 +38,7 @@ import '../providers/providers.dart' show appInfoProvider;
 import '../widgets/channel_rail_frame.dart' show serverInfoProvider;
 import 'close_behavior.dart';
 import 'desktop_window_port.dart';
+import 'update_chip.dart';
 import 'window_menu_button.dart';
 
 /// The proposed height, a step on the 4dp grid and a real reduction from a
@@ -77,8 +78,12 @@ class TitleBar extends ConsumerWidget {
     final appVersion = ref.watch(appInfoProvider).valueOrNull?.version;
     final name = server.valueOrNull?.name ?? 'slim-m';
 
+    // Touch density (rule 2, width not platform) grows the bar to the 44 floor.
+    final height = AppTouchTargets.of(context)
+        ? AppSizes.rowTouch
+        : titleBarHeight;
     return SizedBox(
-      height: titleBarHeight,
+      height: height,
       child: DecoratedBox(
         decoration: BoxDecoration(
           color: tokens.surfaceBase,
@@ -204,6 +209,7 @@ class _WindowControlsState extends State<_WindowControls> {
   Widget build(BuildContext context) => Row(
     mainAxisSize: MainAxisSize.min,
     children: [
+      UpdateChip(port: widget.port),
       WindowMenuButton(port: widget.port),
       const SizedBox(width: AppSpacing.s4),
       AppIconButton(

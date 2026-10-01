@@ -18,12 +18,7 @@
 /// vanishes out from under a keyboard user mid-navigation is its own bug.
 ///
 /// Update appears only while `update_watch.dart` knows a newer version, so
-/// it never sits there doing nothing. On an rpm install with auto-update on,
-/// it restarts: the splash's own update pass installs through dnf and
-/// relaunches into the new build. A per-user tarball installs the update
-/// itself (`self_update/`) and restarts. Anywhere else it opens the release page,
-/// the same action the in-session banner offers, because this app does not
-/// fake a self-update the platform cannot do (decision 0020).
+/// it never sits there doing nothing; `update_action.dart` says what it does.
 library;
 
 import 'dart:async';
@@ -31,45 +26,15 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:slimm_design_system/design_system.dart';
-import 'package:slimm_platform/platform.dart';
-import 'package:url_launcher/url_launcher.dart';
 
-import '../providers/auto_update_preference.dart';
-import '../providers/providers.dart';
-import '../providers/voice_controller.dart';
 import '../widgets/context_menu_focus.dart';
 import 'desktop_window_port.dart';
 import 'self_update/self_update_controller.dart';
+import 'update_action.dart';
 import 'update_check.dart';
 import 'update_watch.dart';
 
-/// What the Update item does for [update] on this install.
-enum UpdateMenuAction { installAndRestart, restartToUpdate, openRelease }
-
-/// Restart only where the splash will actually install on the way back up:
-/// an rpm, with the auto-update preference answered yes. A per-user tarball
-/// installs itself on tap ([selfApplies]) and restarts once [staged].
-UpdateMenuAction updateMenuAction(
-  ClientUpdate update, {
-  bool? autoUpdate,
-  bool selfApplies = false,
-  String? staged,
-}) {
-  if (selfApplies) {
-    return staged == update.version
-        ? UpdateMenuAction.restartToUpdate
-        : UpdateMenuAction.installAndRestart;
-  }
-  return update.format == InstallFormat.rpm && autoUpdate == true
-      ? UpdateMenuAction.restartToUpdate
-      : UpdateMenuAction.openRelease;
-}
-
-/// The auto-update preference, or null while it is still being read.
-final _autoUpdatePreferenceProvider = FutureProvider<bool?>((ref) async {
-  final prefs = await ref.watch(preferencesProvider.future);
-  return loadAutoUpdatePreference(prefs);
-});
+export 'update_action.dart' show UpdateMenuAction, updateMenuAction;
 
 class WindowMenuButton extends ConsumerStatefulWidget {
   const WindowMenuButton({super.key, required this.port});
@@ -87,9 +52,7 @@ class _WindowMenuButtonState extends ConsumerState<WindowMenuButton> {
   @override
   Widget build(BuildContext context) {
     final update = ref.watch(inSessionUpdateProvider);
-    final autoUpdate = ref.watch(_autoUpdatePreferenceProvider).valueOrNull;
-    final selfApplies = ref.watch(selfApplyAvailableProvider);
-    final staged = ref.watch(stagedUpdateVersionProvider);
+    final action = ref.watch(updateActionProvider);
     final installing = ref.watch(selfUpdateInstallingProvider);
     return CompositedTransformTarget(
       link: _link,
@@ -114,17 +77,10 @@ class _WindowMenuButtonState extends ConsumerState<WindowMenuButton> {
                 child: AppMenu(
                   width: 220,
                   children: [
-                    if (update != null)
+                    if (update != null && action != null)
                       _updateItem(
                         update,
-                        action: updateMenuAction(
-                          update,
-                          autoUpdate: autoUpdate,
-                          selfApplies:
-                              selfApplies &&
-                              update.format == InstallFormat.tarball,
-                          staged: staged,
-                        ),
+                        action: action,
                         installing: installing,
                       ),
                     if (widget.port.canRelaunch)
@@ -166,45 +122,22 @@ class _WindowMenuButtonState extends ConsumerState<WindowMenuButton> {
     required bool installing,
   }) {
     return AppMenuItem(
-      label: switch (action) {
-        UpdateMenuAction.installAndRestart when installing =>
-          'Installing ${update.version}',
-        UpdateMenuAction.installAndRestart => 'Install ${update.version}',
-        UpdateMenuAction.restartToUpdate =>
-          'Restart to update to ${update.version}',
-        UpdateMenuAction.openRelease => 'Get update ${update.version}',
-      },
+      label: updateActionLabel(update, action, installing: installing),
       leading: AppIcons.download,
       onTap: installing
           ? null
           : () {
               _controller.hide();
-              switch (action) {
-                case UpdateMenuAction.installAndRestart:
-                  unawaited(_installThenRestart());
-                case UpdateMenuAction.restartToUpdate:
-                  unawaited(widget.port.relaunch());
-                case UpdateMenuAction.openRelease:
-                  final uri = Uri.tryParse(update.releaseUrl);
-                  if (uri != null) {
-                    unawaited(
-                      launchUrl(uri, mode: LaunchMode.externalApplication),
-                    );
-                  }
-              }
+              unawaited(
+                runUpdateAction(
+                  ref,
+                  port: widget.port,
+                  update: update,
+                  action: action,
+                  isMounted: () => mounted,
+                ),
+              );
             },
     );
-  }
-
-  /// Restarts straight away unless a call is live; then the item turns into
-  /// "Restart to update" and waits for the person.
-  Future<void> _installThenRestart() async {
-    final info = await ref.read(appInfoProvider.future);
-    final version = await ref
-        .read(selfUpdateProvider)
-        .install(currentVersion: info.version);
-    if (version == null || !mounted) return;
-    if (ref.read(voiceControllerProvider).channelId != null) return;
-    await widget.port.relaunch();
   }
 }
