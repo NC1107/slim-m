@@ -34,8 +34,7 @@ void main() {
       tester.getTopLeft(find.byType(MessageContextMenuRegion)) +
       const Offset(30, 30);
 
-  // SlimmApi.report once had no call site at all, despite the endpoint and a
-  // full admin triage screen existing. Nothing gated that regressing.
+  // SlimmApi.report once had no call site; nothing gated that regressing.
   testWidgets('a message not authored by the caller offers Report and Block', (
     tester,
   ) async {
