@@ -13,6 +13,7 @@ library;
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:slimm_api/api.dart' as api;
 import 'package:slimm_app/src/widgets/module_scene.dart';
@@ -241,5 +242,87 @@ void main() {
       findsOneWidget,
       reason: 'its own controls are untouched by having no expand',
     );
+  });
+
+  group('leaving full screen', () {
+    Future<void> openFromInline(WidgetTester tester) async {
+      tester.view.physicalSize = const Size(1200, 900);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: buildTheme(Brightness.dark, AppTokens.dark),
+          home: Scaffold(
+            body: Builder(
+              builder: (context) => ModuleSceneView(
+                initial: _scene(),
+                runCommand: _run,
+                onExpand: () => showModuleSceneFullscreen(
+                  context,
+                  initial: _scene(),
+                  runCommand: _run,
+                  title: 'tic-tac-toe',
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(find.bySemanticsLabel('Open full screen'));
+      await tester.pumpAndSettle();
+      expect(find.byType(ModuleSceneFullscreen), findsOneWidget);
+    }
+
+    testWidgets('Escape leaves, and focus returns to the expand control', (
+      tester,
+    ) async {
+      await openFromInline(tester);
+
+      await tester.sendKeyEvent(LogicalKeyboardKey.escape);
+      await tester.pumpAndSettle();
+
+      expect(find.byType(ModuleSceneFullscreen), findsNothing);
+      final expand = tester.widget<AppIconButton>(
+        find.widgetWithIcon(AppIconButton, AppIcons.expand),
+      );
+      expect(expand.focusNode?.hasPrimaryFocus, isTrue);
+    });
+
+    testWidgets('the system back gesture leaves too', (tester) async {
+      await openFromInline(tester);
+
+      await tester.binding.handlePopRoute();
+      await tester.pumpAndSettle();
+
+      expect(find.byType(ModuleSceneFullscreen), findsNothing);
+    });
+
+    testWidgets('the screen announces itself as a route naming the module', (
+      tester,
+    ) async {
+      final handle = tester.ensureSemantics();
+      await openFromInline(tester);
+
+      expect(
+        tester.getSemantics(find.byType(ModuleSceneFullscreen)),
+        matchesSemantics(
+          scopesRoute: true,
+          namesRoute: true,
+          label: 'tic-tac-toe, full screen',
+        ),
+      );
+      handle.dispose();
+    });
+
+    testWidgets('focus enters full screen without a tap', (tester) async {
+      await openFromInline(tester);
+
+      expect(
+        FocusManager.instance.primaryFocus?.context
+            ?.findAncestorWidgetOfExactType<ModuleSceneFullscreen>(),
+        isNotNull,
+      );
+    });
   });
 }

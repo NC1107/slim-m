@@ -28,6 +28,7 @@ import 'module_scene_busy.dart';
 import 'module_scene_images.dart';
 import 'module_scene_inputs.dart';
 import 'module_scene_controls.dart';
+import 'module_scene_expand.dart';
 import 'module_scene_frame.dart';
 import 'module_scene_keyboard.dart';
 import 'module_scene_pacing.dart';
@@ -71,7 +72,7 @@ class ModuleSceneView extends StatefulWidget {
   /// Opens this scene full screen. Absent means no expand control is offered -
   /// the Dock panel's ephemeral runs have nowhere to expand to, and the
   /// full-screen view itself is already there.
-  final VoidCallback? onExpand;
+  final FutureOr<void> Function()? onExpand;
 
   @override
   State<ModuleSceneView> createState() => _ModuleSceneViewState();
@@ -434,12 +435,7 @@ class _ModuleSceneViewState extends State<ModuleSceneView> {
                 onAction: _send,
               ),
               if (widget.onExpand case final expand?)
-                AppIconButton(
-                  icon: AppIcons.expand,
-                  semanticLabel: 'Open full screen',
-                  tooltip: 'Open full screen',
-                  onPressed: expand,
-                ),
+                SceneExpandButton(onExpand: expand),
             ],
           ),
         ],

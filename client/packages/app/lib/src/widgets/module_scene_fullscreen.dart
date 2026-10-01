@@ -23,6 +23,7 @@
 library;
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:slimm_design_system/design_system.dart';
 
 import 'module_scene.dart';
@@ -69,6 +70,33 @@ class ModuleSceneFullscreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final tokens = Theme.of(context).extension<AppTokens>()!;
+    final name = title ?? 'Module';
+    return Semantics(
+      scopesRoute: true,
+      namesRoute: true,
+      label: '$name, full screen',
+      explicitChildNodes: true,
+      child: Shortcuts(
+        shortcuts: const {
+          SingleActivator(LogicalKeyboardKey.escape): DismissIntent(),
+        },
+        child: Actions(
+          actions: {
+            DismissIntent: CallbackAction<DismissIntent>(
+              onInvoke: (_) => Navigator.of(context).maybePop(),
+            ),
+          },
+          // Autofocus so Escape works before anything inside has been clicked.
+          child: Focus(
+            autofocus: true,
+            child: _scaffold(context, tokens, name),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _scaffold(BuildContext context, AppTokens tokens, String name) {
     return Scaffold(
       backgroundColor: tokens.surfaceBase,
       appBar: AppBar(
@@ -81,7 +109,7 @@ class ModuleSceneFullscreen extends StatelessWidget {
           onPressed: () => Navigator.of(context).maybePop(),
         ),
         title: Text(
-          title ?? 'Module',
+          name,
           style: AppText.body.copyWith(
             color: tokens.textPrimary,
             fontWeight: AppWeights.semi,

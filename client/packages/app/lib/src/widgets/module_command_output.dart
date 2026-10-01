@@ -93,14 +93,12 @@ class ModuleCommandOutput extends ConsumerWidget {
           onNotes: notes,
           // Only a message-scoped board has a screen of its own to go to.
           onExpand: shared
-              ? () => unawaited(
-                  showModuleSceneFullscreen(
-                    context,
-                    initial: scene,
-                    runCommand: run,
-                    onNotes: notes,
-                    title: moduleId,
-                  ),
+              ? () => showModuleSceneFullscreen(
+                  context,
+                  initial: scene,
+                  runCommand: run,
+                  onNotes: notes,
+                  title: moduleId,
                 )
               : null,
         );
