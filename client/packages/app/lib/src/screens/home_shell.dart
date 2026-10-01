@@ -31,6 +31,7 @@ import '../providers/notification_schedule_controller.dart';
 import '../providers/notification_sound_controller.dart';
 import '../providers/providers.dart';
 import '../providers/retention_sweep.dart';
+import '../providers/sync_controller.dart' show initialSyncCompleteProvider;
 import '../providers/threads.dart';
 import '../providers/voice_controller.dart';
 import '../providers/channel_search_controller.dart';
@@ -55,6 +56,7 @@ import '../widgets/whats_new_gate.dart';
 import '../widgets/channel_header.dart';
 import 'canvas/canvas_fullscreen.dart';
 import 'canvas/canvas_pane.dart';
+import 'channel_not_found.dart';
 import 'channel_screen.dart';
 import 'dm_call_pane.dart';
 import 'hang_up_recap_toast.dart';
@@ -377,6 +379,10 @@ class ConversationPane extends ConsumerWidget {
               ?.where((c) => c.id == channelId)
               .cast<Channel?>()
               .firstOrNull;
+          // Before the first sync an unresolved id may just not have arrived yet.
+          if (channel == null && ref.watch(initialSyncCompleteProvider)) {
+            return const ChannelNotFound();
+          }
           final isVoice = channel?.kind == 'voice';
           final canvasOpen = ref.watch(canvasOpenProvider) == channelId;
           final dmCallOpen =
