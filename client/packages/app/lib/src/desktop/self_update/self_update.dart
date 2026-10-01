@@ -8,6 +8,7 @@ import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
 
+import 'package:flutter/foundation.dart' show visibleForTesting;
 import 'package:http/http.dart' as http;
 
 import '../update_check.dart';
@@ -20,12 +21,23 @@ const _timeout = Duration(seconds: 15);
 const _maxManifestBytes = 256 * 1024;
 
 /// A downloaded, hash-checked artifact waiting in the staging directory.
+///
+/// Only [fetchVerifiedUpdate] can build one, so an install can never be handed
+/// a file that skipped the signature, hash and platform checks.
 class VerifiedUpdate {
-  const VerifiedUpdate({
+  const VerifiedUpdate._({
     required this.version,
     required this.tag,
     required this.file,
   });
+
+  /// Skips every check; for tests that exercise an install step on its own.
+  @visibleForTesting
+  const factory VerifiedUpdate.forTest({
+    required String version,
+    required String tag,
+    required File file,
+  }) = VerifiedUpdate._;
 
   final String version;
   final String tag;
@@ -38,6 +50,21 @@ class VerifiedUpdate {
 /// which must never read as "nothing to do"; the staging
 /// directory then holds no finished file.
 Future<VerifiedUpdate?> fetchVerifiedUpdate({
+  required String currentVersion,
+  required String platformKey,
+  required Directory stagingDir,
+  required http.Client client,
+}) => fetchVerifiedUpdateWith(
+  currentVersion: currentVersion,
+  platformKey: platformKey,
+  stagingDir: stagingDir,
+  client: client,
+);
+
+/// [fetchVerifiedUpdate] with the trusted keys and free-space probe exposed,
+/// so a test can sign with its own key; production never passes either.
+@visibleForTesting
+Future<VerifiedUpdate?> fetchVerifiedUpdateWith({
   required String currentVersion,
   required String platformKey,
   required Directory stagingDir,
@@ -68,7 +95,7 @@ Future<VerifiedUpdate?> fetchVerifiedUpdate({
     );
   }
   final manifest = parseManifest(manifestBytes);
-  if (parseVersion(manifest.version) == null) {
+  if (!isPlainVersion(manifest.version)) {
     throw const SelfUpdateFailure(
       SelfUpdateFailureKind.badManifest,
       'The update information was not in a form this version understands.',
@@ -93,7 +120,7 @@ Future<VerifiedUpdate?> fetchVerifiedUpdate({
     client: client,
     freeSpace: freeSpace,
   );
-  return VerifiedUpdate(
+  return VerifiedUpdate._(
     version: manifest.version,
     tag: manifest.tag,
     file: file,

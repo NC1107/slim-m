@@ -127,7 +127,7 @@ void main() {
     String current = '0.89.0',
     String platform = 'linux-x64',
     FreeSpace? freeSpace,
-  }) => fetchVerifiedUpdate(
+  }) => fetchVerifiedUpdateWith(
     currentVersion: current,
     platformKey: platform,
     stagingDir: staging,
@@ -220,6 +220,31 @@ void main() {
       }
     },
   );
+
+  test('an arm64 host never receives the x64 entry', () async {
+    final client = await _server(_Release(key: key));
+    expect(
+      await failureOf(run(client, platform: 'linux-arm64')),
+      SelfUpdateFailureKind.noArtifactForPlatform,
+    );
+    expect(
+      client.requests.where((r) => r.url.path.endsWith('.tar.gz')),
+      isEmpty,
+    );
+    expect(stagedNames(), isEmpty);
+  });
+
+  test('a signed version that is not plain digits names nothing', () async {
+    for (final version in ['9.9.9-/../../x', '9.9.9-rc1', '9.9.9+b', '1.2']) {
+      final client = await _server(_Release(key: key, version: version));
+      expect(
+        await failureOf(run(client)),
+        SelfUpdateFailureKind.badManifest,
+        reason: version,
+      );
+      expect(stagedNames(), isEmpty);
+    }
+  });
 
   test('a manifest schema this build does not know is refused', () async {
     final client = await _server(_Release(key: key, schema: 2));

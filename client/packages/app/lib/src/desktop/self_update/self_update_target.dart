@@ -13,6 +13,7 @@ import 'linux_layout.dart';
 import 'macos_install.dart' as macos;
 import 'macos_layout.dart';
 import 'self_update.dart';
+import 'update_manifest.dart';
 import 'windows_install.dart' as windows;
 import 'windows_layout.dart';
 
@@ -37,37 +38,44 @@ abstract interface class SelfUpdateTarget {
 }
 
 /// The target [resolvedExecutable] runs from on [os], or null when it is not a
-/// per-user install the updater created.
+/// per-user install the updater created or when no release artifact exists for
+/// [arch] (the host's by default), so a wrong-architecture build is never
+/// chosen.
 SelfUpdateTarget? installTargetFor(
   String resolvedExecutable,
   String os, {
   String? home,
-}) => switch (os) {
-  'linux' => switch (detectLinuxLayout(resolvedExecutable)) {
-    final layout? => _LinuxTarget(layout),
-    null => null,
-  },
-  'windows' => switch (detectWindowsLayout(resolvedExecutable)) {
-    final layout? => _WindowsTarget(layout),
-    null => null,
-  },
-  'macos' => switch (detectMacosLayout(
-    resolvedExecutable,
-    home: home ?? Platform.environment['HOME'] ?? '',
-  )) {
-    final layout? => _MacosTarget(layout),
-    null => null,
-  },
-  _ => null,
-};
+  String? arch,
+}) {
+  final key = updatePlatformKey(os: os, arch: arch ?? hostArchitecture());
+  if (key == null) return null;
+  return switch (os) {
+    'linux' => switch (detectLinuxLayout(resolvedExecutable)) {
+      final layout? => _LinuxTarget(layout, key),
+      null => null,
+    },
+    'windows' => switch (detectWindowsLayout(resolvedExecutable)) {
+      final layout? => _WindowsTarget(layout, key),
+      null => null,
+    },
+    'macos' => switch (detectMacosLayout(
+      resolvedExecutable,
+      home: home ?? Platform.environment['HOME'] ?? '',
+    )) {
+      final layout? => _MacosTarget(layout, key),
+      null => null,
+    },
+    _ => null,
+  };
+}
 
 class _LinuxTarget implements SelfUpdateTarget {
-  const _LinuxTarget(this.layout);
+  const _LinuxTarget(this.layout, this.platformKey);
 
   final LinuxInstallLayout layout;
 
   @override
-  String get platformKey => 'linux-x64';
+  final String platformKey;
   @override
   Directory get stagingDir => layout.stagingDir;
   @override
@@ -94,12 +102,12 @@ class _LinuxTarget implements SelfUpdateTarget {
 }
 
 class _WindowsTarget implements SelfUpdateTarget {
-  const _WindowsTarget(this.layout);
+  const _WindowsTarget(this.layout, this.platformKey);
 
   final WindowsInstallLayout layout;
 
   @override
-  String get platformKey => 'windows-x64';
+  final String platformKey;
   @override
   Directory get stagingDir => layout.stagingDir;
   @override
@@ -126,12 +134,12 @@ class _WindowsTarget implements SelfUpdateTarget {
 }
 
 class _MacosTarget implements SelfUpdateTarget {
-  const _MacosTarget(this.layout);
+  const _MacosTarget(this.layout, this.platformKey);
 
   final MacosInstallLayout layout;
 
   @override
-  String get platformKey => 'macos';
+  final String platformKey;
   @override
   Directory get stagingDir => layout.stagingDir;
   @override

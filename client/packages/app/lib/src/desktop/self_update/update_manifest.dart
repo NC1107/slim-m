@@ -5,6 +5,7 @@
 library;
 
 import 'dart:convert';
+import 'dart:io' show Platform;
 import 'dart:typed_data';
 
 import 'package:cryptography/cryptography.dart';
@@ -36,6 +37,20 @@ class UpdateManifest {
   final String version;
   final String tag;
   final Map<String, UpdateArtifact> artifacts;
+}
+
+/// Whether [version] is exactly `major.minor.patch` in digits, the only shape
+/// allowed to name a directory on disk.
+bool isPlainVersion(String version) =>
+    RegExp(r'^\d+\.\d+\.\d+$').hasMatch(version);
+
+/// The CPU architecture this process runs on, as `Platform.version` names it
+/// (`x64`, `arm64`, ...), without needing dart:ffi.
+String hostArchitecture([String? dartVersion]) {
+  final match = RegExp(
+    r'on "[a-z]+_([a-z0-9]+)"',
+  ).firstMatch(dartVersion ?? Platform.version);
+  return match?.group(1) ?? 'unknown';
 }
 
 /// The manifest's platform key for this host, or null where there is none.

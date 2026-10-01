@@ -30,7 +30,7 @@ Each section below is named for its workflow file.
 | `server-binaries` | called by `release` | the static musl server binaries per arch, uploaded as run artifacts for `server-release-assets`, split out into its own file because `release` is past the 500-line budget |
 | `copr-publish` | called by `main-builds` and `copr-catch-up` | the Fedora COPR snapshot submission, split out into its own file once `main-builds` hit the 500-line ceiling; a failed submit is retried up to three times and then fails the job |
 | `desktop-clients` | `client-v*` tag pushes, and by hand with a tag input | unsigned Windows and macOS tester archives, attached to the client's GitHub release, with the Windows launcher built and its Go tests run on the way, then the signed `update-manifest` job. The two desktop platforms `release` does not package |
-| `update-manifest` | called by `desktop-clients` after its archives attach and by `release` after the Linux tarball attaches, and by hand with a tag input | signs a manifest (versions, artifact URLs, sha256s) of the desktop artifacts on a client release with the `UPDATE_SIGNING_KEY` secret, for the self-updater in decision 0041. Signs only once every platform (`windows-x64`, `macos`, `linux-x64`) is attached, whichever producer finishes last. Skips with a warning while the secret is unset |
+| `update-manifest` | called by `desktop-clients` after its archives attach and by `release` after the Linux tarball attaches, and by hand with a tag input | signs a manifest (versions, artifact URLs, sha256s) of the desktop artifacts on a client release with the `UPDATE_SIGNING_KEY` secret, for the self-updater in decision 0041. Signs only once every platform (`windows-x64`, `macos`, `linux-x64`) is attached, whichever producer finishes last. Fails when the secret is unset, because a client release with no signed manifest cannot be updated to |
 | `release` | pushes to `main`, and by hand on a `server-v*` / `client-v*` tag ref | the whole publish pipeline, including the web image under the server's version |
 | `release-tag-watchdog` | an hourly schedule, and by hand | every release-please manifest's version has a matching git tag, catching a release PR that merged with no tag ever following it, and no merged release PR is still labelled `autorelease: pending`, which silently fails every later release run; and, in a second job, re-dispatches `release.yml` on the tag once when the release run's verify failed and the commit's required checks have since gone green |
 | `release-asset-watchdog` | an hourly schedule, and by hand | nothing. It checks every `client-v*` and `server-v*` release from the last 3 days against the asset set its kind always carries, and opens a deduplicated `release-incomplete` issue (and fails its own run) when one older than 90 minutes is missing a file, or when its `manifest.json` omits a platform whose asset is attached |
@@ -848,8 +848,15 @@ A release younger than the grace period (90 minutes, `--grace-minutes`) is repor
 The workflow runs the script hourly over `--recent 3` days and hands the result to `scripts/report-advisory-issue.sh`, the same open, dedupe and close flow `advisory-watchdog` uses, with the label `release-incomplete`.
 Unlike the advisory check it also fails its own run, because an incomplete release is something to act on rather than to read later.
 Releases older than the window are not rechecked, so a release left incomplete for more than 3 days stops alerting; run the script by hand with `--recent` for a longer look.
-It does not check that `manifest.json` lists every platform whose archive is attached; client 0.88.0's manifest once omitted linux-x64 while the tarball arrived later.
 `scripts/lib/test_check_release_assets.py` drives the comparison with fake asset lists.
+
+The run itself now fails where it can know.
+`release.yml` attaches assets through `scripts/upload-release-assets.sh`, which retries a failed upload (five attempts, growing pauses, the PAT's remaining core API budget in the final error) and fails the job when a required file pattern matches nothing, where softprops uploaded whatever matched and went green.
+Only the flatpak and the rpm globs are optional at upload time, so the tarball and checksums still attach, and a last `verify flatpak bundle was produced` step then turns the job red.
+That step was `continue-on-error` and could never fail a run.
+`update-manifest` fails rather than warns when `UPDATE_SIGNING_KEY` is unset.
+The hourly watchdog stays the net for what the run cannot see, such as the Windows zip, which a different workflow attaches.
+Not done here: the COPR jobs stay best effort, and the signing key stays a repository secret, because moving it behind the `release` environment needs the owner to scope the secret and set reviewers.
 
 ## verify-release-checks
 
@@ -978,7 +985,7 @@ By hand it takes a `tag`, a `require` list and `defer`, which is how to backfill
 Without `defer` a missing required platform fails the run.
 
 The secret is `UPDATE_SIGNING_KEY`, an ed25519 private key in PKCS8 PEM form, stored as a repository secret.
-While it is unset the job passes with a warning and does nothing, the same shape as `copr-publish` without `COPR_CONFIG`.
+While it is unset the job fails, unlike `copr-publish` without `COPR_CONFIG`: a green run that attached no manifest is how 0.89.0 shipped with none, and every caller runs on a client tag.
 The owner's one-time key generation is in the decision record.
 `scripts/lib/test_update_manifest.py` covers build, sign and verify, tampering, wrong key, swapped artifacts and rollback against a throwaway key generated per run.
 
