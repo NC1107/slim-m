@@ -63,7 +63,9 @@ fn clamp_one(sweep: &mut Value) -> bool {
         return false;
     };
     let delay = number(map, "delay").clamp(0.0, MAX_TIMELINE_SECONDS - MIN_SWEEP_SECONDS);
-    let secs = number(map, "secs").clamp(MIN_SWEEP_SECONDS, MAX_TIMELINE_SECONDS - delay);
+    // 10.0 - 9.9 is a hair under 0.1 in floating point, and clamp panics when its bounds cross.
+    let longest = (MAX_TIMELINE_SECONDS - delay).max(MIN_SWEEP_SECONDS);
+    let secs = number(map, "secs").clamp(MIN_SWEEP_SECONDS, longest);
     for key in DELTA_KEYS {
         map.insert(
             key.into(),
@@ -142,5 +144,29 @@ mod tests {
         ]}));
         assert!(out["ops"][0].get("sweep").is_none());
         assert!(out["ops"][1].get("sweep").is_none());
+    }
+
+    /// A delay at the ceiling left less than the minimum duration, so the
+    /// duration's own clamp had its bounds inverted and panicked; this server
+    /// aborts on panic, so one scene took the whole process down.
+    #[test]
+    fn a_delay_at_or_past_the_ceiling_is_clamped_and_never_panics() {
+        for delay in [9.8, 9.89, 9.9, 9.95, 10.0, 10.1, 1e9, -1.0, f64::MAX] {
+            let out = run(json!({"ops": [rect(json!({"delay": delay, "secs": 1}))]}));
+            let sweep = &out["ops"][0]["sweep"];
+            let (delay, secs) = (
+                sweep["delay"].as_f64().unwrap(),
+                sweep["secs"].as_f64().unwrap(),
+            );
+            assert!(
+                (0.0..=MAX_TIMELINE_SECONDS).contains(&delay),
+                "delay {delay}"
+            );
+            assert!(secs >= MIN_SWEEP_SECONDS, "secs {secs} for delay {delay}");
+            assert!(
+                delay + secs <= MAX_TIMELINE_SECONDS + 1e-9,
+                "delay {delay} plus secs {secs} runs past the timeline"
+            );
+        }
     }
 }
