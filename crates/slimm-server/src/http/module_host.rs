@@ -244,6 +244,7 @@ impl ChannelPoster {
                 presence: state.hub.presence(),
             },
         );
+        super::threads::notify_reply(state, message.channel_id).await;
     }
 
     fn charge_rate_limits(&self) -> Result<(), PostRefused> {

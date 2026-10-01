@@ -86,7 +86,10 @@ async fn role(store: &Store, name: &str, mentionable: bool) -> RoleId {
         .await
         .unwrap();
     if mentionable {
-        store.update_role(id, None, None, Some(true)).await.unwrap();
+        store
+            .update_role(id, None, None, Some(true), None)
+            .await
+            .unwrap();
     }
     id
 }

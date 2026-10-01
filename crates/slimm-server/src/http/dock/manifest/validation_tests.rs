@@ -128,3 +128,27 @@ fn rejects_hidden_characters_in_a_registry_index_entry() {
         Err(ManifestError::Malformed(_))
     ));
 }
+
+#[test]
+fn an_artifact_path_that_url_join_would_reinterpret_is_refused() {
+    for path in [
+        "%2e%2e/%2e%2e/bob/evil/main/m.wasm",
+        "%2E%2E/m.wasm",
+        "\\bob\\evil\\main\\m.wasm",
+        "modules//m.wasm",
+        "modules/./m.wasm",
+        "modules/../m.wasm",
+        "./m.wasm",
+        "modules/",
+        "modules/m.wasm?x=1",
+        "modules/m.wasm#x",
+        "modules/a:b/m.wasm",
+    ] {
+        let json_path = path.replace('\\', "\\\\");
+        let bad = GOOD_MANIFEST.replace("modules/code-exec/0.1.0/module.wasm", &json_path);
+        assert!(
+            refusal(&bad).contains("artifact.path"),
+            "{path} should be refused"
+        );
+    }
+}

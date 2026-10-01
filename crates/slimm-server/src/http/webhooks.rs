@@ -40,6 +40,7 @@ use super::embeds;
 use super::error::ApiError;
 use super::extract::{Json, Query, enforce};
 use super::messages::{parse_uuid, validate_content};
+use super::post_commit::after_commit;
 use crate::hub::Event;
 use crate::ids::{MessageId, WebhookId};
 use crate::ratelimit::Class;
@@ -181,21 +182,29 @@ async fn deliver(
 
     if sent.fresh {
         if let Some(username) = username {
-            state
-                .store
-                .set_webhook_message_username(sent.message.id, username)
-                .await?;
+            after_commit(
+                "its username",
+                state
+                    .store
+                    .set_webhook_message_username(sent.message.id, username)
+                    .await,
+            );
         }
-        let stored_embeds =
-            embeds::store_and_reload(&state, sent.message.id, true, &embeds).await?;
-        super::message_mentions::resolve_and_store(
-            &state,
-            channel_id,
-            context.principal_id,
-            sent.message.id,
-            &sent.message.content,
-        )
-        .await?;
+        let stored_embeds = after_commit(
+            "its embeds",
+            embeds::store_and_reload(&state, sent.message.id, true, &embeds).await,
+        );
+        after_commit(
+            "its mentions",
+            super::message_mentions::resolve_and_store(
+                &state,
+                channel_id,
+                context.principal_id,
+                sent.message.id,
+                &sent.message.content,
+            )
+            .await,
+        );
         state.hub.publish(Event::MessageCreated {
             message: std::sync::Arc::new(sent.message.clone()),
             attachments: std::sync::Arc::new(Vec::new()),

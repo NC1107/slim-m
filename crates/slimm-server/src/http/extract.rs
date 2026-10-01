@@ -300,7 +300,14 @@ pub(crate) async fn require_human(state: &AppState, user_id: UserId) -> Result<(
     Ok(())
 }
 
-async fn require_base_permission(
+/// Refuses with a reason of its own, so a client can tell it from a missing permission.
+pub(crate) const SECOND_FACTOR_REQUIRED: &str =
+    "turn on two-factor sign-in in your account settings before using administrator powers";
+
+/// Refuses a caller without `bit` deployment-wide, and refuses an administrator
+/// the deployment's `required_for_elevated` policy says is owed a second factor.
+/// Sign-in and enrolment never come through here, so that refusal cannot strand anyone.
+pub(crate) async fn require_base_permission(
     state: &AppState,
     user_id: UserId,
     bit: Permissions,
@@ -308,6 +315,11 @@ async fn require_base_permission(
     let permissions = state.store.base_permissions(user_id).await?;
     if !permissions.contains(bit) {
         return Err(ApiError::Forbidden);
+    }
+    if permissions.contains(Permissions::ADMINISTRATOR)
+        && state.store.elevated_factor_missing(user_id).await?
+    {
+        return Err(ApiError::ForbiddenBecause(SECOND_FACTOR_REQUIRED));
     }
     Ok(permissions)
 }

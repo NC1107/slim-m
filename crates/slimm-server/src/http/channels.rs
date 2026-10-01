@@ -35,7 +35,7 @@ use crate::hub::Event;
 use crate::ids::{ChannelCategoryId, ChannelId};
 use crate::permissions::Permissions;
 use crate::ratelimit::Class;
-use crate::store::{Channel, DM_CHANNEL_KIND, DeleteChannelError};
+use crate::store::{Channel, ChannelPatch, DM_CHANNEL_KIND, DeleteChannelError};
 use crate::voice::VoiceError;
 
 const CHANNEL_BODY_LIMIT: usize = 4 * 1024;
@@ -349,33 +349,19 @@ async fn update(
         }
     }
 
-    let mut channel = if name.is_some() || topic.is_some() {
-        state
-            .store
-            .update_channel(channel_id, name, topic.as_ref().map(|t| t.as_deref()))
-            .await?
-            .ok_or(ApiError::NotFound("channel not found"))?
-    } else {
-        state
-            .store
-            .channel(channel_id)
-            .await?
-            .ok_or(ApiError::NotFound("channel not found"))?
-    };
-    if let Some(seconds) = slow_mode_seconds {
-        channel = state
-            .store
-            .update_channel_slow_mode(channel_id, seconds)
-            .await?
-            .ok_or(ApiError::NotFound("channel not found"))?;
-    }
-    if let Some(join_muted) = req.join_muted {
-        channel = state
-            .store
-            .update_channel_join_muted(channel_id, join_muted)
-            .await?
-            .ok_or(ApiError::NotFound("channel not found"))?;
-    }
+    let channel = state
+        .store
+        .update_channel_settings(
+            channel_id,
+            ChannelPatch {
+                name,
+                topic: topic.as_ref().map(|t| t.as_deref()),
+                slow_mode_seconds,
+                join_muted: req.join_muted,
+            },
+        )
+        .await?
+        .ok_or(ApiError::NotFound("channel not found"))?;
     let restricted = state.store.channel_restricted(channel_id).await?;
     state
         .hub

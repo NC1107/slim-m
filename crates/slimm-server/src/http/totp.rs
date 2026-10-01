@@ -22,7 +22,7 @@ use super::reauth::require_password;
 use crate::hub::Event;
 use crate::ids::UserId;
 use crate::permissions::Permissions;
-use crate::store::{ChallengeError, OpenError, TotpError, TotpProof};
+use crate::store::{ChallengeError, TotpError, TotpProof};
 
 const BODY_LIMIT: usize = 4 * 1024;
 
@@ -254,14 +254,8 @@ async fn admin_clear(
     Path(user_id): Path<String>,
     State(state): State<AppState>,
 ) -> Result<StatusCode, ApiError> {
-    if !state
-        .store
-        .base_permissions(ctx.user_id)
-        .await?
-        .contains(Permissions::ADMINISTRATOR)
-    {
-        return Err(ApiError::Forbidden);
-    }
+    super::extract::require_base_permission(&state, ctx.user_id, Permissions::ADMINISTRATOR)
+        .await?;
     let user_id = UserId(parse_uuid(&user_id)?);
     let revoked = state
         .store
@@ -320,13 +314,8 @@ fn challenge_error(err: ChallengeError) -> ApiError {
         ChallengeError::Unusable => ApiError::Unauthorized,
         ChallengeError::BadCode => ApiError::BadRequest(BAD_CODE),
         ChallengeError::Locked { .. } => ApiError::TooManyRequests,
-        ChallengeError::Open(OpenError::Removed) => {
-            ApiError::ForbiddenBecause("you have been removed from this server")
-        }
-        ChallengeError::Open(OpenError::AccountGone) => ApiError::Unauthorized,
-        ChallengeError::Open(OpenError::Internal(err)) | ChallengeError::Internal(err) => {
-            err.into()
-        }
+        ChallengeError::Open(open) => open.into(),
+        ChallengeError::Internal(err) => err.into(),
     }
 }
 
