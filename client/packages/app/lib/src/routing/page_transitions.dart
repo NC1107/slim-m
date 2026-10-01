@@ -94,7 +94,11 @@ Widget _fadeThroughTransition(
           begin: Offset.zero,
           end: const Offset(-0.3, 0),
         ).animate(curvedOut),
-        child: child,
+        // Opaque, or the page it slides over shows through its transparent text surface.
+        child: ColoredBox(
+          color: Theme.of(context).scaffoldBackgroundColor,
+          child: child,
+        ),
       ),
     );
   }

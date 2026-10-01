@@ -120,4 +120,31 @@ void main() {
     expect(find.byKey(_a), findsNothing);
     expect(_opacity(tester, _b), 1);
   });
+
+  testWidgets('a compact switch slides an opaque page over the old one', (
+    tester,
+  ) async {
+    final router = _router();
+    tester.view.physicalSize = const Size(390, 844);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.reset);
+    await tester.pumpWidget(
+      MaterialApp.router(
+        theme: buildTheme(Brightness.dark, AppTokens.dark),
+        routerConfig: router,
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    router.go('/b');
+    await tester.pump();
+    await tester.pump(AppMotion.base ~/ 2);
+
+    final backing = tester.widget<ColoredBox>(
+      find
+          .ancestor(of: find.byKey(_b), matching: find.byType(ColoredBox))
+          .first,
+    );
+    expect(backing.color.a, 1, reason: 'a transparent page shows the old one');
+  });
 }
