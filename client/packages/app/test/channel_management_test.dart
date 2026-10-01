@@ -11,6 +11,7 @@ import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:slimm_api/api.dart' show ChannelOrderGroup;
+import 'package:slimm_app/src/routing/routes.dart';
 import 'package:slimm_data/data.dart';
 import 'package:slimm_app/src/widgets/channel_rail.dart' show channelIdInPath;
 import 'package:slimm_app/src/widgets/channel_rail_sections.dart';
@@ -358,6 +359,11 @@ void main() {
       expect(channelIdInPath('/channels'), isNull);
       expect(channelIdInPath('/channels/'), isNull);
       expect(channelIdInPath('/settings'), isNull);
+    });
+
+    test('a message link is its channel, not channel/m/message', () {
+      expect(channelIdInPath(Routes.message('c1', 'm1')), 'c1');
+      expect(channelIdInPath('/channels/c1/'), 'c1');
     });
   });
 }
