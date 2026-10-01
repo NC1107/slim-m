@@ -22,7 +22,9 @@ import '../providers/voice_controller.dart';
 import '../providers/voice_flags.dart';
 import '../providers/voice_roster.dart';
 import '../routing/routes.dart';
+import 'channel_drag_grip.dart';
 import 'channel_kind_icon.dart';
+import 'channel_move.dart';
 import 'channel_row_menu.dart';
 import 'context_menu_region.dart';
 import 'join_muted_badge.dart';
@@ -40,6 +42,7 @@ class ManagedChannelRow extends StatefulWidget {
     required this.canManage,
     required this.reorderable,
     this.dragHandleIndex,
+    this.move,
     required this.channel,
     required this.row,
   });
@@ -55,10 +58,13 @@ class ManagedChannelRow extends StatefulWidget {
   /// keyboard route are both unaffected either way.
   final bool reorderable;
 
-  /// Non-null when this row keeps its long-press menu and supplies its own
-  /// drag handle instead - see `channel_rail_reorder.dart` for which arrangement
-  /// applies where.
+  /// Non-null when this row keeps its long-press menu and shows a
+  /// [ChannelDragGrip] beside the kebab instead - see
+  /// `channel_rail_reorder.dart` for which arrangement applies where.
   final int? dragHandleIndex;
+
+  /// The non-gesture way to reorder, offered in the menu to a manager.
+  final ChannelMoveActions? move;
 
   /// Builds the row given the kebab to place in its trailing slot, or null
   /// when [canManage] is false. Passed through unconditionally so the row
@@ -90,6 +96,7 @@ class _ManagedChannelRowState extends State<ManagedChannelRow> {
         close,
         widget.channel,
         widget.canManage,
+        move: widget.move,
       );
 
   @override
@@ -143,9 +150,15 @@ class _ManagedChannelRowState extends State<ManagedChannelRow> {
     );
     final handled = widget.dragHandleIndex == null
         ? kebab
-        : ReorderableDragStartListener(
-            index: widget.dragHandleIndex!,
-            child: kebab,
+        : Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              ChannelDragGrip(
+                index: widget.dragHandleIndex!,
+                channelName: widget.channel.name,
+              ),
+              kebab,
+            ],
           );
     // Inside the row's trailing slot, so no combined height to float against.
     return ContextMenuRegion(

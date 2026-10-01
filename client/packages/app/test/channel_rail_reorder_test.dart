@@ -34,7 +34,9 @@ Channel _channel(String id) => Channel(
 
 Widget _harness(Widget child) => MaterialApp(
   theme: buildTheme(Brightness.light, AppTokens.light),
-  home: Scaffold(body: SizedBox(height: 400, child: child)),
+  home: Scaffold(
+    body: SizedBox(height: 400, child: SingleChildScrollView(child: child)),
+  ),
 );
 
 Widget _header(ChannelCategoryRow? category) =>
@@ -61,7 +63,7 @@ void main() {
       ),
     );
 
-    expect(find.byType(ReorderableListView), findsNothing);
+    expect(find.byType(SliverReorderableList), findsNothing);
     expect(find.text('header:uncategorised'), findsOneWidget);
     expect(find.text('a'), findsOneWidget);
     expect(find.text('b'), findsOneWidget);
@@ -115,8 +117,12 @@ void main() {
           ],
           canManage: true,
           onReorder: (_) {},
+          // A tappable row, as every real one is: a lone recognizer would win the arena on press.
           rowBuilder: (channel, longPressDrags, dragHandleIndex) =>
-              SizedBox(height: 48, child: Text(channel.id)),
+              GestureDetector(
+                onTap: () {},
+                child: SizedBox(height: 48, child: Text(channel.id)),
+              ),
           headerBuilder: _header,
         ),
       ),

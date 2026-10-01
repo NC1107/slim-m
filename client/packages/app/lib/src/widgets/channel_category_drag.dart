@@ -21,6 +21,7 @@ import 'package:slimm_data/data.dart';
 import 'package:slimm_design_system/design_system.dart';
 
 import '../providers/channel_order_controller.dart';
+import 'channel_drag_grip.dart';
 import 'rail_drag_lift.dart';
 
 /// The grip that starts a category drag - a dedicated handle rather than the
@@ -46,30 +47,55 @@ class CategoryDragGrip extends StatelessWidget {
       size: AppSizes.icon16,
       color: tokens.textSecondary,
     );
-    return Draggable<String>(
-      data: category.id,
-      dragAnchorStrategy: pointerDragAnchorStrategy,
-      // Already fully lifted: a Draggable feedback has no proxy animation controller for RailDragLift to follow.
-      feedback: RailDragLift(
-        animation: kAlwaysCompleteAnimation,
-        child: Padding(
-          padding: const EdgeInsets.symmetric(
-            horizontal: AppSpacing.s12,
-            vertical: AppSpacing.s8,
-          ),
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 220),
-            child: Text(
-              category.name,
-              overflow: TextOverflow.ellipsis,
-              style: AppText.label.copyWith(color: tokens.textPrimary),
-            ),
+    final touch = AppTouchTargets.of(context);
+    // A full touch target on a phone, where it is held to lift so a scroll is never mistaken for it.
+    final grip = Semantics(
+      label: 'Reorder ${category.name}',
+      child: touch
+          ? ColoredBox(
+              color: Colors.transparent,
+              child: SizedBox.square(
+                dimension: ChannelDragGrip.touchWidth,
+                child: Center(child: glyph),
+              ),
+            )
+          : glyph,
+    );
+    final feedback = RailDragLift(
+      animation: kAlwaysCompleteAnimation,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(
+          horizontal: AppSpacing.s12,
+          vertical: AppSpacing.s8,
+        ),
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 220),
+          child: Text(
+            category.name,
+            overflow: TextOverflow.ellipsis,
+            style: AppText.label.copyWith(color: tokens.textPrimary),
           ),
         ),
       ),
-      childWhenDragging: Opacity(opacity: 0.3, child: glyph),
-      child: Semantics(label: 'Reorder ${category.name}', child: glyph),
     );
+    final whileDragging = Opacity(opacity: 0.3, child: grip);
+    // Already fully lifted: a Draggable feedback has no proxy animation controller for RailDragLift to follow.
+    return touch
+        ? LongPressDraggable<String>(
+            data: category.id,
+            dragAnchorStrategy: pointerDragAnchorStrategy,
+            onDragStarted: AppHaptics.impact,
+            feedback: feedback,
+            childWhenDragging: whileDragging,
+            child: grip,
+          )
+        : Draggable<String>(
+            data: category.id,
+            dragAnchorStrategy: pointerDragAnchorStrategy,
+            feedback: feedback,
+            childWhenDragging: whileDragging,
+            child: grip,
+          );
   }
 }
 

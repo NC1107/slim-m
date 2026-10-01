@@ -1,0 +1,300 @@
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
+/// Touch reordering of the channel rail at phone width: a finger that scrolls
+/// never lifts a row, a lifted row can be carried past the fold, and the
+/// handle is a full touch target. Drives the real `ChannelCategorySections`
+/// inside a scroll view the way `ChannelRail` builds it.
+library;
+
+import 'package:flutter/gestures.dart';
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_test/flutter_test.dart';
+import 'package:http/http.dart' as http;
+import 'package:http/testing.dart';
+import 'package:slimm_api/api.dart' as api;
+import 'package:slimm_app/src/providers/providers.dart';
+import 'package:slimm_app/src/widgets/channel_category_drag.dart';
+import 'package:slimm_app/src/widgets/channel_drag_grip.dart';
+import 'package:slimm_app/src/widgets/rail_drag_lift.dart';
+import 'package:slimm_app/src/widgets/channel_move.dart';
+import 'package:slimm_app/src/widgets/channel_rail_reorder.dart'
+    show ChannelSection;
+import 'package:slimm_app/src/widgets/channel_rail_channel_rows.dart';
+import 'package:slimm_app/src/widgets/channel_rail_sections.dart';
+import 'package:slimm_data/data.dart';
+import 'package:slimm_design_system/design_system.dart';
+
+const _tokens = api.TokenPair(
+  userId: 'u-me',
+  accessToken: 'access',
+  refreshToken: 'refresh',
+  accessExpiresAt: 4102444800000,
+);
+
+Channel _channel(String id, String category, int position) => Channel(
+  id: id,
+  name: id,
+  kind: 'text',
+  categoryId: category.isEmpty ? null : category,
+  createdAt: 0,
+  position: position,
+  cursor: 0,
+  lastReadSeq: 0,
+  mentionedSeq: 0,
+  slowModeSeconds: 0,
+  joinMuted: false,
+  isPersonalSpace: false,
+);
+
+final _categories = [
+  ChannelCategoryRow(id: 'cat-a', name: 'Alpha', position: 0),
+  ChannelCategoryRow(id: 'cat-b', name: 'Beta', position: 1),
+];
+
+final _channels = [
+  for (var i = 0; i < 12; i++)
+    _channel('a-${i.toString().padLeft(2, '0')}', 'cat-a', i),
+  for (var i = 0; i < 12; i++)
+    _channel('b-${i.toString().padLeft(2, '0')}', 'cat-b', i),
+];
+
+class _Rail {
+  _Rail(this.controller);
+  final ScrollController controller;
+  final reports = <List<api.ChannelOrderGroup>>[];
+}
+
+Future<_Rail> _pumpRail(WidgetTester tester) async {
+  tester.view.physicalSize = const Size(390, 844);
+  tester.view.devicePixelRatio = 1;
+  addTearDown(tester.view.resetPhysicalSize);
+  addTearDown(tester.view.resetDevicePixelRatio);
+  final rail = _Rail(ScrollController());
+  addTearDown(rail.controller.dispose);
+  await tester.pumpWidget(
+    ProviderScope(
+      overrides: [
+        sessionProvider.overrideWithValue(api.SessionStore(tokens: _tokens)),
+        apiProvider.overrideWith((ref) {
+          final client = api.SlimmApi(
+            baseUrl: Uri.parse('http://localhost:8080'),
+            session: ref.watch(sessionProvider),
+            httpClient: MockClient((_) async => http.Response('', 404)),
+          );
+          ref.onDispose(client.close);
+          return client;
+        }),
+      ],
+      child: MaterialApp(
+        theme: buildTheme(Brightness.light, AppTokens.light),
+        home: Scaffold(
+          body: SingleChildScrollView(
+            controller: rail.controller,
+            child: ChannelCategorySections(
+              channels: _channels,
+              categories: _categories,
+              selectedId: null,
+              canManage: true,
+              onReorder: rail.reports.add,
+            ),
+          ),
+        ),
+      ),
+    ),
+  );
+  await tester.pump();
+  return rail;
+}
+
+Finder _handle(String id) => find.descendant(
+  of: find.ancestor(
+    of: find.text(id),
+    matching: find.byType(ManagedChannelRow),
+  ),
+  matching: find.byType(ChannelDragGrip),
+);
+
+void main() {
+  testWidgets('a finger scrolling from the right edge never lifts a row', (
+    tester,
+  ) async {
+    final rail = await _pumpRail(tester);
+    final start = tester.getCenter(find.byIcon(AppIcons.moreVertical).at(3));
+
+    final gesture = await tester.startGesture(start);
+    for (var i = 0; i < 12; i++) {
+      await gesture.moveBy(const Offset(0, -24));
+      await tester.pump(const Duration(milliseconds: 16));
+    }
+    await gesture.up();
+    await tester.pumpAndSettle();
+
+    expect(rail.reports, isEmpty, reason: 'a scroll must not reorder');
+    expect(rail.controller.offset, greaterThan(100), reason: 'it scrolled');
+  });
+
+  testWidgets('a finger scrolling from the handle never lifts a row', (
+    tester,
+  ) async {
+    final rail = await _pumpRail(tester);
+    final start = tester.getCenter(_handle('a-02'));
+
+    final gesture = await tester.startGesture(start);
+    for (var i = 0; i < 12; i++) {
+      await gesture.moveBy(const Offset(0, -24));
+      await tester.pump(const Duration(milliseconds: 16));
+    }
+    await gesture.up();
+    await tester.pumpAndSettle();
+
+    expect(rail.reports, isEmpty, reason: 'a scroll must not reorder');
+    expect(rail.controller.offset, greaterThan(100), reason: 'it scrolled');
+  });
+
+  testWidgets('the handle is a full 44px touch target at phone width', (
+    tester,
+  ) async {
+    await _pumpRail(tester);
+    final listener = find.descendant(
+      of: _handle('a-02'),
+      matching: find.byType(ReorderableDelayedDragStartListener),
+    );
+    final rect = tester.getRect(listener);
+    expect(rect.width, greaterThanOrEqualTo(44));
+    expect(rect.height, greaterThanOrEqualTo(44));
+    final target = tester.renderObject(
+      find.descendant(of: listener, matching: find.byType(Listener)).first,
+    );
+    for (final point in [
+      rect.topLeft + const Offset(1, 1),
+      rect.bottomRight - const Offset(1, 1),
+      rect.center,
+    ]) {
+      final path = tester.hitTestOnBinding(point).path.map((e) => e.target);
+      expect(path, contains(target), reason: 'corner $point must hit the grip');
+    }
+  });
+
+  testWidgets(
+    'a held drag at the bottom edge scrolls the rail and drops past the fold',
+    (tester) async {
+      final rail = await _pumpRail(tester);
+      final gesture = await tester.startGesture(
+        tester.getCenter(_handle('a-02')),
+      );
+      await tester.pump(kLongPressTimeout + kPressTimeout);
+      await gesture.moveBy(const Offset(0, 8));
+      await tester.pump();
+      final bottom = tester.view.physicalSize.height;
+      await gesture.moveTo(Offset(350, bottom - 6));
+      for (var i = 0; i < 90; i++) {
+        await tester.pump(const Duration(milliseconds: 16));
+      }
+      expect(
+        rail.controller.offset,
+        greaterThan(150),
+        reason: 'edge auto-scroll',
+      );
+      await gesture.up();
+      await tester.pumpAndSettle();
+
+      expect(rail.reports, hasLength(1));
+      final beta = rail.reports.single.firstWhere(
+        (g) => g.categoryId == 'cat-b',
+      );
+      expect(
+        beta.channelIds,
+        contains('a-02'),
+        reason: 'reached the far category',
+      );
+    },
+  );
+
+  testWidgets('Move down in a row menu reports the same payload as a drag', (
+    tester,
+  ) async {
+    final rail = await _pumpRail(tester);
+
+    await tester.tap(find.byIcon(AppIcons.moreVertical).at(1));
+    await tester.pumpAndSettle();
+    expect(find.text('Move up'), findsOneWidget);
+    await tester.tap(find.text('Move down'));
+    await tester.pumpAndSettle();
+
+    final alpha = rail.reports.single.firstWhere(
+      (g) => g.categoryId == 'cat-a',
+    );
+    expect(alpha.channelIds.take(3), ['a-00', 'a-02', 'a-01']);
+  });
+
+  testWidgets(
+    'Move up on the first channel of a category leaves the category',
+    (tester) async {
+      final rail = await _pumpRail(tester);
+
+      await tester.tap(find.byIcon(AppIcons.moreVertical).first);
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Move up'));
+      await tester.pumpAndSettle();
+
+      final loose = rail.reports.single.firstWhere((g) => g.categoryId == null);
+      expect(loose.channelIds, ['a-00']);
+    },
+  );
+
+  group('groupsAfterStep', () {
+    List<ChannelSection> sections() => [
+      (null, <Channel>[]),
+      (_categories[0], _channels.take(2).toList()),
+      (_categories[1], _channels.skip(12).take(2).toList()),
+    ];
+
+    test('the last channel of a category steps into the start of the next', () {
+      final groups = groupsAfterStep(sections(), 'a-01', 1)!;
+      expect(groups[1].channelIds, ['a-00']);
+      expect(groups[2].channelIds, ['a-01', 'b-00', 'b-01']);
+    });
+
+    test('the first channel steps into the end of the category above', () {
+      final groups = groupsAfterStep(sections(), 'b-00', -1)!;
+      expect(groups[1].channelIds, ['a-00', 'a-01', 'b-00']);
+      expect(groups[2].channelIds, ['b-01']);
+    });
+
+    test('a collapsed category is stepped over', () {
+      final groups = groupsAfterStep(
+        sections(),
+        'a-01',
+        1,
+        collapsed: {'cat-b'},
+      );
+      expect(groups, isNull, reason: 'nowhere visible to go');
+    });
+
+    test('the ends of the rail have nowhere to step', () {
+      expect(groupsAfterStep(sections(), 'a-00', -1)?[0].channelIds, ['a-00']);
+      expect(groupsAfterStep(sections(), 'b-01', 1), isNull);
+    });
+  });
+
+  testWidgets(
+    'a finger scrolling from a category grip never lifts the category',
+    (tester) async {
+      final rail = await _pumpRail(tester);
+      final grip = find.byType(CategoryDragGrip).first;
+      expect(tester.getSize(grip).width, greaterThanOrEqualTo(44));
+      expect(tester.getSize(grip).height, greaterThanOrEqualTo(44));
+
+      final gesture = await tester.startGesture(tester.getCenter(grip));
+      for (var i = 0; i < 12; i++) {
+        await gesture.moveBy(const Offset(0, -24));
+        await tester.pump(const Duration(milliseconds: 16));
+      }
+      expect(find.byType(RailDragLift), findsNothing, reason: 'nothing lifted');
+      await gesture.up();
+      await tester.pumpAndSettle();
+
+      expect(rail.controller.offset, greaterThan(100), reason: 'it scrolled');
+    },
+  );
+}
