@@ -306,6 +306,15 @@ pub(super) enum ServerFrame {
     ReadStateChanged {
         channel_id: String,
         last_read_seq: i64,
+        manually_unread: bool,
+    },
+    /// The account's override for a channel was set or cleared on some
+    /// device; see [`crate::hub::Event::NotificationOverrideChanged`].
+    /// `preference` is null once the channel follows the account default.
+    #[serde(rename = "notification_override.changed")]
+    NotificationOverrideChanged {
+        channel_id: String,
+        preference: Option<String>,
     },
     /// A bot's private answer to this account; see
     /// [`crate::hub::Event::EphemeralMessage`]. Carries no `seq`.

@@ -303,3 +303,20 @@ impl Store {
         Ok(found.is_some())
     }
 }
+
+/// Records that a device was just used. Called on sign-in, refresh and socket
+/// connect only, never per request, so listing devices costs no write load.
+pub(super) async fn touch_device(
+    tx: &mut sqlx::Transaction<'_, sqlx::Sqlite>,
+    device_id: DeviceId,
+    now: i64,
+) -> anyhow::Result<()> {
+    sqlx::query!(
+        "UPDATE devices SET last_seen_at = ? WHERE id = ?",
+        now,
+        device_id
+    )
+    .execute(&mut **tx)
+    .await?;
+    Ok(())
+}

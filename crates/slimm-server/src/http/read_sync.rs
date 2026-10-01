@@ -23,6 +23,7 @@ pub(super) async fn advance_and_announce(
             user_id,
             channel_id,
             last_read_seq,
+            manually_unread: false,
         });
     }
     Ok(())

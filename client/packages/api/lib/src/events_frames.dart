@@ -448,10 +448,31 @@ class ReportsChanged extends ServerEvent {
 /// read receipt. [lastReadSeq] is the stored marker, which only moves
 /// forward, so a receiver applies it as a max.
 class ReadStateChanged extends ServerEvent {
-  const ReadStateChanged({required this.channelId, required this.lastReadSeq});
+  const ReadStateChanged({
+    required this.channelId,
+    required this.lastReadSeq,
+    this.manuallyUnread = false,
+  });
 
   final String channelId;
   final int lastReadSeq;
+
+  /// Whether the channel is now marked unread by hand. False for a read, and
+  /// for a frame from a server that predates the field.
+  final bool manuallyUnread;
+}
+
+/// This account's override for a channel was set or cleared on some device.
+/// Delivered only to the account's own sockets. A null [preference] means the
+/// channel follows the account default again.
+class NotificationOverrideChanged extends ServerEvent {
+  const NotificationOverrideChanged({
+    required this.channelId,
+    required this.preference,
+  });
+
+  final String channelId;
+  final NotificationPreference? preference;
 }
 
 /// A device this account has not used before just signed in. Delivered only

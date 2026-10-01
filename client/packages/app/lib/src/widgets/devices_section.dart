@@ -11,15 +11,24 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:slimm_api/api.dart' as api;
 import 'package:slimm_design_system/design_system.dart';
 
+import '../providers/live_events.dart';
 import '../providers/providers.dart';
 import 'confirm_dialog.dart';
 import 'run_guarded.dart';
 import 'settings_section_header.dart';
 
 /// The account's devices, refetched when invalidated.
-final devicesProvider = FutureProvider.autoDispose<List<api.Device>>(
-  (ref) => ref.watch(apiProvider).listDevices(),
-);
+///
+/// A sign-in from another device refetches it, so the device a banner warns
+/// about is in the list that banner points to.
+final devicesProvider = FutureProvider.autoDispose<List<api.Device>>((ref) {
+  final signIns = ref
+      .watch(liveEventsProvider)
+      .where((event) => event is api.NewDeviceSignIn)
+      .listen((_) => ref.invalidateSelf());
+  ref.onDispose(signIns.cancel);
+  return ref.watch(apiProvider).listDevices();
+});
 
 class DevicesSection extends ConsumerStatefulWidget {
   const DevicesSection({super.key});

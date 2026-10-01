@@ -74,4 +74,32 @@ mod tests {
             assert!(!is_hidden_char(plain), "{plain:?}");
         }
     }
+
+    /// Every code point, against the ranges `hidden_chars.json` lists. The
+    /// Dart test (`code_hidden_characters_test.dart`) sweeps the same file, so
+    /// the two classifiers cannot disagree about any character.
+    #[test]
+    fn the_shared_fixture_lists_exactly_the_hidden_characters() {
+        let fixture: serde_json::Value =
+            serde_json::from_str(include_str!("../tests/fixtures/hidden_chars.json")).unwrap();
+        let hex = |v: &serde_json::Value| u32::from_str_radix(v.as_str().unwrap(), 16).unwrap();
+        let ranges: Vec<(u32, u32)> = fixture["hidden"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|r| (hex(&r["from"]), hex(&r["to"])))
+            .collect();
+        for code in 0..=0x10FFFFu32 {
+            let Some(c) = char::from_u32(code) else {
+                continue;
+            };
+            let listed = ranges
+                .iter()
+                .any(|(from, to)| (*from..=*to).contains(&code));
+            assert_eq!(is_hidden_char(c), listed, "U+{code:04X}");
+        }
+        for plain in fixture["plain"].as_array().unwrap() {
+            assert!(!is_hidden_char(char::from_u32(hex(plain)).unwrap()));
+        }
+    }
 }

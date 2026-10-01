@@ -70,21 +70,30 @@ impl Store {
     /// Inserts a row when one does not exist yet, because a channel nobody has
     /// ever opened can still be marked - it already reads as unread, and the
     /// mark is what survives them opening and leaving it.
-    pub async fn mark_unread(&self, user_id: UserId, channel_id: ChannelId) -> anyhow::Result<()> {
+    ///
+    /// Returns the stored marker when the mark is new and `None` when the
+    /// channel was already marked, so a caller can skip announcing a no-op.
+    pub async fn mark_unread(
+        &self,
+        user_id: UserId,
+        channel_id: ChannelId,
+    ) -> anyhow::Result<Option<i64>> {
         let now = now_ms();
-        sqlx::query!(
-            "INSERT INTO read_states (user_id, channel_id, last_read_seq, manually_unread, updated_at)
+        let stored = sqlx::query_scalar!(
+            r#"INSERT INTO read_states (user_id, channel_id, last_read_seq, manually_unread, updated_at)
              VALUES (?, ?, 0, 1, ?)
              ON CONFLICT(user_id, channel_id) DO UPDATE SET
                  manually_unread = 1,
-                 updated_at = excluded.updated_at",
+                 updated_at = excluded.updated_at
+             WHERE manually_unread = 0
+             RETURNING last_read_seq AS "last_read_seq!: i64""#,
             user_id,
             channel_id,
             now
         )
-        .execute(&self.pool)
+        .fetch_optional(&self.pool)
         .await?;
-        Ok(())
+        Ok(stored)
     }
 
     /// Whether this user asked to see this channel as unread.

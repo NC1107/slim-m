@@ -167,7 +167,14 @@ async fn put_unread(
     {
         return Err(ApiError::Forbidden);
     }
-    state.store.mark_unread(ctx.user_id, channel_id).await?;
+    if let Some(last_read_seq) = state.store.mark_unread(ctx.user_id, channel_id).await? {
+        state.hub.publish(crate::hub::Event::ReadStateChanged {
+            user_id: ctx.user_id,
+            channel_id,
+            last_read_seq,
+            manually_unread: true,
+        });
+    }
     Ok(Json(read_state_for(&state, ctx.user_id, channel_id).await?))
 }
 

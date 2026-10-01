@@ -119,11 +119,13 @@ impl Store {
         .await?;
         if let Some(uploader) = uploader {
             sqlx::query!(
-                "INSERT OR IGNORE INTO attachment_uploaders (sha256, uploaded_by, uploaded_at)
-                 VALUES (?, ?, ?)",
+                "INSERT INTO attachment_uploaders (sha256, uploaded_by, uploaded_at, filename)
+                 VALUES (?, ?, ?, ?)
+                 ON CONFLICT (sha256, uploaded_by) DO UPDATE SET filename = excluded.filename",
                 sha256,
                 uploader,
-                now
+                now,
+                filename
             )
             .execute(&mut *tx)
             .await?;
@@ -243,7 +245,8 @@ impl Store {
         // Built rather than a fixed `query!` because the id list is variable
         // length and SQLite has no array binding.
         let mut builder = QueryBuilder::new(
-            "SELECT ma.message_id, a.sha256, a.filename, a.content_type, a.size \
+            "SELECT ma.message_id, a.sha256, COALESCE(ma.filename, a.filename) AS filename, \
+                    a.content_type, a.size \
              FROM message_attachments ma \
              JOIN attachments a ON a.sha256 = ma.sha256 \
              WHERE ma.message_id IN (",
@@ -348,6 +351,9 @@ impl Store {
 /// transaction rather than exposed as its own `Store` method, since it only
 /// ever makes sense as part of that larger write.
 ///
+/// The link carries the name its author gave these bytes when they uploaded
+/// them, falling back to the blob's first name when they have none recorded.
+///
 /// Authorization is [`may_link`]'s job and runs before the write lock is
 /// taken; this is the existence half only.
 ///
@@ -358,16 +364,21 @@ impl Store {
 pub(super) async fn link_attachments(
     tx: &mut sqlx::Transaction<'_, sqlx::Sqlite>,
     message_id: MessageId,
+    author_id: UserId,
     sha256_list: &[Vec<u8>],
 ) -> Result<(), LinkError> {
     for (position, sha256) in sha256_list.iter().enumerate() {
         let position = position as i64;
         let affected = sqlx::query!(
-            "INSERT INTO message_attachments (message_id, sha256, position)
-             SELECT ?, ?, ? WHERE EXISTS (SELECT 1 FROM attachments WHERE sha256 = ?)",
+            "INSERT INTO message_attachments (message_id, sha256, position, filename)
+             SELECT ?, ?, ?, (SELECT filename FROM attachment_uploaders
+                              WHERE sha256 = ? AND uploaded_by = ?)
+             WHERE EXISTS (SELECT 1 FROM attachments WHERE sha256 = ?)",
             message_id,
             sha256,
             position,
+            sha256,
+            author_id,
             sha256
         )
         .execute(&mut **tx)
