@@ -11,7 +11,11 @@ on:
       require:
         type: string
         required: false
-        default: "windows-x64,macos"
+        default: "windows-x64,macos,linux-x64"
+      defer:
+        type: boolean
+        required: false
+        default: false
     secrets:
       UPDATE_SIGNING_KEY:
         required: false
@@ -22,10 +26,15 @@ on:
         required: true
         type: string
       require:
-        description: "Comma-separated platforms that must be attached (add linux-x64 once release has run)"
+        description: "Comma-separated platforms that must be attached"
         required: false
         type: string
-        default: "windows-x64,macos"
+        default: "windows-x64,macos,linux-x64"
+      defer:
+        description: "Skip quietly when a required platform is not attached yet, because its producer signs last"
+        required: false
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -45,6 +54,7 @@ jobs:
       UPDATE_SIGNING_KEY: ${{ secrets.UPDATE_SIGNING_KEY }}
       TAG: ${{ inputs.tag }}
       REQUIRE: ${{ inputs.require }}
+      DEFER: ${{ inputs.defer }}
       GH_TOKEN: ${{ github.token }}
     steps:
       - name: check secret
@@ -69,21 +79,33 @@ jobs:
             --pattern 'slim-m-client-*-windows-x64.zip' \
             --pattern 'slim-m-client-*-macos.zip'
 
-      - name: build and sign the manifest
+      # The Linux tarball (release) and the Windows and macOS archives (desktop-clients) land in either order, so each producer calls this with defer and the last one to attach signs.
+      - name: build the manifest
+        id: build
         if: steps.gate.outputs.ready == 'true'
         run: |
+          extra=()
+          [ "$DEFER" = "true" ] && extra=(--defer-if-missing)
           python3 scripts/update-manifest.py build --tag "$TAG" --dir dist \
-            --repo "$GITHUB_REPOSITORY" --require "$REQUIRE" --out manifest.json
-          python3 scripts/update-manifest.py sign --manifest manifest.json --sig manifest.json.sig
+            --repo "$GITHUB_REPOSITORY" --require "$REQUIRE" --out manifest.json "${extra[@]}"
+          if [ -f manifest.json ]; then
+            echo "built=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "::notice::Not every required platform is attached to $TAG yet. The producer that attaches the last one signs the manifest."
+          fi
+
+      - name: sign the manifest
+        if: steps.build.outputs.built == 'true'
+        run: python3 scripts/update-manifest.py sign --manifest manifest.json --sig manifest.json.sig
 
       # Round trip against the key's own public half, so a bad secret fails here and not on a user's machine.
       - name: verify what was just signed
-        if: steps.gate.outputs.ready == 'true'
+        if: steps.build.outputs.built == 'true'
         run: |
           pubkey="$(python3 scripts/update-manifest.py pubkey)"
           python3 scripts/update-manifest.py verify --manifest manifest.json \
             --sig manifest.json.sig --pubkey "$pubkey" --dir dist
 
       - name: attach to the github release
-        if: steps.gate.outputs.ready == 'true'
+        if: steps.build.outputs.built == 'true'
         run: gh release upload "$TAG" manifest.json manifest.json.sig --repo "$GITHUB_REPOSITORY" --clobber

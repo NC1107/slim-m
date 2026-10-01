@@ -15,10 +15,16 @@ enum SelfUpdateFailureKind {
   unsupportedInstall,
   installFailed,
   rolledBack,
+  noArtifactForPlatform,
 }
 
 class SelfUpdateFailure implements Exception {
-  const SelfUpdateFailure(this.kind, this.message, {this.detail});
+  const SelfUpdateFailure(
+    this.kind,
+    this.message, {
+    this.detail,
+    this.releaseUrl,
+  });
 
   final SelfUpdateFailureKind kind;
 
@@ -27,6 +33,9 @@ class SelfUpdateFailure implements Exception {
 
   /// Technical detail for `AppErrorState.detail`.
   final String? detail;
+
+  /// The release page to download from by hand, when that is the way forward.
+  final String? releaseUrl;
 
   @override
   String toString() => 'SelfUpdateFailure(${kind.name}): $message';

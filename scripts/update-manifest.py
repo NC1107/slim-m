@@ -11,7 +11,7 @@ key (base64), which `pubkey` prints for the owner's one-time setup.
 Stdlib only, with openssl (3.x, ed25519 raw signing) as the one external tool,
 since python has no ed25519 in its standard library.
 
-  build   --tag T --dir D --repo R [--require a,b] --out manifest.json
+  build   --tag T --dir D --repo R [--require a,b] [--defer-if-missing] --out manifest.json
   sign    --manifest M --sig S            (key in $UPDATE_SIGNING_KEY)
   pubkey                                  (key in $UPDATE_SIGNING_KEY)
   verify  --manifest M --sig S --pubkey B64 [--dir D] [--newer-than V]
@@ -36,12 +36,16 @@ PLATFORMS = {
     "windows-x64": re.compile(r"^slim-m-client-.+-windows-x64\.zip$"),
     "macos": re.compile(r"^slim-m-client-.+-macos\.zip$"),
 }
-DEFAULT_REQUIRE = "windows-x64,macos"
+DEFAULT_REQUIRE = "windows-x64,macos,linux-x64"
 MANIFEST_NAME = "manifest.json"
 SIGNATURE_NAME = "manifest.json.sig"
 
 
 class ManifestError(Exception):
+    pass
+
+
+class MissingPlatforms(ManifestError):
     pass
 
 
@@ -79,7 +83,7 @@ def build_manifest(tag: str, directory: Path, repo: str, require: list[str]) -> 
             }
     missing = [name for name in require if name not in artifacts]
     if missing:
-        raise ManifestError(f"required platforms missing from {directory}: {', '.join(missing)}")
+        raise MissingPlatforms(f"required platforms missing from {directory}: {', '.join(missing)}")
     return {"schema": SCHEMA, "version": version, "tag": tag, "artifacts": artifacts}
 
 
@@ -220,6 +224,7 @@ def main(argv: list[str]) -> int:
     build.add_argument("--repo", required=True)
     build.add_argument("--require", default=DEFAULT_REQUIRE)
     build.add_argument("--out", type=Path, required=True)
+    build.add_argument("--defer-if-missing", action="store_true")
     sign = sub.add_parser("sign")
     sign.add_argument("--manifest", type=Path, required=True)
     sign.add_argument("--sig", type=Path, required=True)
@@ -234,7 +239,13 @@ def main(argv: list[str]) -> int:
     try:
         if args.cmd == "build":
             require = [name for name in args.require.split(",") if name]
-            manifest = build_manifest(args.tag, existing_dir(args.dir), args.repo, require)
+            try:
+                manifest = build_manifest(args.tag, existing_dir(args.dir), args.repo, require)
+            except MissingPlatforms as err:
+                if not args.defer_if_missing:
+                    raise
+                print(f"deferred: {err}")
+                return 0
             output_file(args.out, MANIFEST_NAME).write_bytes(canonical(manifest))
         elif args.cmd == "sign":
             signature = sign_bytes(existing_file(args.manifest).read_bytes())

@@ -43,7 +43,7 @@ Taken from `client-v0.89.0` as it stands now.
 | `slim-m-client-android.apk` | `release.yml` |
 | `slim-m-client-<version>-windows-x64.zip` | `desktop-clients.yml` |
 | `slim-m-client-<version>-macos.zip` | `desktop-clients.yml` |
-| `manifest.json` | `update-manifest.yml` |
+| `manifest.json` | `update-manifest.yml`, called by `release.yml` and `desktop-clients.yml`, the last to attach signs |
 | `manifest.json.sig` | `update-manifest.yml` |
 
 A `SHA256SUMS.asc` is added when the GPG secret is set; the workflow skips only that file when it is not.
@@ -103,12 +103,15 @@ The job checks out the tag, but the workflow file that runs is the one on the re
 ### A missing manifest on its own
 
 `update-manifest.yml` takes `tag` and `require`.
-`require` is the comma-separated list of platforms that must already be attached, and defaults to `windows-x64,macos`.
-Add `linux-x64` once `release.yml` has attached the tarball.
+`require` is the comma-separated list of platforms that must already be attached, and defaults to `windows-x64,macos,linux-x64`.
+Both `release.yml` and `desktop-clients.yml` call it with `defer: true`, so whichever attaches the last archive signs the manifest, and a backfill should not normally be needed.
+A run by hand without `defer` fails when a required archive is missing.
 
 ```bash
 gh workflow run update-manifest.yml --ref main -f tag=client-v<version> -f require=windows-x64,macos,linux-x64
 ```
+
+The release-asset watchdog also reports a release whose `manifest.json` omits a platform whose archive is attached (client 0.88.0 omits `linux-x64`); the same command, from a ref with this change, re-signs it.
 
 It needs the `UPDATE_SIGNING_KEY` secret.
 While the secret is unset the job passes with a warning and attaches nothing, so a green run with no `manifest.json` on the release means the secret is missing.

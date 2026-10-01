@@ -167,7 +167,7 @@ jobs:
 
       - {if: failure(), uses: ./.github/actions/native-hooks-diagnose}
 
-  # Signs a manifest of the archives above; a no-op with a warning until UPDATE_SIGNING_KEY exists.
+  # Signs the manifest once every platform is attached, so it defers when release.yml's Linux tarball is not there yet; a no-op with a warning until UPDATE_SIGNING_KEY exists.
   update-manifest:
     name: signed update manifest
     needs: [windows-client, macos-client]
@@ -176,5 +176,6 @@ jobs:
     uses: ./.github/workflows/update-manifest.yml
     with:
       tag: ${{ inputs.tag || github.ref_name }}
+      defer: true
     secrets:
       UPDATE_SIGNING_KEY: ${{ secrets.UPDATE_SIGNING_KEY }}
