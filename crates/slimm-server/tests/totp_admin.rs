@@ -398,6 +398,8 @@ async fn omitting_the_policy_leaves_it_alone() {
         ))
         .await
         .unwrap();
+    // The policy now asks administrators for a factor, so this one enrols first.
+    enrol_and_confirm(&router, &admin_token).await;
     let response = router
         .clone()
         .oneshot(request(
