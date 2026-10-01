@@ -22,9 +22,7 @@ from datetime import datetime, timedelta, timezone
 
 DEFAULT_REPO = "Slim-m-org/slim-m"
 
-# One regex per required asset; {v} is the tag's version. Kept in sync with
-# release.yml, desktop-clients.yml and update-manifest.yml, and with the
-# complete releases client-v0.89.0 (10 assets) and server-v0.77.0 (3).
+# One regex per required asset; {v} is the tag's version (docs/ci.md, release-asset-watchdog).
 REQUIRED = {
     "client-v": [
         r"manifest\.json",

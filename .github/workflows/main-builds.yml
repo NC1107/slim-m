@@ -29,8 +29,7 @@ on:
     paths:
       - "client/**"
       - "crates/**"
-      # The same root files server-ci.yml treats as server-affecting: a lone
-      # dependency, toolchain or base-image bump passed CI and never redeployed.
+      # The root files server-ci.yml treats as server-affecting; a lone bump once never redeployed.
       - "Cargo.toml"
       - "Cargo.lock"
       - "rust-toolchain.toml"
@@ -40,8 +39,7 @@ on:
       - ".github/workflows/copr-publish.yml"
       - ".github/actions/**"
       - ".sqlx/**"
-      # Its own file, so a change to how these builds work is validated and
-      # deployed by them rather than waiting on unrelated work to trigger it.
+      # Its own file, so a change to how these builds work is run by them.
       - ".github/workflows/main-builds.yml"
       # A spec fix must be able to trigger the job that builds the rpm it fixes.
       - "packaging/**"
@@ -49,9 +47,7 @@ on:
       - "!client/CHANGELOG.md"
       - "!client/pubspec.yaml"
       - "!client/packages/app/pubspec.yaml"
-  # By hand, for the one thing a push cannot recover from: a run cancelled by a
-  # later push, where that later push changed nothing this side builds. See
-  # docs/ci.md's concurrency section for the day that happened.
+  # By hand, to recover a run a later push cancelled; docs/ci.md's concurrency section.
   workflow_dispatch:
     inputs:
       server:

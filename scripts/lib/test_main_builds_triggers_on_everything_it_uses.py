@@ -11,9 +11,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[2]
 WORKFLOW = ROOT / ".github" / "workflows" / "main-builds.yml"
 
-# Trigger paths that deliberately map to no filter output: the server side
-# is decided by scripts/server-image-needed.sh, and the file itself only
-# needs to run the workflow.
+# Trigger paths with no filter output on purpose; scripts/server-image-needed.sh decides the server side.
 UNFILTERED = {
     ".github/workflows/main-builds.yml",
     "docker/server.Dockerfile",
