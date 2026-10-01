@@ -392,8 +392,7 @@ http.Client voiceApi({
       return http.Response('', 204);
     }
     if (request.url.path.endsWith('/voice/roster')) {
-      final body = jsonEncode({'participants': [], 'call_age_ms': callAgeMs});
-      return http.Response(body, 200);
+      return http.Response('{"participants":[],"call_age_ms":$callAgeMs}', 200);
     }
     if (!request.url.path.endsWith('/voice/token')) {
       return http.Response('{}', 404);

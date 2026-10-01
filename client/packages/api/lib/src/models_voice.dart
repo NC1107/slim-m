@@ -86,7 +86,8 @@ class VoiceRoster {
     final ageMs = json['call_age_ms'] as int?;
     return VoiceRoster(
       participants: (json['participants'] as List<dynamic>)
-          .map((p) => VoiceRosterParticipant.fromJson(p as Map<String, dynamic>))
+          .map(
+              (p) => VoiceRosterParticipant.fromJson(p as Map<String, dynamic>))
           .toList(growable: false),
       callAge: ageMs == null ? null : Duration(milliseconds: ageMs),
     );
