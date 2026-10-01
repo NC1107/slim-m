@@ -62,6 +62,13 @@ class ModuleSceneFrame extends StatelessWidget {
   /// because the window share binds long before this does.
   static const maxCellSize = 160.0;
 
+  /// The longest an inline board may be drawn on any window, whatever its own
+  /// coordinate space. The per-cell bound only exists for a grid; a scene made
+  /// of rects and text declares a height in arbitrary units, so a 300 unit
+  /// board never met it and took the window share instead, 650px on a
+  /// 1818x1071 desktop. This is the bound that holds for every scene.
+  static const maxInlineEdge = 560.0;
+
   @override
   Widget build(BuildContext context) {
     final tokens = Theme.of(context).extension<AppTokens>()!;
@@ -103,7 +110,10 @@ class ModuleSceneFrame extends StatelessWidget {
     final cellBound = sceneHeight > 0
         ? sceneHeight * maxCellSize
         : double.infinity;
-    final maxHeight = math.max(minHeight, math.min(windowBound, cellBound));
+    final maxHeight = math.max(
+      minHeight,
+      math.min(math.min(windowBound, cellBound), maxInlineEdge),
+    );
     return LayoutBuilder(
       builder: (context, constraints) {
         final widthForHeight = maxHeight * ratio;

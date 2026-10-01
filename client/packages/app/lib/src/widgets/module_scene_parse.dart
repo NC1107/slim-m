@@ -55,9 +55,13 @@ ModuleScene? parseModuleScene(String raw) {
     }
   }
 
+  final (width, height) = _boundedAspect(
+    _double(decoded['width'], 100),
+    _double(decoded['height'], 100),
+  );
   return ModuleScene(
-    width: _double(decoded['width'], 100),
-    height: _double(decoded['height'], 100),
+    width: width,
+    height: height,
     ops: ops,
     background: _string(decoded['background']),
     state: _string(decoded['state']),
@@ -281,3 +285,15 @@ String? _string(Object? value) => value is String ? value : null;
 List<String> _stringList(Object? value) => value is List
     ? value.whereType<String>().toList(growable: false)
     : const [];
+
+/// Grows the short axis until the ratio is within [ModuleScene.maxAspect].
+///
+/// Growing rather than shrinking keeps every op at the coordinates the module
+/// wrote it at; the scene draws with empty room instead of squashed.
+(double, double) _boundedAspect(double width, double height) {
+  if (width <= 0 || height <= 0) return (width, height);
+  const limit = ModuleScene.maxAspect;
+  if (width > height * limit) return (width, width / limit);
+  if (height > width * limit) return (height / limit, height);
+  return (width, height);
+}

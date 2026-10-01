@@ -71,7 +71,7 @@ class ModuleSceneView extends StatefulWidget {
   /// Opens this scene full screen. Absent means no expand control is offered -
   /// the Dock panel's ephemeral runs have nowhere to expand to, and the
   /// full-screen view itself is already there.
-  final VoidCallback? onExpand;
+  final FutureOr<void> Function()? onExpand;
 
   @override
   State<ModuleSceneView> createState() => _ModuleSceneViewState();
@@ -87,6 +87,7 @@ class _ModuleSceneViewState extends State<ModuleSceneView> {
 
   /// Decoded bitmaps for this view's `image` ops; see `module_scene_images.dart`.
   final _images = SceneImageCache();
+  final _expandFocus = FocusNode(debugLabel: 'scene expand');
   bool _busy = false;
   bool _playing = false;
   String? _error;
@@ -175,6 +176,7 @@ class _ModuleSceneViewState extends State<ModuleSceneView> {
     _timer?.cancel();
     _images.removeListener(_onImageDecoded);
     _images.dispose();
+    _expandFocus.dispose();
     super.dispose();
   }
 
@@ -392,6 +394,13 @@ class _ModuleSceneViewState extends State<ModuleSceneView> {
     return '$prefix:${cells.join(';')}';
   }
 
+  /// Focus goes back to the control that opened full screen, so a keyboard
+  /// user leaving it is not dropped at the top of the page.
+  Future<void> _expand(FutureOr<void> Function() open) async {
+    await open();
+    if (mounted) _expandFocus.requestFocus();
+  }
+
   @override
   Widget build(BuildContext context) {
     final tokens = Theme.of(context).extension<AppTokens>()!;
@@ -438,7 +447,8 @@ class _ModuleSceneViewState extends State<ModuleSceneView> {
                   icon: AppIcons.expand,
                   semanticLabel: 'Open full screen',
                   tooltip: 'Open full screen',
-                  onPressed: expand,
+                  focusNode: _expandFocus,
+                  onPressed: () => _expand(expand),
                 ),
             ],
           ),

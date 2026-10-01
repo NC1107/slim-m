@@ -289,6 +289,9 @@ A module opts in simply by choosing to emit one, and any output that is not a va
 ```
 
 - `width` and `height` are the scene's own logical units; the painter scales them to whatever box it is given.
+- The ratio between the long and short axis is clamped to **4:1** at parse, by growing the short axis, so an op keeps the coordinates you wrote it at and the scene gains empty room instead of being squashed.
+  That is the most a 390 point phone card can show while the short side stays tall enough to see and aim at (98 points); a 1000:1 scene would otherwise be a 3 point sliver.
+- Inline in a transcript a scene is drawn at most about 560 points tall, whatever units `width` and `height` use.
   Coordinates in ops are in these units.
 - `background` is an optional fill for the whole scene.
 - `status` is an optional one-line caption shown under the scene.

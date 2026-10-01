@@ -468,6 +468,14 @@ class ModuleScene {
     this.live = false,
   });
 
+  /// The widest ratio between a scene's long and short axis, clamped at parse.
+  ///
+  /// Chosen from phone width: a 4:1 board on a 390px card is still 98px tall,
+  /// enough to see and aim at, where the 1000:1 a module could declare was a
+  /// 3px sliver. Like [CellsOp.maxPerAxis] it is a ceiling set by what a
+  /// person can use, not by whatever else happens to bound the scene.
+  static const maxAspect = 4.0;
+
   final double width;
   final double height;
   final List<SceneOp> ops;
