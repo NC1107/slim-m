@@ -14,6 +14,8 @@ class UserProfile {
     required this.username,
     required this.displayName,
     required this.createdAt,
+    this.nickname,
+    this.accountDisplayName,
     this.avatarUpdatedAt,
     this.roles = const [],
     this.roleIds = const [],
@@ -30,7 +32,18 @@ class UserProfile {
 
   final String id;
   final String username;
+
+  /// What readers see: [nickname] when an administrator gave this account
+  /// one, else the account's own name ([accountDisplayName]).
   final String displayName;
+
+  /// The space-local name an administrator gave this account, or null. See
+  /// `docs/decisions/0053-member-nicknames.md`.
+  final String? nickname;
+
+  /// The account's own name, whatever [nickname] is. Null on a server older
+  /// than nicknames, where [displayName] already is the account's own.
+  final String? accountDisplayName;
 
   /// Unix milliseconds.
   final int createdAt;
@@ -112,6 +125,8 @@ class UserProfile {
         id: json['id'] as String,
         username: json['username'] as String,
         displayName: json['display_name'] as String,
+        nickname: json['nickname'] as String?,
+        accountDisplayName: json['account_display_name'] as String?,
         createdAt: json['created_at'] as int,
         avatarUpdatedAt: json['avatar_updated_at'] as int?,
         // Absent on a server older than the roles field is not the same as a
@@ -141,6 +156,7 @@ class UserProfile {
           id == other.id &&
           username == other.username &&
           displayName == other.displayName &&
+          nickname == other.nickname &&
           createdAt == other.createdAt &&
           avatarUpdatedAt == other.avatarUpdatedAt &&
           hoistedRoleId == other.hoistedRoleId &&
@@ -158,6 +174,7 @@ class UserProfile {
         id,
         username,
         displayName,
+        nickname,
         createdAt,
         avatarUpdatedAt,
         hoistedRoleId,

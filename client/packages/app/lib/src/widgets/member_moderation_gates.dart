@@ -30,6 +30,7 @@ class MemberModerationGates {
     required this.voiceChannelId,
     required this.outranked,
     required this.canTimeOut,
+    required this.canRename,
     required this.canOfferTimeoutChips,
     required this.canRemove,
     required this.canManageRoles,
@@ -55,6 +56,10 @@ class MemberModerationGates {
 
   final bool canTimeOut;
 
+  /// Renaming rides the kick bit and the same no-escalation rule as a timeout,
+  /// but stays on offer over a member already serving one.
+  final bool canRename;
+
   /// [canTimeOut], narrowed to a member not already timed out - offering the
   /// chips again over a member already serving one reads as the action
   /// having failed.
@@ -70,6 +75,7 @@ class MemberModerationGates {
   /// these rights sees no row, never a disabled one.
   bool get showModeration =>
       canOfferTimeoutChips ||
+      canRename ||
       canRemove ||
       canManageRoles ||
       canEject ||
@@ -131,6 +137,7 @@ MemberModerationGates memberModerationGates(
     voiceChannelId: voiceChannelId,
     outranked: outranked,
     canTimeOut: canTimeOut,
+    canRename: canTimeOut,
     canOfferTimeoutChips: canOfferTimeoutChips,
     canRemove: canRemove,
     canManageRoles: canManageRoles,

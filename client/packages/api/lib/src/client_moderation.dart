@@ -163,6 +163,28 @@ extension SlimmApiMemberModeration on SlimmApi {
         expectNoContent: true,
       );
 
+  /// Gives a member or bot a space-local name that every reader sees, leaving
+  /// the account's own name alone. Requires KICK_MEMBERS, and refuses the same
+  /// targets a timeout does. Decision 0053.
+  Future<void> setMemberNickname({
+    required String userId,
+    required String nickname,
+  }) =>
+      _send(
+        'PUT',
+        '/members/$userId/nickname',
+        body: {'nickname': nickname},
+        expectNoContent: true,
+      );
+
+  /// Removes a space-local name, so the account's own shows again. Requires
+  /// KICK_MEMBERS. Idempotent.
+  Future<void> clearMemberNickname(String userId) => _send(
+        'DELETE',
+        '/members/$userId/nickname',
+        expectNoContent: true,
+      );
+
   /// Removes a member from the Space. Requires BAN_MEMBERS.
   ///
   /// Revokes their sessions, stops them signing in, revokes invites they

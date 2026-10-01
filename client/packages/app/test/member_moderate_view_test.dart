@@ -78,6 +78,7 @@ MemberModerateView _view(
   bool canManageRoles = true,
   bool outranked = false,
   bool canOfferTimeoutChips = false,
+  bool canRename = false,
   bool canIssueReset = false,
   bool canRemove = false,
   bool canEject = false,
@@ -91,6 +92,7 @@ MemberModerateView _view(
   canManageRoles: canManageRoles,
   outranked: outranked,
   canOfferTimeoutChips: canOfferTimeoutChips,
+  canRename: canRename,
   canIssueReset: canIssueReset,
   canRemove: canRemove,
   canEject: canEject,
@@ -329,5 +331,22 @@ void main() {
       findsOneWidget,
     );
     expect(find.text('TIME OUT'), findsNothing);
+  });
+
+  testWidgets('Rename is offered only where the gate allows it', (
+    tester,
+  ) async {
+    for (final canRename in [true, false]) {
+      await tester.pumpWidget(
+        _harness(
+          child: Builder(
+            builder: (context) => _view(context, canRename: canRename),
+          ),
+        ),
+      );
+      await tester.pump();
+
+      expect(find.text('Rename...'), canRename ? findsOneWidget : findsNothing);
+    }
   });
 }

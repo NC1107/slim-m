@@ -30,6 +30,7 @@ import '../providers/providers.dart';
 import 'member_profile_sections.dart';
 import 'moderation_unavailable_caption.dart';
 import 'clear_totp_sheet.dart';
+import 'member_rename_sheet.dart';
 import 'reset_code_sheet.dart';
 import 'run_guarded.dart';
 import '../action_labels.dart';
@@ -42,6 +43,7 @@ class MemberModerateView extends ConsumerStatefulWidget {
     required this.canManageRoles,
     required this.outranked,
     required this.canOfferTimeoutChips,
+    required this.canRename,
     required this.canIssueReset,
     required this.canRemove,
     required this.canEject,
@@ -62,6 +64,7 @@ class MemberModerateView extends ConsumerStatefulWidget {
   /// The member holds permissions the viewer does not; see the gates.
   final bool outranked;
   final bool canOfferTimeoutChips;
+  final bool canRename;
   final bool canIssueReset;
   final bool canRemove;
   final bool canEject;
@@ -160,6 +163,15 @@ class _MemberModerateViewState extends ConsumerState<MemberModerateView>
               'they hold permissions you do not.',
             ),
           ),
+        ],
+        if (widget.canRename) ...[
+          const AppMenuLabel('NAME'),
+          RenameMemberMenuItem(
+            host: widget.host,
+            profile: live ?? widget.profile,
+            onDone: widget.onDone,
+          ),
+          const AppMenuDivider(),
         ],
         if (widget.canOfferTimeoutChips) ...[
           const AppMenuLabel('TIME OUT'),
