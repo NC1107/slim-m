@@ -22,6 +22,7 @@ import 'package:slimm_app/src/providers/providers.dart';
 import 'package:slimm_app/src/screens/admin/account_recovery_screen.dart';
 import 'package:slimm_design_system/design_system.dart';
 import 'package:slimm_platform/platform.dart';
+import 'package:slimm_app/src/action_labels.dart';
 
 const _tokens = api.TokenPair(
   userId: 'admin-1',
@@ -104,7 +105,7 @@ void main() {
     // The pane explains recovery, because there is no email path to guess at.
     expect(find.textContaining('no recovery email'), findsOneWidget);
 
-    await tester.tap(find.text('Issue a reset code'));
+    await tester.tap(find.text(ActionLabels.createResetCode));
     await tester.pumpAndSettle();
     expect(
       find.text('Choose a member'),
@@ -131,7 +132,7 @@ void main() {
   testWidgets('a cancelled pick issues nothing', (tester) async {
     await _pump(tester, permissions: Perm.administrator);
 
-    await tester.tap(find.text('Issue a reset code'));
+    await tester.tap(find.text(ActionLabels.createResetCode));
     await tester.pumpAndSettle();
     expect(find.text('Choose a member'), findsOneWidget);
 
@@ -140,7 +141,7 @@ void main() {
 
     expect(find.text('Choose a member'), findsNothing);
     expect(
-      find.text('Issue a reset code'),
+      find.text(ActionLabels.createResetCode),
       findsOneWidget,
       reason: 'backing out returns to the pane, having issued nothing',
     );
@@ -157,7 +158,7 @@ void main() {
     await _pump(tester, permissions: Perm.manageServer);
 
     expect(
-      find.text('Issue a reset code'),
+      find.text(ActionLabels.createResetCode),
       findsNothing,
       reason: 'the action must not be visible to somebody who cannot take it',
     );

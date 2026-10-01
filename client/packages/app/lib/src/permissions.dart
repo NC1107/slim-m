@@ -7,6 +7,8 @@
 /// server-side from scratch regardless of what a caller can see.
 library;
 
+import 'action_labels.dart';
+
 abstract final class Perm {
   static const int administrator = 1 << 0;
   static const int viewChannel = 1 << 1;
@@ -47,7 +49,7 @@ abstract final class Perm {
     (manageMessages, 'Manage messages'),
     (manageChannels, 'Manage channels'),
     (manageRoles, 'Manage roles'),
-    (kickMembers, 'Kick members'),
+    (kickMembers, ActionLabels.removeMembers),
     (banMembers, 'Ban members'),
     (createInvite, 'Create invites'),
     (addReactions, 'Add reactions'),
@@ -105,7 +107,7 @@ abstract final class Perm {
       ),
       PermSpec(
         kickMembers,
-        'Kick members',
+        ActionLabels.removeMembers,
         'Remove someone; they can rejoin with an invite.',
         elevated: true,
       ),

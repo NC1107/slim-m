@@ -23,6 +23,7 @@ import 'package:slimm_app/src/screens/admin/emoji_screen.dart';
 import 'package:slimm_app/src/screens/admin/emoji_upload_card.dart';
 import 'package:slimm_design_system/design_system.dart';
 import 'package:slimm_platform/platform.dart';
+import 'package:slimm_app/src/action_labels.dart';
 
 const _tokens = TokenPair(
   userId: 'self',
@@ -202,7 +203,7 @@ void main() {
       findsOneWidget,
       reason: 'the field normalises to nothing, so the button cannot work',
     );
-    await tester.tap(find.text('Add emoji'));
+    await tester.tap(find.text(ActionLabels.createEmoji));
     await tester.pumpAndSettle();
     expect(server.seen.where((r) => r.method == 'POST'), isEmpty);
   });
@@ -217,7 +218,7 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.text('Choose image'));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('Add emoji'));
+    await tester.tap(find.text(ActionLabels.createEmoji));
     await tester.pumpAndSettle();
 
     final posts = server.seen.where((r) => r.method == 'POST').toList();
@@ -244,7 +245,7 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.text('Choose image'));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('Add emoji'));
+    await tester.tap(find.text(ActionLabels.createEmoji));
     await tester.pumpAndSettle();
 
     expect(
@@ -266,7 +267,7 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.text('Choose image'));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('Add emoji'));
+    await tester.tap(find.text(ActionLabels.createEmoji));
     await tester.pumpAndSettle();
 
     expect(server.seen.where((r) => r.method == 'POST'), isEmpty);

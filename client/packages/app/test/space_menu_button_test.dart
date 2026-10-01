@@ -23,6 +23,7 @@ import 'package:slimm_app/src/widgets/space_menu_button.dart';
 import 'package:slimm_data/data.dart';
 import 'package:slimm_design_system/design_system.dart';
 import 'package:slimm_platform/platform.dart';
+import 'package:slimm_app/src/action_labels.dart';
 
 const _tokens = api.TokenPair(
   userId: 'self',
@@ -112,7 +113,7 @@ Future<void> _pump(WidgetTester tester, ProviderContainer container) async {
 
 void main() {
   testWidgets(
-    'a caller with MANAGE_CHANNELS sees Add channel and Add category, '
+    'a caller with MANAGE_CHANNELS sees Create channel and Create category, '
     'alongside Space settings',
     (tester) async {
       final container = _setup(Perm.manageChannels);
@@ -122,8 +123,8 @@ void main() {
       await tester.tap(find.bySemanticsLabel('Space menu'));
       await tester.pumpAndSettle();
 
-      expect(find.text('Add channel'), findsOneWidget);
-      expect(find.text('Add category'), findsOneWidget);
+      expect(find.text(ActionLabels.createChannel), findsOneWidget);
+      expect(find.text(ActionLabels.createCategory), findsOneWidget);
       expect(find.text('Space settings'), findsOneWidget);
     },
   );
@@ -139,11 +140,11 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Space settings'), findsOneWidget);
-    expect(find.text('Add channel'), findsNothing);
-    expect(find.text('Add category'), findsNothing);
+    expect(find.text(ActionLabels.createChannel), findsNothing);
+    expect(find.text(ActionLabels.createCategory), findsNothing);
   });
 
-  testWidgets('Add channel opens the create sheet, which posts the name and '
+  testWidgets('Create channel opens the create sheet, which posts the name and '
       'kind and lands on the new channel', (tester) async {
     final requests = <http.Request>[];
     final container = _setup(
@@ -167,7 +168,7 @@ void main() {
 
     await tester.tap(find.bySemanticsLabel('Space menu'));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('Add channel'));
+    await tester.tap(find.text(ActionLabels.createChannel));
     await tester.pumpAndSettle();
     expect(find.text('Create a channel'), findsOneWidget);
 
@@ -187,7 +188,7 @@ void main() {
   });
 
   testWidgets(
-    'Add category opens the create sheet directly, which posts the name',
+    'Create category opens the create sheet directly, which posts the name',
     (tester) async {
       final requests = <http.Request>[];
       final container = _setup(
@@ -210,7 +211,7 @@ void main() {
 
       await tester.tap(find.bySemanticsLabel('Space menu'));
       await tester.pumpAndSettle();
-      await tester.tap(find.text('Add category'));
+      await tester.tap(find.text(ActionLabels.createCategory));
       await tester.pumpAndSettle();
       expect(find.text('Create a category'), findsOneWidget);
 

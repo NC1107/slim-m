@@ -19,6 +19,7 @@ import '../settings_screen_scaffold.dart';
 import 'report_card.dart';
 import 'report_history_pane.dart';
 import 'reports_load_more_row.dart';
+import '../../widgets/settings_empty.dart';
 
 class ReportsScreen extends StatelessWidget {
   const ReportsScreen({super.key});
@@ -108,25 +109,30 @@ class _OpenQueuePane extends ConsumerWidget {
       ),
       errorMessage: 'Could not load reports.',
       onRetry: controller.refresh,
-      isEmpty: (list) => list.isEmpty,
-      emptyMessage: 'The queue is empty.',
-      data: (context, list) => ListView.separated(
-        padding: const EdgeInsets.all(AppSpacing.s16),
-        // One trailing row when the last page came back full; see the controller.
-        itemCount: reports.more || reports.error != null
-            ? list.length + 1
-            : list.length,
-        separatorBuilder: (_, __) => const SizedBox(height: AppSpacing.s12),
-        itemBuilder: (context, i) => i == list.length
-            ? ReportsLoadMoreRow(
-                loading: reports.loading,
-                error: reports.error,
-                failureMessage: 'Could not load more reports.',
-                onTap: controller.loadMore,
-              )
-            // Keyed by id, or a shortened page hands the next report the previous card's busy state.
-            : ReportCard(key: ValueKey(list[i].id), report: list[i]),
-      ),
+      center: false,
+      data: (context, list) => list.isEmpty
+          ? ListView(
+              padding: const EdgeInsets.symmetric(horizontal: AppSpacing.s16),
+              children: const [SettingsEmpty('The queue is empty.')],
+            )
+          : ListView.separated(
+              padding: const EdgeInsets.all(AppSpacing.s16),
+              // One trailing row when the last page came back full; see the controller.
+              itemCount: reports.more || reports.error != null
+                  ? list.length + 1
+                  : list.length,
+              separatorBuilder: (_, __) =>
+                  const SizedBox(height: AppSpacing.s12),
+              itemBuilder: (context, i) => i == list.length
+                  ? ReportsLoadMoreRow(
+                      loading: reports.loading,
+                      error: reports.error,
+                      failureMessage: 'Could not load more reports.',
+                      onTap: controller.loadMore,
+                    )
+                  // Keyed by id, or a shortened page hands the next report the previous card's busy state.
+                  : ReportCard(key: ValueKey(list[i].id), report: list[i]),
+            ),
     );
   }
 }

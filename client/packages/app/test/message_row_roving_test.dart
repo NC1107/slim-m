@@ -139,7 +139,7 @@ void main() {
     const order = [
       'View profile',
       'Priya, view profile',
-      'Add a reaction',
+      'Add reaction',
       'Reply',
       'Reply in thread',
       'Edit',
@@ -174,7 +174,7 @@ void main() {
     for (var i = 0; i < 3; i++) {
       await _key(tester, LogicalKeyboardKey.arrowRight);
     }
-    expect(_focusedControl(), 'Add a reaction');
+    expect(_focusedControl(), 'Add reaction');
     await _key(tester, LogicalKeyboardKey.arrowRight);
     expect(_focusedControl(), 'Reply');
     await _key(tester, LogicalKeyboardKey.enter);

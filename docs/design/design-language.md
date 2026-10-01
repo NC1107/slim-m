@@ -2,6 +2,8 @@
 
 Scope: color, typography, spacing, iconography, motion, and how they compile into Flutter design tokens.
 
+Wording (one verb per action, one name per thing) is in [`wording.md`](wording.md).
+
 > **Status, 2026-07-26.** This is the original proposal. Where it disagrees with
 > `client/packages/design_system/lib/src/app_tokens.dart`, **the code is
 > correct** - values were tuned to pass the WCAG contrast gate, and the

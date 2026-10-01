@@ -42,6 +42,7 @@ import '../screens/admin/server_metrics_screen.dart';
 import '../screens/admin/storage_screen.dart';
 import '../screens/admin/webhooks_screen.dart';
 import 'settings_panes.dart';
+import '../action_labels.dart';
 
 /// Whether [permissions] carries any of the bits that gate a pane here.
 /// Shared with the rail's Space menu, which must hide its own entry point on
@@ -161,12 +162,12 @@ List<SettingsPaneGroup> spaceSettingsPaneGroups(
     ),
     // What the Space is above; how it is running below - see the library doc.
     SettingsPaneGroup(
-      label: 'Server',
+      label: ActionLabels.operationsGroup,
       panes: [
         if (canManageServer)
           SettingsPane(
             id: 'performance',
-            label: 'Performance',
+            label: ActionLabels.retentionAndLimits,
             icon: AppIcons.performance,
             compactRoute: Routes.adminPerformance,
             builder: (_) => const PerformancePane(),
