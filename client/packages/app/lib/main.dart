@@ -331,13 +331,14 @@ Widget appChromeBuilder(BuildContext context, Widget? child) => Consumer(
           child: Stack(
             children: [
               // Outside everything routed: a client the server refuses has nothing useful behind this. Fail-open.
-              ClientTooOldGate(
-                child: ServerIdentityChangeGate(
-                  child: PictureInPictureGate(child: densityWrapped),
+              ModerationErrorHost(
+                child: ClientTooOldGate(
+                  child: ServerIdentityChangeGate(
+                    child: PictureInPictureGate(child: densityWrapped),
+                  ),
                 ),
               ),
               const Positioned.fill(child: ToastOverlay()),
-              const Positioned.fill(child: ModerationErrorHost()),
               const Positioned.fill(child: WebUpdatePill()),
               const Positioned.fill(child: IncomingCallOverlay()),
               // Last, so a locked screen covers a toast or a ring too, not just the routed app underneath.
