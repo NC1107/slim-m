@@ -47,18 +47,35 @@ else
     --jq '.workflow_runs')"
 fi
 
-# The API answers newest-first; a cancelled run is skipped, not counted and not a streak end.
+# A success whose only successful job is the `changes` filter built nothing, so it proves nothing either way.
+built_something() {
+  local id="$1" names
+  [[ -n "$id" && "$id" != "null" ]] || return 0
+  if ! names="$(gh api "repos/${GITHUB_REPOSITORY}/actions/runs/${id}/jobs?per_page=100" \
+    --jq '[.jobs[] | select(.conclusion=="success") | .name] | .[]' 2>/dev/null)"; then
+    return 0
+  fi
+  grep -qvx 'changes' <<<"$names"
+}
+
+# The API answers newest-first; a cancelled or hollow run is skipped, not counted and not a streak end.
 completed_json=$(jq -c '[.[] | select(.status=="completed")]' <<<"$runs_json")
 completed_count=$(jq 'length' <<<"$completed_json")
 
 streak_len=0
+saw_real_success=false
 oldest_in_streak=""
 i=0
 while [[ "$i" -lt "$completed_count" ]]; do
   row=$(jq -c ".[$i]" <<<"$completed_json")
   conclusion=$(jq -r '.conclusion' <<<"$row")
   if [[ "$conclusion" = "success" ]]; then
-    break
+    if built_something "$(jq -r '.id' <<<"$row")"; then
+      saw_real_success=true
+      break
+    fi
+    i=$((i + 1))
+    continue
   fi
   if [[ "$conclusion" = "cancelled" ]]; then
     i=$((i + 1))
@@ -107,7 +124,7 @@ This issue closes itself the next time a run on main succeeds."
   exit 0
 fi
 
-if [[ "$streak_len" -eq 0 ]]; then
+if [[ "$streak_len" -eq 0 && "$saw_real_success" = true ]]; then
   existing="$(existing_open)"
   if [[ -n "$existing" ]]; then
     gh issue close "$existing" --repo "$GITHUB_REPOSITORY" \
