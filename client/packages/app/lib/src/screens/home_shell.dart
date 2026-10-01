@@ -9,7 +9,6 @@ export 'home_shell_empty_state.dart' show NoChannelSelected;
 
 import 'dart:async';
 
-import 'package:flutter/gestures.dart' show DragStartBehavior;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:slimm_data/data.dart';
@@ -42,11 +41,10 @@ import '../widgets/app_panel_reveal.dart';
 import '../widgets/channel_grouping.dart';
 import '../widgets/call_mini_player.dart';
 import '../widgets/channel_rail.dart';
-import '../widgets/channel_rail_drawer.dart';
 import '../widgets/channel_rail_frame.dart';
 import '../widgets/command_palette.dart';
 import '../widgets/compact_channel_app_bar.dart';
-import '../widgets/drawer_edge_drag.dart';
+import '../widgets/compact_drawer_scaffold.dart';
 import '../widgets/member_pane.dart';
 import '../widgets/new_device_banner_host.dart';
 import '../widgets/push_to_talk_listener.dart';
@@ -223,43 +221,12 @@ class HomeShell extends ConsumerWidget {
             if (showVoiceStrip && !keyboardUp) const VoiceStripIndicator(),
           ],
         );
-        final edgeWidth = drawerEdgeDragWidth(context);
-        return DrawerEdgeDrag(
-          builder: (context, restore) => Scaffold(
-            appBar: replacesHeader || notFound
-                ? null
-                : _restoredBar(
-                    restore,
-                    CompactChannelAppBar(
-                      channelId: channelId,
-                      onBack: () => context.go(Routes.channels),
-                    ),
-                  ),
-            // Withheld only where the pane above also claims the edge itself.
-            drawer: hidesRailAccess
-                ? null
-                : restore(
-                    CompactChannelRailDrawer(selectedChannelId: channelId),
-                  ),
-            drawerEdgeDragWidth: edgeWidth,
-            // Down, not start (both drawers): the drawer then follows from the first pixel instead of from where the touch slop was crossed.
-            drawerDragStartBehavior: DragStartBehavior.down,
-            onEndDrawerChanged: (open) => endSelectionOnDrawerClose(ref, open),
-            // The roster slides in from the right instead of docking beside the
-            // conversation, which is the only pane there is at this width.
-            endDrawer: isDm || notFound
-                ? null
-                : restore(
-                    Drawer(
-                      width: AppMemberPane.width,
-                      child: SafeArea(
-                        child: AppMemberPane(channelId: channelId),
-                      ),
-                    ),
-                  ),
-            // No rail here, so the connection bar mounts under the app bar; one SafeArea wraps the whole column, so no child insets itself and opens a gap or a dead band.
-            body: restore(SafeArea(child: compactBody)),
-          ),
+        return CompactDrawerScaffold(
+          channelId: channelId,
+          showAppBar: !(replacesHeader || notFound),
+          showRail: !hidesRailAccess,
+          showMembers: !(isDm || notFound),
+          body: compactBody,
         );
       }
 
@@ -339,11 +306,6 @@ class HomeShell extends ConsumerWidget {
     context.go(Routes.channel(target.id));
   }
 }
-
-PreferredSizeWidget _restoredBar(
-  Widget Function(Widget) restore,
-  PreferredSizeWidget bar,
-) => PreferredSize(preferredSize: bar.preferredSize, child: restore(bar));
 
 /// Bridges the 599/600 chrome swap with a short fade, so a resize across
 /// the breakpoint reads as reflow rather than a one-frame interface swap.
