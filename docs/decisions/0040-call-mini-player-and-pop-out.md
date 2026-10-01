@@ -56,6 +56,7 @@ On compact widths the pane ends above the voice strip and the keyboard, so the c
 The composer is inside the pane, so the bottom corners rest above a reserve (`miniPlayerComposerReserve`).
 On widths where the channel header is inside the pane, the top corners rest below `miniPlayerHeaderReserve`.
 Tests drive every corner at phone and desktop width and assert the card's rectangle does not overlap the composer's.
+It also stays off a voice channel's own page: that page offers "Switch to this call" in the middle of the pane, which no corner can clear at every width, so the card hides there and returns on the next other channel.
 
 **Size follows width.**
 The card is 192 wide below `kCompactWidth` and 272 wide above it.

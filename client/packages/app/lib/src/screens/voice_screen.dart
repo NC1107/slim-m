@@ -15,6 +15,8 @@
 /// shows `VoiceSwitchPrompt` instead of silently hanging up the first call.
 library;
 
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:slimm_design_system/design_system.dart';
@@ -25,9 +27,11 @@ import 'package:go_router/go_router.dart';
 import '../providers/bot_ui_uses.dart';
 import '../providers/call_recap.dart';
 import '../providers/last_text_channel.dart';
+import '../providers/dm_call_ring_controller.dart';
 import '../providers/member_presence.dart' show membersProvider;
 import '../providers/voice_controller.dart';
 import '../providers/voice_flags.dart';
+import '../providers/voice_roster.dart';
 import '../routing/breakpoints.dart';
 import '../routing/routes.dart';
 import '../widgets/bot_call_controls.dart';
@@ -143,6 +147,20 @@ class _VoiceScreenState extends ConsumerState<VoiceScreen> {
     controller.join(widget.channelId);
   }
 
+  /// A DM's first ring is spent once it was declined or timed out, so a rejoin
+  /// calls again unless the other person is already in the room or a ring is out.
+  void _rejoin(VoiceController controller) {
+    final channelId = widget.channelId;
+    unawaited(controller.join(channelId));
+    if (!widget.isDm) return;
+    final ringing =
+        ref.read(dmCallRingControllerProvider).outgoing?.channelId == channelId;
+    final roster = ref.read(voiceRosterProvider(channelId)).valueOrNull;
+    if (ringing || (roster != null && roster.isNotEmpty)) return;
+    final ring = ref.read(dmCallRingControllerProvider.notifier);
+    unawaited(ring.startOutgoingRing(channelId));
+  }
+
   /// Owner: the rejoin screen after a hang-up is a "useless screen". On a
   /// phone a hang-up returns to the last text channel (the shell shows the
   /// recap toast, see `listenForHangUpRecap`); a dropped or failed call never sets `justLeftAt`, so it keeps
@@ -232,7 +250,7 @@ class _VoiceScreenState extends ConsumerState<VoiceScreen> {
           wasInCall: !widget.openChat || voice.justLeftChannelId == channelId,
           errorMessage: errorMessage,
           canRetry: canRetry,
-          onRetry: () => controller.join(channelId),
+          onRetry: () => _rejoin(controller),
           recap: recapForChannel(voice, channelId),
         ),
       },
