@@ -37,6 +37,9 @@ import 'message_transcript_widgets.dart';
 typedef MessageActionsFor =
     MessageActions Function(Message message, bool hasExistingThread);
 
+/// Past this many rows a thread scrolls as an ordinary reversed list.
+const int _shrinkWrapThreadMax = 40;
+
 class MessageTranscript extends StatefulWidget {
   const MessageTranscript({
     super.key,
@@ -48,6 +51,7 @@ class MessageTranscript extends StatefulWidget {
     this.channelIsThread = false,
     this.channelIsVoice = false,
     this.channelTopic,
+    this.threadParent,
     required this.scrollController,
     required this.lastReadSeq,
     required this.selfId,
@@ -71,6 +75,10 @@ class MessageTranscript extends StatefulWidget {
     this.jumpToken,
     this.onJumpArrived,
   });
+
+  /// The message a thread hangs off, shown as the transcript's first item once
+  /// history reaches its start; null for a channel.
+  final Widget? threadParent;
 
   /// Only used to scope [editingMessageIdProvider] per row; nothing here
   /// otherwise reaches the network or the store, per this file's own doc
@@ -307,6 +315,9 @@ class _MessageTranscriptState extends State<MessageTranscript> {
         onRetry: widget.onRetryOlder,
       );
     }
+    if (widget.channelIsThread) {
+      return widget.threadParent ?? const SizedBox.shrink();
+    }
     return ChannelStartHeader(
       name: widget.channelName,
       topic: widget.channelTopic,
@@ -315,10 +326,18 @@ class _MessageTranscriptState extends State<MessageTranscript> {
     );
   }
 
+  /// A short thread reads from the top (parent, replies, free space below); a channel stays bottom-anchored against its composer.
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context) => widget.channelIsThread
+      ? Align(alignment: Alignment.topCenter, child: _transcript(context))
+      : _transcript(context);
+
+  Widget _transcript(BuildContext context) {
     final messages = widget.messages;
     final start = _topSlot();
+    // Shrink-wrapped, a thread lays out every row: affordable only while it is short.
+    final shrinkWrap =
+        widget.channelIsThread && messages.length <= _shrinkWrapThreadMax;
 
     if (messages.isEmpty) {
       // Reverse-anchored like the populated list below, so the welcome sits above the composer, not at the top of an empty pane.
@@ -326,11 +345,24 @@ class _MessageTranscriptState extends State<MessageTranscript> {
         return ListView(
           controller: widget.scrollController,
           reverse: true,
+          shrinkWrap: shrinkWrap,
           padding: const EdgeInsets.only(bottom: AppSpacing.s8),
-          children: [start],
+          children: [
+            if (widget.channelIsThread)
+              const ChannelStartHeader(name: null, isThread: true),
+            start,
+          ],
         );
       }
-      return EmptyMessages(syncStatus: widget.syncStatus);
+      final waiting = EmptyMessages(syncStatus: widget.syncStatus);
+      if (!widget.channelIsThread) return waiting;
+      // The parent is known without the sync, so it shows even while the replies cannot.
+      return Column(
+        children: [
+          widget.threadParent ?? const SizedBox.shrink(),
+          Expanded(child: waiting),
+        ],
+      );
     }
 
     _checkAfterLayout();
@@ -350,6 +382,7 @@ class _MessageTranscriptState extends State<MessageTranscript> {
       child: ListView.custom(
         controller: widget.scrollController,
         reverse: true,
+        shrinkWrap: shrinkWrap,
         padding: const EdgeInsets.only(bottom: AppSpacing.s8),
         semanticChildCount: messages.length + 1,
         childrenDelegate: TranscriptChildDelegate(

@@ -1,19 +1,13 @@
 // SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
-/// The message a thread hangs off, shown once above its replies so a thread
-/// never reads as a conversation with no visible subject - before this,
-/// `ThreadScreen` resolved `threadParentProvider` only for its own AppBar
-/// title and never rendered the parent message anywhere.
+/// The message a thread hangs off, shown as the transcript's first item so a
+/// thread never reads as a conversation with no visible subject.
 ///
-/// Styled after `ForwardedMessageCard`'s own boxed treatment (a bordered,
-/// sunken container with an icon+label row over an avatar+name row) rather
-/// than `ReplyQuote`'s bare inline line: a reply quote sits inside another
-/// message's own row, where a full box would crowd it, but this card is the
-/// only thing above the transcript and reads better as a small
-/// self-contained block. The body stays a truncated snippet, matching
-/// `ReplyQuote`'s and `ThreadRow`'s (`threads_sheet.dart`) own ceiling,
-/// rather than the full markdown render `MessageBody` gives an ordinary
-/// row - this is context for orientation, not a second copy of the message
-/// to read in full.
+/// Laid out like an ordinary message row (the pane gutter, a 36px avatar, the
+/// author line over the text) rather than as a boxed quote, so the original
+/// reads as the start of the conversation and the first reply sits directly
+/// under it. It is not a [MessageRow]: the thread-parent payload carries no
+/// timestamp or attachments to give one, and the row's own redesign is in
+/// flight. A hairline under it separates the original from the replies.
 library;
 
 import 'package:flutter/material.dart';
@@ -23,18 +17,34 @@ import 'package:slimm_api/api.dart' as api;
 import 'package:slimm_design_system/design_system.dart';
 
 import '../message_preview.dart';
+import '../providers/threads.dart';
 import '../providers/user_profiles.dart';
+import '../routing/breakpoints.dart';
 import 'author_label.dart';
 import 'message_jump.dart';
 import 'user_avatar.dart';
 
-/// How much of the parent's own text is shown before it is cut off, matching
-/// `ReplyQuote`'s own ceiling.
-const int _snippetMaxRunes = 240;
+/// How much of the parent's own text is shown before it is cut off.
+const int _snippetMaxRunes = 600;
 
-/// The avatar beside the parent's own author, matching
-/// `ForwardedMessageCard`'s own quoted-author sizing.
-const double _avatarSize = AppAvatarSize.s20;
+/// The parent's author avatar, the size a message row uses.
+const double _avatarSize = AppAvatarSize.s36;
+
+/// Resolves [threadParentProvider] for [channelId] and shows the parent once
+/// it is known; nothing before then or for a channel that is not a thread, so
+/// the transcript's top slot is always present and never shifts the list.
+class ThreadParentSlot extends ConsumerWidget {
+  const ThreadParentSlot({super.key, required this.channelId});
+
+  final String channelId;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final parent = ref.watch(threadParentProvider(channelId)).valueOrNull;
+    if (parent == null || !parent.isThread) return const SizedBox.shrink();
+    return ThreadParentCard(parent: parent, threadChannelId: channelId);
+  }
+}
 
 class ThreadParentCard extends ConsumerWidget {
   const ThreadParentCard({
@@ -54,28 +64,14 @@ class ThreadParentCard extends ConsumerWidget {
     final tokens = Theme.of(context).extension<AppTokens>()!;
     resolveAuthorProfiles(ref, [parent.parentAuthorId]);
 
-    final decoration = BoxDecoration(
-      color: tokens.surfaceSunken,
-      border: Border.all(color: tokens.borderSubtle),
-      borderRadius: BorderRadius.circular(AppRadii.control),
-    );
-    final header = Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Icon(AppIcons.thread, size: 13, color: tokens.textSecondary),
-        const SizedBox(width: AppSpacing.s4),
-        Text(
-          'Thread on',
-          style: AppText.caption.copyWith(color: tokens.textSecondary),
-        ),
-      ],
-    );
+    final gutter = LayoutClass.of(context) == LayoutClass.compact
+        ? AppSizes.paneGutterCompact
+        : AppSizes.paneGutter;
 
     final Widget body;
     final String semanticLabel;
     if (parent.parentDeleted) {
       body = Row(
-        mainAxisSize: MainAxisSize.min,
         children: [
           Icon(AppIcons.delete, size: 13, color: tokens.textSecondary),
           const SizedBox(width: AppSpacing.s4),
@@ -112,7 +108,7 @@ class ThreadParentCard extends ConsumerWidget {
             userId: parent.parentAuthorId,
             size: _avatarSize,
           ),
-          const SizedBox(width: AppSpacing.s8),
+          const SizedBox(width: AppSpacing.s12),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -121,16 +117,16 @@ class ThreadParentCard extends ConsumerWidget {
                 AuthorNameLine(
                   name: name,
                   profile: resolution.profile,
-                  style: AppText.caption.copyWith(
+                  style: AppText.body.copyWith(
                     color: tokens.textPrimary,
                     fontWeight: AppWeights.semi,
                   ),
                 ),
                 Text(
                   snippet,
-                  maxLines: 3,
+                  maxLines: 8,
                   overflow: TextOverflow.ellipsis,
-                  style: AppText.body.copyWith(color: tokens.textSecondary),
+                  style: AppText.body.copyWith(color: tokens.textPrimary),
                 ),
               ],
             ),
@@ -155,25 +151,13 @@ class ThreadParentCard extends ConsumerWidget {
             messageId: parent.parentMessageId!,
           );
 
-    final card = Container(
-      decoration: decoration,
-      padding: const EdgeInsets.all(AppSpacing.s8),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          header,
-          const SizedBox(height: AppSpacing.s4),
-          body,
-        ],
-      ),
-    );
-
+    // The focus ring reserves its own space around a jumpable card; take it out of the padding so the avatar still lines up with the replies' gutter.
+    final ringInset = onJump == null ? 0.0 : focusRingGap + focusRingWidth;
     final padded = Padding(
-      padding: const EdgeInsets.fromLTRB(
-        AppSpacing.s12,
-        AppSpacing.s12,
-        AppSpacing.s12,
+      padding: EdgeInsets.fromLTRB(
+        gutter - ringInset,
+        AppSpacing.s12 - ringInset,
+        gutter - ringInset,
         0,
       ),
       child: Semantics(
@@ -181,7 +165,17 @@ class ThreadParentCard extends ConsumerWidget {
         label: onJump != null
             ? '$semanticLabel, go to the original'
             : semanticLabel,
-        child: ExcludeSemantics(child: card),
+        child: ExcludeSemantics(
+          child: DecoratedBox(
+            decoration: BoxDecoration(
+              border: Border(bottom: BorderSide(color: tokens.borderSubtle)),
+            ),
+            child: Padding(
+              padding: const EdgeInsets.only(bottom: AppSpacing.s12),
+              child: body,
+            ),
+          ),
+        ),
       ),
     );
 

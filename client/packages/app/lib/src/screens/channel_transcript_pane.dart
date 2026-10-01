@@ -42,6 +42,7 @@ import '../widgets/dismiss_keyboard_on_drag.dart';
 import '../widgets/jump_to_latest_button.dart';
 import '../widgets/message_jump.dart';
 import '../widgets/message_transcript.dart';
+import '../widgets/thread_parent_card.dart';
 import 'channel_message_actions.dart';
 import 'channel_screen.dart' show knownRoleNamesFrom, knownUsernamesFrom;
 import 'channel_screen_streams.dart';
@@ -212,6 +213,9 @@ class ChannelTranscriptPane extends ConsumerWidget {
                           channelIsThread: isThread,
                           channelIsVoice: isVoice,
                           channelTopic: channelTopic,
+                          threadParent: isThread
+                              ? ThreadParentSlot(channelId: channelId)
+                              : null,
                           scrollController: scrollTracker.controller,
                           lastReadSeq: lastReadSeq,
                           knownUsernames: knownUsernames,

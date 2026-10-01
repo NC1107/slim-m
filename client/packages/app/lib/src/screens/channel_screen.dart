@@ -76,6 +76,7 @@ class ChannelScreen extends ConsumerStatefulWidget {
     required this.channelId,
     this.isThread = false,
     this.showHeader = true,
+    this.autofocusComposer = false,
     super.key,
   });
 
@@ -105,6 +106,9 @@ class ChannelScreen extends ConsumerStatefulWidget {
   /// acceptable for a secondary surface beside a live call, the same trade
   /// [ThreadScreen] already makes for its own docked transcript.
   final bool showHeader;
+
+  /// See `ComposerAutofocus`; only the docked thread pane sets it.
+  final bool autofocusComposer;
 
   @override
   ConsumerState<ChannelScreen> createState() => _ChannelScreenState();
@@ -352,6 +356,7 @@ class _ChannelScreenState extends ConsumerState<ChannelScreen> {
                   onSend: _send,
                   replyingTo: _replyingTo,
                   onCancelReply: _cancelReply,
+                  autofocus: widget.autofocusComposer,
                 ),
             ],
           );

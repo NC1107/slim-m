@@ -20,6 +20,7 @@ import 'package:slimm_app/src/providers/providers.dart';
 import 'package:slimm_app/src/providers/threads.dart';
 import 'package:slimm_app/src/routing/router.dart';
 import 'package:slimm_app/src/routing/routes.dart';
+import 'package:slimm_app/src/screens/thread_screen.dart';
 import 'package:slimm_data/data.dart';
 import 'package:slimm_design_system/design_system.dart';
 import 'package:slimm_platform/platform.dart';
@@ -137,6 +138,64 @@ void main() {
         container.read(openThreadProvider),
         'c-thread',
         reason: 'with the thread itself open in the docked pane',
+      );
+
+      await _teardown(tester, container, db);
+    },
+  );
+
+  testWidgets(
+    'the docked thread pane draws its left edge, not under the screen',
+    (tester) async {
+      tester.view.physicalSize = const Size(1400, 900);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.reset);
+
+      final (:container, :db) = _setup();
+      container.read(chosenServerProvider.notifier).restore(Uri.parse(_server));
+      container.read(sessionProvider).set(_tokens);
+
+      final router = container.read(routerProvider);
+      await tester.pumpWidget(
+        UncontrolledProviderScope(
+          container: container,
+          child: MediaQuery(
+            data: const MediaQueryData(
+              size: Size(1400, 900),
+              disableAnimations: true,
+            ),
+            child: MaterialApp.router(
+              theme: buildTheme(Brightness.light, AppTokens.light),
+              routerConfig: router,
+            ),
+          ),
+        ),
+      );
+      await tester.pump();
+      router.go('/thread/c-thread');
+      for (var i = 0; i < 4; i++) {
+        await tester.pump(const Duration(milliseconds: 50));
+      }
+
+      final edge = find
+          .ancestor(
+            of: find.byType(ThreadScreen),
+            matching: find.byWidgetPredicate(
+              (w) =>
+                  w is Container &&
+                  w.decoration is BoxDecoration &&
+                  (w.decoration! as BoxDecoration).border != null,
+            ),
+          )
+          .first;
+      final border =
+          (tester.widget<Container>(edge).decoration! as BoxDecoration).border!;
+      expect((border as Border).left.color, AppTokens.light.borderStrong);
+      expect(
+        tester.getTopLeft(find.byType(ThreadScreen)).dx -
+            tester.getTopLeft(edge).dx,
+        border.dimensions.horizontal,
+        reason: 'an opaque screen must sit inside the edge, not cover it',
       );
 
       await _teardown(tester, container, db);

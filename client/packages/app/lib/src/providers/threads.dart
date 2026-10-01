@@ -36,6 +36,21 @@ const String threadChannelName = '';
 /// a docked thread back to its channel rather than restoring the pane.
 final openThreadProvider = StateProvider<String?>((ref) => null);
 
+/// Bumped each time the user asks for a thread that is already docked, so the
+/// pane's composer takes focus again; a new thread focuses itself on mount.
+final threadComposerFocusRequestProvider = StateProvider<int>((ref) => 0);
+
+/// Docks [threadId] in the side pane. Asking for the thread already open
+/// moves the caret back into its composer instead of doing nothing.
+void dockThread(ProviderContainer container, String threadId) {
+  final open = container.read(openThreadProvider.notifier);
+  if (open.state == threadId) {
+    container.read(threadComposerFocusRequestProvider.notifier).state++;
+  } else {
+    open.state = threadId;
+  }
+}
+
 /// What a thread's own channel id hangs off, for a thread panel opened cold
 /// - a deep link, a reload, or a notification - that never went through
 /// [openThreadFromMessage] on this device and so never learned its parent

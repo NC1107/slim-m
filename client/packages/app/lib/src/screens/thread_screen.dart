@@ -131,7 +131,6 @@ import '../providers/threads.dart';
 import '../routing/close_screen.dart';
 import '../routing/routes.dart';
 import '../widgets/compact_channel_app_bar.dart' show ChannelSearchAction;
-import '../widgets/thread_parent_card.dart';
 import 'channel_screen.dart';
 
 class ThreadScreen extends ConsumerStatefulWidget {
@@ -195,8 +194,13 @@ class _ThreadScreenState extends ConsumerState<ThreadScreen> {
     final title = parentName == null || parentName.isEmpty
         ? 'Thread'
         : 'Thread in #$parentName';
+    // Docked beside the chat: its own raised surface, so the pane is not lost against the transcript it sits next to.
+    final docked = widget.onClose != null;
+    final surface = docked ? tokens.surfaceRaised : null;
     return Scaffold(
+      backgroundColor: surface,
       appBar: AppBar(
+        backgroundColor: surface,
         // Docked: a close, since the parent sits beside it, not behind. Routed: the automatic back button is a Material glyph; BackToButton's is the Lucide one every other screen uses.
         leading: widget.onClose != null
             ? IconButton(
@@ -216,14 +220,10 @@ class _ThreadScreenState extends ConsumerState<ThreadScreen> {
           const SizedBox(width: AppSpacing.s8),
         ],
       ),
-      body: Column(
-        children: [
-          if (parent != null && parent.isThread)
-            ThreadParentCard(parent: parent, threadChannelId: widget.channelId),
-          Expanded(
-            child: ChannelScreen(channelId: widget.channelId, isThread: true),
-          ),
-        ],
+      body: ChannelScreen(
+        channelId: widget.channelId,
+        isThread: true,
+        autofocusComposer: docked,
       ),
     );
   }

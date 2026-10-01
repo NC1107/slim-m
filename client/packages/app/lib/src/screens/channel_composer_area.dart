@@ -25,6 +25,7 @@ import 'package:slimm_design_system/design_system.dart';
 import '../providers/message_selection.dart';
 import '../providers/providers.dart';
 import '../widgets/composer.dart';
+import '../widgets/composer_autofocus.dart';
 import '../widgets/ephemeral_tray.dart';
 import '../widgets/message_selection_bar.dart';
 import '../widgets/reply_banner.dart';
@@ -39,6 +40,7 @@ class ChannelComposerArea extends ConsumerWidget {
     required this.onSend,
     required this.replyingTo,
     required this.onCancelReply,
+    this.autofocus = false,
     super.key,
   });
 
@@ -48,6 +50,9 @@ class ChannelComposerArea extends ConsumerWidget {
   final Future<void> Function(List<String>) onSend;
   final Message? replyingTo;
   final VoidCallback onCancelReply;
+
+  /// See [ComposerAutofocus]; only the docked thread pane sets it.
+  final bool autofocus;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -81,6 +86,12 @@ class ChannelComposerArea extends ConsumerWidget {
     final stillTimedOut =
         timedOutUntil != null &&
         timedOutUntil > DateTime.now().millisecondsSinceEpoch;
+    final composer = Composer(
+      controller: controller,
+      channelId: channelId,
+      channelName: channelName,
+      onSend: onSend,
+    );
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
@@ -95,12 +106,10 @@ class ChannelComposerArea extends ConsumerWidget {
               : ReplyBanner(message: replyingTo!, onCancel: onCancelReply),
         ),
         EphemeralTray(channelId: channelId),
-        Composer(
-          controller: controller,
-          channelId: channelId,
-          channelName: channelName,
-          onSend: onSend,
-        ),
+        if (autofocus)
+          ComposerAutofocus(channelId: channelId, child: composer)
+        else
+          composer,
       ],
     );
   }

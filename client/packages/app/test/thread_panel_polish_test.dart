@@ -40,10 +40,11 @@ void main() {
       findsNothing,
       reason: 'a thread has no channel name to render, empty or otherwise',
     );
-    expect(find.text('Thread'), findsOneWidget);
+    expect(find.text('No replies yet'), findsOneWidget);
     expect(
       find.text('Replies to the original message appear here.'),
-      findsOneWidget,
+      findsNothing,
+      reason: 'the parent message above says what the thread is about',
     );
   });
 
