@@ -6,12 +6,12 @@ library;
 
 import 'package:flutter/gestures.dart' show kLongPressTimeout;
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:slimm_design_system/design_system.dart';
 
-import 'bot_menu_sections.dart';
+import 'bot_menu_sections.dart' show BotMenuSection;
 import 'context_menu_region.dart';
 import 'hover_reveal.dart';
+import 'message_menu_body.dart';
 import 'message_row_roving.dart';
 
 /// What the menu can do for one message. The caller (which knows authorship
@@ -147,6 +147,8 @@ class MessageContextMenuRegion extends StatefulWidget {
     required this.content,
     required this.actions,
     required this.onAddReaction,
+    required this.onPickReaction,
+    this.reactedEmoji = const {},
     required this.child,
   });
 
@@ -158,6 +160,12 @@ class MessageContextMenuRegion extends StatefulWidget {
   /// that knows permissions supplies, and reacting is ungated in this client
   /// exactly as the hover button has always been.
   final VoidCallback onAddReaction;
+
+  /// Reacts (or, for one the viewer already left, un-reacts) with a quick pick.
+  final ValueChanged<String> onPickReaction;
+
+  /// The reaction tokens the viewer has already left, shown selected in the quick row.
+  final Set<String> reactedEmoji;
 
   final Widget child;
 
@@ -174,117 +182,16 @@ class _MessageContextMenuRegionState extends State<MessageContextMenuRegion> {
   /// The item list both the floating menu and the bottom sheet render,
   /// parameterised on how each closes itself: hiding the overlay controller
   /// for one, popping the sheet's own route for the other.
-  List<Widget> _items(BuildContext context, VoidCallback close) {
-    final actions = widget.actions;
-    final tokens = Theme.of(context).extension<AppTokens>()!;
-    void run(VoidCallback action) {
-      close();
-      action();
-    }
-
-    // See MessageActions.hasExistingThread's own doc comment for why "Reply" stays offered here.
-    final showThreadHint = actions.canReply && actions.hasExistingThread;
-
-    return [
-      AppMenuItem(
-        label: 'Add reaction',
-        leading: AppIcons.smile,
-        onTap: () => run(widget.onAddReaction),
-      ),
-      if (actions.canReply)
-        AppMenuItem(
-          label: 'Reply',
-          leading: AppIcons.reply,
-          // A glyph, not text: this row is only 250px wide, with no room for a second string.
-          trailing: showThreadHint
-              ? Icon(
-                  AppIcons.thread,
-                  size: AppSizes.icon16,
-                  color: tokens.textSecondary,
-                )
-              : null,
-          semanticLabel: showThreadHint
-              ? 'Reply. A thread already exists on this message.'
-              : null,
-          onTap: () => run(actions.onReply),
-        ),
-      if (actions.canOpenThread)
-        AppMenuItem(
-          label: 'Reply in thread',
-          leading: AppIcons.thread,
-          onTap: () => run(actions.onOpenThread),
-        ),
-      const AppMenuDivider(),
-      AppMenuItem(
-        label: 'Copy text',
-        leading: AppIcons.copy,
-        onTap: () =>
-            run(() => Clipboard.setData(ClipboardData(text: widget.content))),
-      ),
-      if (actions.canCopyLink)
-        AppMenuItem(
-          label: 'Copy link',
-          leading: AppIcons.link,
-          onTap: () => run(actions.onCopyLink),
-        ),
-      if (actions.canForward)
-        AppMenuItem(
-          label: 'Forward message',
-          leading: AppIcons.forward,
-          onTap: () => run(actions.onForward),
-        ),
-      if (actions.canSave)
-        AppMenuItem(
-          label: 'Save message',
-          leading: AppIcons.bookmark,
-          onTap: () => run(actions.onSave),
-        ),
-      if (actions.canEdit)
-        AppMenuItem(
-          label: 'Edit',
-          leading: AppIcons.edit,
-          onTap: () => run(actions.onEdit),
-        ),
-      if (actions.canManagePins)
-        AppMenuItem(
-          label: actions.pinned ? 'Unpin' : 'Pin',
-          leading: AppIcons.pin,
-          onTap: () => run(actions.onTogglePin),
-        ),
-      if (actions.canReport || actions.canBlockAuthor) ...[
-        const AppMenuDivider(),
-        if (actions.canReport)
-          AppMenuItem(
-            label: 'Report message',
-            leading: AppIcons.report,
-            onTap: () => run(actions.onReport),
-          ),
-        if (actions.canBlockAuthor)
-          AppMenuItem(
-            label: 'Block user',
-            leading: AppIcons.revoke,
-            tone: AppMenuItemTone.danger,
-            onTap: () => run(actions.onBlockAuthor),
-          ),
-      ],
-      if (actions.canDelete) ...[
-        const AppMenuDivider(),
-        if (actions.onStartSelecting case final VoidCallback start)
-          AppMenuItem(
-            label: 'Select messages',
-            leading: AppIcons.check,
-            onTap: () => run(start),
-          ),
-        AppMenuItem(
-          label: 'Delete',
-          leading: AppIcons.delete,
-          tone: AppMenuItemTone.danger,
-          onTap: () => run(actions.onDelete),
-        ),
-      ],
-      ...botMenuItems(actions.botSections, close),
-    ];
-  }
+  List<Widget> _items(BuildContext context, VoidCallback close) => [
+    MessageMenuBody(
+      actions: widget.actions,
+      content: widget.content,
+      reacted: widget.reactedEmoji,
+      onAddReaction: widget.onAddReaction,
+      onPickReaction: widget.onPickReaction,
+      close: close,
+    ),
+  ];
 
   @override
   Widget build(BuildContext context) {

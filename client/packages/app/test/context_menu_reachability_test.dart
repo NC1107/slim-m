@@ -68,6 +68,7 @@ Future<SemanticsHandle> _pump(WidgetTester tester) async {
             content: 'hello',
             actions: _reportAndBlockOnly(),
             onAddReaction: () {},
+            onPickReaction: (_) {},
             child: const SizedBox(
               key: _anchor,
               width: 120,
@@ -122,6 +123,7 @@ Future<void> _pumpMessage(
             content: 'hello',
             actions: _editOnly(onEdit),
             onAddReaction: () {},
+            onPickReaction: (_) {},
             child: const SizedBox(
               key: _anchor,
               width: 200,
@@ -195,7 +197,7 @@ void main() {
   testWidgets('invoking that action really opens the menu', (tester) async {
     final handle = await _pump(tester);
 
-    expect(find.text('Report message'), findsNothing);
+    expect(find.text('More'), findsNothing);
     final node = tester.getSemantics(find.byKey(_anchor));
     tester.binding.performSemanticsAction(
       SemanticsActionEvent(
@@ -208,8 +210,8 @@ void main() {
 
     // Publishing the action and honouring it are two different things, and a
     // published action nothing answers is worse than none.
-    expect(find.text('Report message'), findsOneWidget);
-    expect(find.text('Block user'), findsOneWidget);
+    expect(find.text('More'), findsOneWidget);
+    expect(find.text('Copy text'), findsOneWidget);
     handle.dispose();
   });
 
@@ -235,13 +237,13 @@ void main() {
 
     await tester.sendKeyEvent(LogicalKeyboardKey.tab);
     await tester.pumpAndSettle();
-    expect(find.text('Report message'), findsNothing);
+    expect(find.text('More'), findsNothing);
 
     await tester.sendKeyEvent(LogicalKeyboardKey.contextMenu);
     await tester.pumpAndSettle();
 
-    expect(find.text('Report message'), findsOneWidget);
-    expect(find.text('Block user'), findsOneWidget);
+    expect(find.text('More'), findsOneWidget);
+    expect(find.text('Copy text'), findsOneWidget);
     handle.dispose();
   });
 
@@ -258,7 +260,7 @@ void main() {
     await tester.sendKeyUpEvent(LogicalKeyboardKey.shiftLeft);
     await tester.pumpAndSettle();
 
-    expect(find.text('Report message'), findsOneWidget);
+    expect(find.text('More'), findsOneWidget);
     handle.dispose();
   });
 
@@ -274,15 +276,39 @@ void main() {
     // Answered from the moment it opens, before anything inside has been tabbed to: an intent goes upward from whatever holds focus.
     await tester.sendKeyEvent(LogicalKeyboardKey.escape);
     await tester.pumpAndSettle();
-    expect(find.text('Report message'), findsNothing);
+    expect(find.text('More'), findsNothing);
 
     await tester.sendKeyEvent(LogicalKeyboardKey.contextMenu);
     await tester.pumpAndSettle();
     // A menu that opens and cannot then be operated is half a route, so focus has to reach the items inside the overlay.
-    expect(await _tabTo(tester, 'Block user'), isTrue);
+    expect(await _tabTo(tester, 'More'), isTrue);
     await tester.sendKeyEvent(LogicalKeyboardKey.escape);
     await tester.pumpAndSettle();
-    expect(find.text('Report message'), findsNothing);
+    expect(find.text('More'), findsNothing);
+    handle.dispose();
+  });
+
+  testWidgets('More is opened from the keyboard and focus follows into it', (
+    tester,
+  ) async {
+    final handle = await _pump(tester);
+
+    await tester.sendKeyEvent(LogicalKeyboardKey.tab);
+    await tester.sendKeyEvent(LogicalKeyboardKey.contextMenu);
+    await tester.pumpAndSettle();
+    expect(await _tabTo(tester, 'More'), isTrue);
+
+    await tester.sendKeyEvent(LogicalKeyboardKey.enter);
+    await tester.pumpAndSettle();
+
+    expect(find.text('Report message'), findsOneWidget);
+    expect(
+      _focusedMenuItem(),
+      isNotNull,
+      reason:
+          'the focused row was swapped out; focus must land on the new page',
+    );
+    expect(await _tabTo(tester, 'Block user'), isTrue);
     handle.dispose();
   });
 

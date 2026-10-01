@@ -77,7 +77,8 @@ class _MessageEditFieldState extends State<MessageEditField> {
           vertical: AppSpacing.s4,
         ),
         decoration: BoxDecoration(
-          color: tokens.surfaceRaised,
+          // The row around it is raised while editing, so the field sits in it as an inset.
+          color: tokens.surfaceBase,
           border: Border.all(color: tokens.accentFill),
           borderRadius: BorderRadius.circular(AppRadii.control),
         ),
@@ -105,32 +106,123 @@ class _MessageEditFieldState extends State<MessageEditField> {
               ),
             ),
             const SizedBox(height: AppSpacing.s4),
-            Row(
-              children: [
-                if (!soft)
-                  Text(
-                    'escape to cancel - enter to save',
-                    style: AppText.code.copyWith(color: tokens.textSecondary),
-                  ),
-                const Spacer(),
-                AppButton(
-                  label: 'Cancel',
-                  variant: AppButtonVariant.ghost,
-                  size: AppButtonSize.sm,
-                  onPressed: widget.onCancel,
-                ),
-                const SizedBox(width: AppSpacing.s8),
-                AppButton(
-                  label: 'Save',
-                  variant: AppButtonVariant.primary,
-                  size: AppButtonSize.sm,
-                  onPressed: _submit,
-                ),
-              ],
-            ),
+            _Footer(soft: soft, onCancel: widget.onCancel, onSave: _submit),
           ],
         ),
       ),
+    );
+  }
+}
+
+/// Narrower than this and the hints stack above the buttons: three keycap
+/// groups and two buttons need about this much to share a line.
+const double _footerSideBySide = 440;
+
+/// The hints and the Cancel and Save buttons, beside each other when they fit
+/// and stacked when they do not, so neither is ever cut off.
+class _Footer extends StatelessWidget {
+  const _Footer({
+    required this.soft,
+    required this.onCancel,
+    required this.onSave,
+  });
+
+  final bool soft;
+  final VoidCallback onCancel;
+  final VoidCallback onSave;
+
+  @override
+  Widget build(BuildContext context) {
+    final buttons = Row(
+      mainAxisSize: MainAxisSize.min,
+      spacing: AppSpacing.s8,
+      children: [
+        AppButton(
+          label: 'Cancel',
+          variant: AppButtonVariant.ghost,
+          size: AppButtonSize.sm,
+          onPressed: onCancel,
+        ),
+        AppButton(
+          label: 'Save',
+          variant: AppButtonVariant.primary,
+          size: AppButtonSize.sm,
+          onPressed: onSave,
+        ),
+      ],
+    );
+    if (soft) return Align(alignment: Alignment.centerRight, child: buttons);
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        if (constraints.maxWidth >= _footerSideBySide) {
+          return Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              const Expanded(child: _KeyHints()),
+              buttons,
+            ],
+          );
+        }
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          spacing: AppSpacing.s8,
+          children: [
+            const _KeyHints(),
+            Align(alignment: Alignment.centerRight, child: buttons),
+          ],
+        );
+      },
+    );
+  }
+}
+
+/// What the keyboard does in the field, as keycaps. Wraps rather than shrinks,
+/// so a narrow window gets a second line instead of a cut key.
+class _KeyHints extends StatelessWidget {
+  const _KeyHints();
+
+  @override
+  Widget build(BuildContext context) {
+    return const Wrap(
+      spacing: AppSpacing.s12,
+      runSpacing: AppSpacing.s4,
+      crossAxisAlignment: WrapCrossAlignment.center,
+      children: [
+        _KeyHint(keys: ['Esc'], label: 'cancel'),
+        _KeyHint(keys: ['Enter'], label: 'save'),
+        _KeyHint(keys: ['Shift', 'Enter'], label: 'newline'),
+      ],
+    );
+  }
+}
+
+class _KeyHint extends StatelessWidget {
+  const _KeyHint({required this.keys, required this.label});
+
+  final List<String> keys;
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    final tokens = Theme.of(context).extension<AppTokens>()!;
+    final ink = AppText.caption.copyWith(color: tokens.textSecondary);
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      spacing: AppSpacing.s4,
+      children: [
+        for (final (i, key) in keys.indexed) ...[
+          if (i > 0) Text('+', style: ink),
+          AppKbd(key),
+        ],
+        Flexible(
+          child: Text(
+            label,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: ink,
+          ),
+        ),
+      ],
     );
   }
 }

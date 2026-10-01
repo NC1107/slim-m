@@ -218,7 +218,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Copy text'), findsOneWidget);
-    expect(find.text(ActionLabels.addReaction), findsOneWidget);
+    expect(find.byTooltip(ActionLabels.addReaction), findsOneWidget);
     final button = tester.getRect(find.byKey(MessageHoverToolbar.overflowKey));
     final menu = tester.getRect(find.byType(AppMenu));
     expect(
@@ -417,7 +417,7 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(find.text(ActionLabels.addReaction), findsOneWidget);
+    expect(find.byTooltip(ActionLabels.addReaction), findsOneWidget);
     expect(find.byType(AppMenu), findsNothing, reason: 'a sheet, not a popup');
     expect(_plate, findsNothing);
   });

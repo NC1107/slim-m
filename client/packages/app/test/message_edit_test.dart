@@ -17,6 +17,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:slimm_app/src/widgets/message_edit_field.dart';
 import 'package:slimm_app/src/widgets/message_row.dart';
+import 'package:slimm_design_system/design_system.dart';
 
 import 'message_row_harness.dart';
 
@@ -149,7 +150,7 @@ void main() {
       await tester.pumpWidget(harness(_editingRow()));
 
       expect(tester.takeException(), isNull);
-      expect(find.textContaining('escape to cancel'), findsNothing);
+      expect(find.byType(AppKbd), findsNothing);
     },
   );
 
@@ -169,8 +170,8 @@ void main() {
         ),
       );
 
-      // The hint naming both shortcuts is desktop-only chrome; still there.
-      expect(find.textContaining('escape to cancel'), findsOneWidget);
+      // The keycaps naming the shortcuts are desktop-only chrome; still there.
+      expect(find.byType(AppKbd), findsNWidgets(4));
 
       await tester.enterText(find.byType(TextField), 'edited on desktop');
       await tester.sendKeyEvent(LogicalKeyboardKey.enter);

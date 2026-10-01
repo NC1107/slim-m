@@ -14,10 +14,9 @@ import '../routing/breakpoints.dart';
 
 import 'message_row_identity.dart' show formatMessageDay, formatMessageTime;
 
-/// A sub-grid optical gap under the message text, so the "Edited" note reads as
-/// trailing that line rather than starting a new one.
-const double _editedLabelTop = 2;
-
+/// The word "edited" after a message's text. Underlined only when [onTap] can
+/// open the history behind it: an underline on something inert reads as a
+/// broken link, which is what the parenthesised, always-underlined version did.
 class EditedMarker extends StatelessWidget {
   const EditedMarker({super.key, this.onTap});
 
@@ -30,40 +29,33 @@ class EditedMarker extends StatelessWidget {
   Widget build(BuildContext context) {
     final tokens = Theme.of(context).extension<AppTokens>()!;
     final label = Text(
-      '(edited)',
+      'edited',
       style: AppText.micro.copyWith(
         color: tokens.textSecondary,
-        decoration: TextDecoration.underline,
+        decoration: onTap == null ? null : TextDecoration.underline,
         decorationStyle: TextDecorationStyle.dotted,
         decorationColor: tokens.textSecondary,
       ),
     );
-    if (onTap == null) {
-      return Padding(
-        padding: const EdgeInsets.only(top: _editedLabelTop),
-        child: label,
-      );
-    }
-    return Padding(
-      padding: const EdgeInsets.only(top: _editedLabelTop),
-      child: Semantics(
-        button: true,
-        label: 'Edited. View edit history',
-        child: MouseRegion(
-          cursor: SystemMouseCursors.click,
-          child: GestureDetector(
-            behavior: HitTestBehavior.opaque,
-            onTap: onTap,
-            child: label,
-          ),
+    if (onTap == null) return label;
+    return Semantics(
+      button: true,
+      label: 'Edited. View edit history',
+      child: MouseRegion(
+        cursor: SystemMouseCursors.click,
+        child: GestureDetector(
+          behavior: HitTestBehavior.opaque,
+          onTap: onTap,
+          child: label,
         ),
       ),
     );
   }
 }
 
-/// The "N replies" affordance under a message that has an opened thread,
-/// tapping through to it - Slack's shape, which is what the owner named.
+/// The thread under a message that has one, as a bordered chip shaped like the
+/// thread pane it opens: a glyph, "N replies", the time of the last one in
+/// mono, an unread dot and a chevron. Tapping it opens the thread.
 ///
 /// Absent entirely for a message with no thread, and also for a thread with
 /// nobody in it yet: [Message.threadReplyCount] is `0` right after a thread
@@ -72,15 +64,20 @@ class EditedMarker extends StatelessWidget {
 ///
 /// [onTap] is only ever wired when the caller's own [MessageActions.canOpenThread]
 /// is true; when it is false (view-only, or a rare race with the parent's own
-/// permissions changing) this renders as inert text rather than a button that
-/// would just 403 on tap, the same "no tap handler at all" treatment
-/// `AppSegmentedOption.disabled` already gives an unavailable choice.
+/// permissions changing) the chip is drawn dimmed with no chevron and no
+/// handler rather than as a button that would just 403 on tap, the same "no tap
+/// handler at all" treatment `AppSegmentedOption.disabled` gives an
+/// unavailable choice.
 ///
-/// [unread] surfaces the same read-tracking a channel's own unread dot
-/// already reads (`AppListRow.unread`), just for this one thread: a small
-/// leading dot plus a medium weight on the label, never colour alone -
-/// `unread` and `enabled` are independent, so a viewer who cannot open the
-/// thread right now still learns it has something new in it.
+/// [unread] surfaces the same read-tracking a channel's own unread dot reads
+/// (`AppListRow.unread`), for this one thread: an accent dot and a heavier
+/// count, never colour alone. `unread` and `enabled` are independent, so a
+/// viewer who cannot open the thread right now still learns it has something
+/// new in it.
+///
+/// The wire carries a reply count and the time of the last reply but not who
+/// wrote them, so there are no replier avatars here; the glyph stands where
+/// they would.
 ///
 /// Always its own `Semantics(container: true)`, tappable or not: static text
 /// still has to be its own stop for a screen reader, and without a boundary
@@ -95,6 +92,10 @@ class ThreadReplySummary extends ConsumerWidget {
     this.onTap,
   });
 
+  /// The bordered box, for a test to measure rather than infer from its contents.
+  static const chipKey = Key('thread_reply_chip');
+  static const unreadDotKey = Key('thread_reply_unread_dot');
+
   final int replyCount;
   final int? lastReplyAt;
   final bool unread;
@@ -107,67 +108,93 @@ class ThreadReplySummary extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final tokens = Theme.of(context).extension<AppTokens>()!;
     final enabled = onTap != null;
-    final color = enabled ? tokens.accent : tokens.textDisabled;
     final countLabel = replyCount == 1 ? '1 reply' : '$replyCount replies';
     final lastReplyAt = this.lastReplyAt;
-    final use24Hour = watchUse24Hour(ref, context);
-    final text = lastReplyAt == null
-        ? countLabel
-        : '$countLabel · Last reply '
-              '${_lastReplyLabel(lastReplyAt, use24Hour: use24Hour)}';
-    final row = Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Icon(AppIcons.thread, size: 13, color: color),
-        const SizedBox(width: AppSpacing.s4),
-        // Flexible, not a bare Text: an absolute "Last reply" date can overflow a phone-width row otherwise.
-        Flexible(
-          child: Text(
-            text,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: AppText.caption.copyWith(
-              color: color,
-              fontWeight: unread ? AppWeights.medium : AppWeights.regular,
-            ),
-          ),
-        ),
-        if (unread) ...[
-          const SizedBox(width: AppSpacing.s4),
-          DecoratedBox(
-            decoration: BoxDecoration(
-              color: tokens.accent,
-              borderRadius: BorderRadius.circular(AppRadii.full),
-            ),
-            child: const SizedBox(width: 6, height: 6),
-          ),
-        ],
-      ],
-    );
-    final padded = Padding(
-      padding: const EdgeInsets.only(top: AppSpacing.s4),
-      child: row,
-    );
-    // See this class's own doc comment for why `container` is always true.
+    final time = lastReplyAt == null
+        ? null
+        : _lastReplyLabel(lastReplyAt, use24Hour: watchUse24Hour(ref, context));
+    final described = [
+      countLabel,
+      if (time != null) 'last reply $time',
+      if (unread) 'unread',
+    ].join(', ');
+    final ink = enabled ? tokens.accent : tokens.textDisabled;
     return Semantics(
       container: true,
       button: enabled,
-      label: enabled
-          ? '$text${unread ? ", unread" : ""}. Open thread.'
-          : '$text${unread ? ", unread" : ""}',
-      child: enabled
-          ? AppFocusRing(
-              radius: AppRadii.control,
-              builder: (context, onFocusChange) => InkWell(
-                onTap: onTap,
-                // AppFocusRing replaces this overlay; see its own doc comment.
-                focusColor: Colors.transparent,
-                onFocusChange: onFocusChange,
-                borderRadius: BorderRadius.circular(AppRadii.control),
-                child: padded,
+      label: enabled ? '$described. Open thread.' : described,
+      child: ExcludeSemantics(
+        child: FocusableTapTarget(
+          enabled: enabled,
+          onTap: onTap,
+          ringRadius: AppRadii.control,
+          builder: (context, focused, hovered) => DecoratedBox(
+            key: chipKey,
+            decoration: BoxDecoration(
+              color: enabled && hovered
+                  ? tokens.surfaceSunken
+                  : Colors.transparent,
+              border: Border.all(color: tokens.borderSubtle),
+              borderRadius: BorderRadius.circular(AppRadii.control),
+            ),
+            child: SizedBox(
+              height: AppSizes.controlSm,
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: AppSpacing.s8),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  spacing: AppSpacing.s8,
+                  children: [
+                    Icon(AppIcons.thread, size: AppSizes.icon16, color: ink),
+                    Text(
+                      countLabel,
+                      maxLines: 1,
+                      style: AppText.caption.copyWith(
+                        color: ink,
+                        fontWeight: unread
+                            ? AppWeights.semi
+                            : AppWeights.medium,
+                      ),
+                    ),
+                    if (time != null)
+                      // Flexible, not a bare Text: an absolute date can overflow a phone-width row otherwise.
+                      Flexible(
+                        child: Text(
+                          time,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: AppText.caption.copyWith(
+                            color: tokens.textSecondary,
+                            fontFamily: AppFonts.mono,
+                            fontFeatures: const [FontFeature.tabularFigures()],
+                          ),
+                        ),
+                      ),
+                    if (unread)
+                      DecoratedBox(
+                        key: unreadDotKey,
+                        decoration: BoxDecoration(
+                          color: tokens.accent,
+                          shape: BoxShape.circle,
+                        ),
+                        child: const SizedBox(
+                          width: AppSpacing.s8,
+                          height: AppSpacing.s8,
+                        ),
+                      ),
+                    if (enabled)
+                      Icon(
+                        AppIcons.chevronRight,
+                        size: AppSizes.icon16,
+                        color: tokens.textSecondary,
+                      ),
+                  ],
+                ),
               ),
-            )
-          : padded,
+            ),
+          ),
+        ),
+      ),
     );
   }
 }

@@ -150,6 +150,7 @@ void main() {
                       onEdit: (_) {},
                     ),
                     onAddReaction: () {},
+                    onPickReaction: (_) {},
                     child: const SizedBox(height: 40, width: 200),
                   );
                 },
@@ -172,6 +173,8 @@ void main() {
       );
 
       await tester.longPress(find.byType(MessageContextMenuRegion));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('More'));
       await tester.pumpAndSettle();
       expect(find.text('Select messages'), findsOneWidget);
 
