@@ -13,6 +13,7 @@ import 'package:slimm_platform/platform.dart';
 
 import '../relaunch.dart';
 import 'linux_install.dart' show Unpack;
+import 'rollback_record.dart';
 import 'self_update.dart';
 import 'self_update_failure.dart';
 import 'self_update_target.dart';
@@ -109,8 +110,12 @@ class SelfUpdateController {
           'This install is updated by its package manager, not by slim-m.',
         );
       }
+      // A rolled-back version counts as installed, or it is fetched again on every launch.
       final update = await _fetch(
-        currentVersion: currentVersion,
+        currentVersion: versionToUpdateFrom(
+          currentVersion,
+          target.failedVersion(),
+        ),
         platformKey: target.platformKey,
         stagingDir: target.stagingDir,
         client: client,
