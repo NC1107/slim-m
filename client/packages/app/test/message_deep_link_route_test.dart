@@ -10,17 +10,21 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 import 'package:http/testing.dart';
-import 'package:slimm_api/api.dart';
+import 'package:slimm_api/api.dart' hide Channel;
+import 'package:slimm_api/api.dart' as api show Channel;
 import 'package:slimm_app/src/providers/message_jump.dart';
 import 'package:slimm_app/src/providers/providers.dart';
 import 'package:slimm_app/src/providers/sync_controller.dart';
+import 'package:slimm_app/src/providers/voice_controller.dart';
 import 'package:slimm_app/src/routing/router.dart';
 import 'package:slimm_app/src/routing/routes.dart';
 import 'package:slimm_data/data.dart';
 import 'package:slimm_design_system/design_system.dart';
 import 'package:slimm_platform/platform.dart';
+import 'package:slimm_rtc/rtc.dart';
 
 import 'home_shell_harness.dart' show NoopSyncController;
+import 'voice_controller_harness.dart' show FakeSession;
 
 const _tokens = TokenPair(
   userId: 'user-1',
@@ -40,18 +44,40 @@ class _RecordingJump extends MessageJumpController {
   }
 }
 
+class _RecordingVoiceController extends VoiceController {
+  _RecordingVoiceController(super.ref) : super(session: FakeSession());
+
+  final joins = <String>[];
+
+  @override
+  Future<void> join(String channelId) async {
+    joins.add(channelId);
+    state = VoiceState(
+      state: VoiceSessionState.connected,
+      channelId: channelId,
+    );
+  }
+}
+
 Future<({ProviderContainer container, SlimmDatabase db, GoRouter router})>
-_pump(WidgetTester tester, String start) async {
+_pump(
+  WidgetTester tester,
+  String start, {
+  List<Override> extraOverrides = const [],
+  Future<void> Function(SlimmDatabase db)? seed,
+}) async {
   tester.view.physicalSize = const Size(1400, 900);
   tester.view.devicePixelRatio = 1.0;
   addTearDown(tester.view.reset);
   final db = SlimmDatabase(NativeDatabase.memory());
+  await seed?.call(db);
   final container = ProviderContainer(
     overrides: [
       keyStoreProvider.overrideWithValue(InMemoryKeyStore()),
       syncControllerProvider.overrideWith(NoopSyncController.new),
       databaseProvider.overrideWith((ref) => db),
       messageJumpProvider.overrideWith(_RecordingJump.new),
+      ...extraOverrides,
       apiProvider.overrideWith((ref) {
         final client = SlimmApi(
           baseUrl: Uri.parse('http://localhost:8080'),
@@ -138,6 +164,35 @@ void main() {
     );
 
     expect(_jump(container).jumps, isEmpty);
+
+    await _teardown(tester, container, db);
+  });
+
+  testWidgets('a link into a voice channel opens its chat and does not join', (
+    tester,
+  ) async {
+    late _RecordingVoiceController voice;
+    final (:container, :db, router: _) = await _pump(
+      tester,
+      Routes.message('c1', 'm1'),
+      extraOverrides: [
+        voiceControllerProvider.overrideWith(
+          (ref) => voice = _RecordingVoiceController(ref),
+        ),
+      ],
+      seed: (db) => MessageStore(db).upsertChannels([
+        const api.Channel(
+          id: 'c1',
+          name: 'lounge',
+          kind: 'voice',
+          createdAt: 0,
+        ),
+      ]),
+    );
+    await tester.pumpAndSettle();
+
+    expect(voice.joins, isEmpty, reason: 'a link is not consent to join');
+    expect(find.text('Join call'), findsOneWidget);
 
     await _teardown(tester, container, db);
   });
