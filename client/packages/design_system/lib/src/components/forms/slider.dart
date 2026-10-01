@@ -13,7 +13,7 @@
 /// settings. `meter` draws a live input level behind everything in both
 /// shapes; `muted` dims the whole control and swaps the fill to a neutral
 /// colour; `ticks` renders a row of mono labels beneath the track, with the
-/// second tick picked out in accent as the recommended value.
+/// tick nearest the thumb picked out in accent.
 library;
 
 import 'package:flutter/material.dart';
@@ -55,8 +55,9 @@ class AppSlider extends StatefulWidget {
   final double? meter;
   final bool muted;
 
-  /// Labels shown beneath the track. The second entry (index 1) is picked
-  /// out in accent as the recommended value, matching the source design.
+  /// Labels spread evenly beneath the track, from [min] to [max]. The one
+  /// nearest the thumb is picked out in accent, so the highlight never
+  /// disagrees with where the thumb is.
   final List<String>? ticks;
   final FocusNode? focusNode;
   final String? semanticLabel;
@@ -85,6 +86,13 @@ class _AppSliderState extends State<AppSlider> {
     _focusNode.removeListener(_handleFocusChange);
     if (_ownsFocusNode) _focusNode.dispose();
     super.dispose();
+  }
+
+  int get _nearestTick {
+    final span = widget.max - widget.min;
+    if (span <= 0) return 0;
+    final fraction = ((widget.value - widget.min) / span).clamp(0.0, 1.0);
+    return (fraction * (widget.ticks!.length - 1)).round();
   }
 
   @override
@@ -173,7 +181,9 @@ class _AppSliderState extends State<AppSlider> {
                   Text(
                     widget.ticks![i],
                     style: AppText.micro.copyWith(
-                      color: i == 1 ? tokens.accent : tokens.textSecondary,
+                      color: i == _nearestTick
+                          ? tokens.accent
+                          : tokens.textSecondary,
                       fontFamily: AppFonts.mono,
                       fontFeatures: const [FontFeature.tabularFigures()],
                     ),
