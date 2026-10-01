@@ -12614,6 +12614,7 @@ components:
         - $ref: "#/components/schemas/CanvasMediaSlotChanged"
         - $ref: "#/components/schemas/ReportsChanged"
         - $ref: "#/components/schemas/ReadStateChanged"
+        - $ref: "#/components/schemas/NotificationOverrideChanged"
         - $ref: "#/components/schemas/MessageEphemeral"
         - $ref: "#/components/schemas/MessageComponents"
         - $ref: "#/components/schemas/InteractionCreated"
@@ -13533,6 +13534,33 @@ components:
         last_read_seq:
           type: integer
           format: int64
+        manually_unread:
+          type: boolean
+          description: >
+            True when the channel was just marked unread by hand, false for a
+            read. Absent from servers that predate the field, read as false.
+
+    NotificationOverrideChanged:
+      type: object
+      required: [type, channel_id, preference]
+      description: >
+        This account's per-channel notification override was set or cleared
+        from one of its devices. Delivered only to the account's own
+        connections; nobody else receives it. A write that changes nothing
+        is not announced.
+      properties:
+        type:
+          type: string
+          enum: [notification_override.changed]
+        channel_id:
+          type: string
+          format: uuid
+        preference:
+          type: string
+          nullable: true
+          description: >
+            `mentions` or `nothing`; null once the channel follows the account
+            default.
 
     NewDeviceSignIn:
       type: object

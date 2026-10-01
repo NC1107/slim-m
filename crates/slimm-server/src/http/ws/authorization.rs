@@ -104,6 +104,7 @@ fn extra_bit(event: &Event) -> Option<Permissions> {
         | Event::CategoryChanged
         | Event::ReportsChanged
         | Event::ReadStateChanged { .. }
+        | Event::NotificationOverrideChanged { .. }
         | Event::EphemeralMessage { .. }
         | Event::InteractionCreated { .. }
         | Event::InteractionAnswered { .. }
@@ -160,21 +161,8 @@ pub(super) async fn authorize_unstamped(
         let frame = signals::presence_frame(hub, target_id, status);
         return Authorization::Deliver(Box::new(frame));
     }
-    // Private to one account, so it is decided before any channel permission is consulted.
-    if let Event::ReadStateChanged {
-        user_id,
-        channel_id,
-        last_read_seq,
-    } = event
-    {
-        return if user_id == ctx.user_id {
-            Authorization::Deliver(Box::new(ServerFrame::ReadStateChanged {
-                channel_id: channel_id.to_string(),
-                last_read_seq,
-            }))
-        } else {
-            Authorization::Withhold
-        };
+    if let Some(decision) = super::account_frames::authorize(ctx, &event) {
+        return decision;
     }
     if let Event::EphemeralMessage {
         recipient_id,
@@ -336,6 +324,7 @@ pub(super) async fn authorize_unstamped(
             | Event::CategoryChanged
             | Event::ReportsChanged
             | Event::ReadStateChanged { .. }
+            | Event::NotificationOverrideChanged { .. }
             | Event::EphemeralMessage { .. }
             | Event::InteractionCreated { .. }
             | Event::InteractionAnswered { .. }
@@ -681,6 +670,7 @@ pub(super) async fn authorize_unstamped(
         | Event::CategoryChanged
         | Event::ReportsChanged
         | Event::ReadStateChanged { .. }
+        | Event::NotificationOverrideChanged { .. }
         | Event::EphemeralMessage { .. }
         | Event::InteractionCreated { .. }
         | Event::InteractionAnswered { .. }

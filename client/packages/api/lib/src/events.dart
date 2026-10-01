@@ -255,6 +255,14 @@ sealed class ServerEvent {
         ReadStateChanged(
           channelId: decoded['channel_id'] as String,
           lastReadSeq: decoded['last_read_seq'] as int,
+          manuallyUnread: decoded['manually_unread'] == true,
+        ),
+      'notification_override.changed' when decoded['channel_id'] is String =>
+        NotificationOverrideChanged(
+          channelId: decoded['channel_id'] as String,
+          preference: decoded['preference'] is String
+              ? NotificationPreference.parse(decoded['preference'] as String)
+              : null,
         ),
       'message.components'
           when decoded['channel_id'] is String &&
