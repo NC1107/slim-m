@@ -279,9 +279,34 @@ String _quoted(String name) => name.replaceAll('"', '""');
 bool _sameCounts(Map<String, int> a, Map<String, int> b) =>
     a.length == b.length && a.entries.every((e) => b[e.key] == e.value);
 
+/// What the staging step needs from the host, gathered so a test can stand in
+/// for a phone: `Platform.operatingSystem` is the real one and cannot be faked.
+@visibleForTesting
+class StagingHost {
+  const StagingHost({required this.operatingSystem, required this.run});
+
+  final String operatingSystem;
+  final ProcessResult Function(String executable, List<String> arguments) run;
+}
+
+@visibleForTesting
+StagingHost stagingHost = StagingHost(
+  operatingSystem: Platform.operatingSystem,
+  run: Process.runSync,
+);
+
+/// Whether a new file has to have its mode narrowed by hand there.
+///
+/// Only where other accounts share the disk. A phone keeps each app's files
+/// in a container no other app can read, and iOS cannot start a process at
+/// all: the `chmod` this used to run there failed on every launch, so an
+/// install with data from before encryption could never open it again.
+bool _narrowsMode(String operatingSystem) =>
+    operatingSystem == 'linux' || operatingSystem == 'macos';
+
 void _restrictToOwner(File file) {
-  if (Platform.isWindows) return;
-  final result = Process.runSync('chmod', ['600', file.path]);
+  if (!_narrowsMode(stagingHost.operatingSystem)) return;
+  final result = stagingHost.run('chmod', ['600', file.path]);
   if (result.exitCode != 0) {
     throw FileSystemException('chmod 600 failed: ${result.stderr}', file.path);
   }
