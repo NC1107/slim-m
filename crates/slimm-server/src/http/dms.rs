@@ -89,7 +89,14 @@ async fn list(
     AuthedLimited(ctx): AuthedLimited<AUTHED_READ>,
     State(state): State<AppState>,
 ) -> Result<Json<Vec<DmConversationDto>>, ApiError> {
-    let conversations = state.store.list_dm_conversations(ctx.user_id).await?;
+    let mut conversations = state.store.list_dm_conversations(ctx.user_id).await?;
+    let ids: Vec<UserId> = conversations.iter().map(|c| c.other.id).collect();
+    let nicknames = state.store.nicknames_for(&ids).await?;
+    for conversation in &mut conversations {
+        if let Some(nickname) = nicknames.get(&conversation.other.id) {
+            conversation.other.display_name.clone_from(nickname);
+        }
+    }
     Ok(Json(
         conversations
             .into_iter()
@@ -122,11 +129,14 @@ async fn open(
         Err(OpenDmError::Internal(e)) => return Err(e.into()),
     };
 
-    let other = state
+    let mut other = state
         .store
         .user_profile(target)
         .await?
         .ok_or(ApiError::NotFound("user not found"))?;
+    if let Some(nickname) = state.store.nicknames_for(&[target]).await?.remove(&target) {
+        other.display_name = nickname;
+    }
     let unread = state.store.unread_count(ctx.user_id, channel.id).await?;
     Ok(Json(DmConversationDto {
         channel_id: channel.id.to_string(),

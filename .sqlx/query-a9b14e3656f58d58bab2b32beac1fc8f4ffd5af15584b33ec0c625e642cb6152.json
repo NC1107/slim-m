@@ -1,0 +1,20 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT nickname FROM member_nicknames WHERE user_id = ?",
+  "describe": {
+    "columns": [
+      {
+        "name": "nickname",
+        "ordinal": 0,
+        "type_info": "Text"
+      }
+    ],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "a9b14e3656f58d58bab2b32beac1fc8f4ffd5af15584b33ec0c625e642cb6152"
+}

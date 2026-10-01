@@ -369,7 +369,7 @@ pub(super) async fn require(
 /// away the ability to lift it only if KICK_MEMBERS were among the masked
 /// bits, which it is not - but removing yourself really would strand the
 /// account, and one rule covering both is easier to keep true than two.
-async fn authorize(
+pub(super) async fn authorize(
     state: &AppState,
     caller: UserId,
     target: UserId,
