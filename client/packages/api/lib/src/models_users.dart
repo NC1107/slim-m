@@ -204,6 +204,7 @@ class Me {
     this.pronouns,
     this.about,
     this.profileColor,
+    this.presenceVisibility,
   });
 
   final String id;
@@ -244,6 +245,10 @@ class Me {
   /// Same meaning as [UserProfile.profileColor].
   final int? profileColor;
 
+  /// The caller's own stored presence choice: online, away, dnd or hidden.
+  /// Null from a server that predates the field. Self-view only.
+  final String? presenceVisibility;
+
   factory Me.fromJson(Map<String, dynamic> json) => Me(
         id: json['id'] as String,
         username: json['username'] as String,
@@ -257,5 +262,6 @@ class Me {
         pronouns: json['pronouns'] as String?,
         about: json['about'] as String?,
         profileColor: json['profile_color'] as int?,
+        presenceVisibility: json['presence_visibility'] as String?,
       );
 }

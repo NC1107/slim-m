@@ -241,6 +241,10 @@ struct MeDto {
     /// The caller's own profile colour index, or `null`; see
     /// [`UserDto::profile_color`].
     profile_color: i64,
+    /// The caller's own stored presence choice (`online`, `away`, `dnd` or
+    /// `hidden`). Self-view only: a hidden choice is invisible to everyone
+    /// else, so this must never appear on [`UserDto`] or any other-user shape.
+    presence_visibility: String,
 }
 
 /// The editable half of a profile.
@@ -307,6 +311,7 @@ async fn get_me(
         .ok_or(ApiError::Unauthorized)?;
     let permissions = state.store.base_permissions(ctx.user_id).await?;
     let timeout = state.store.member_timeout(ctx.user_id).await?;
+    let visibility = state.store.presence_visibility(ctx.user_id).await?;
     Ok(Json(MeDto {
         id: user.id.to_string(),
         username: user.username,
@@ -322,6 +327,7 @@ async fn get_me(
         profile_color: user
             .profile_color
             .unwrap_or_else(|| default_profile_color(user.id)),
+        presence_visibility: visibility.unwrap_or_default().as_str().to_owned(),
     }))
 }
 
