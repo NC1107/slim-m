@@ -28,6 +28,7 @@ class MemberModerationGates {
     required this.isSelf,
     required this.inCallTogether,
     required this.voiceChannelId,
+    required this.outranked,
     required this.canTimeOut,
     required this.canOfferTimeoutChips,
     required this.canRemove,
@@ -46,6 +47,11 @@ class MemberModerationGates {
   /// channel-scoped kick overwrite for [canEject]. Null whenever the viewer
   /// is not in a call at all.
   final String? voiceChannelId;
+
+  /// The viewer holds the kick or ban bit but the member's granted permissions
+  /// reach beyond theirs, which the server refuses for time out and removal
+  /// (`escalation_guard`); false whenever the roles needed to tell are unknown.
+  final bool outranked;
 
   final bool canTimeOut;
 
@@ -101,8 +107,11 @@ MemberModerationGates memberModerationGates(
       voiceState == VoiceSessionState.connected &&
       participants.any((p) => p.identity == profile.id && !p.isLocal);
 
-  final canTimeOut = !isSelf && mine.hasPermission(Perm.kickMembers);
-  final canRemove = !isSelf && mine.hasPermission(Perm.banMembers);
+  final outranked = !isSelf && _outranks(profile, mine, get);
+  final canTimeOut =
+      !isSelf && !outranked && mine.hasPermission(Perm.kickMembers);
+  final canRemove =
+      !isSelf && !outranked && mine.hasPermission(Perm.banMembers);
   final canManageRoles = !isSelf && mine.hasPermission(Perm.manageRoles);
   final canIssueReset = !isSelf && mine.hasPermission(Perm.administrator);
   // The voice kick handler checks KICK_MEMBERS in this call's own channel, since an overwrite may grant it there alone.
@@ -120,6 +129,7 @@ MemberModerationGates memberModerationGates(
     isSelf: isSelf,
     inCallTogether: inCallTogether,
     voiceChannelId: voiceChannelId,
+    outranked: outranked,
     canTimeOut: canTimeOut,
     canOfferTimeoutChips: canOfferTimeoutChips,
     canRemove: canRemove,
@@ -127,4 +137,27 @@ MemberModerationGates memberModerationGates(
     canIssueReset: canIssueReset,
     canEject: canEject,
   );
+}
+
+/// Whether [profile] holds permissions the viewer does not. Needs the role
+/// list, which only MANAGE_ROLES may read, so a viewer without it is never
+/// told they are outranked on a guess: the server still refuses.
+bool _outranks(
+  api.UserProfile profile,
+  int mine,
+  T Function<T>(ProviderListenable<T>) get,
+) {
+  if (mine.hasPermission(Perm.administrator) ||
+      !mine.hasPermission(Perm.manageRoles)) {
+    return false;
+  }
+  final roles = get(rolesProvider).valueOrNull;
+  if (roles == null) return false;
+  var granted = 0;
+  for (final role in roles) {
+    if (role.isEveryone || profile.roleIds.contains(role.id)) {
+      granted |= role.permissions;
+    }
+  }
+  return !mine.hasPermission(granted);
 }

@@ -142,38 +142,44 @@ class MemberRow extends ConsumerWidget {
           )
         : null;
 
-    final row = AppListRow(
-      // Taller than a channel row: a 28px avatar's corner status dot crops at the default height.
-      height: 36,
-      label: displayed.displayName,
-      // What they are playing wins over a typed status; the card shows the activity.
-      subtitle: personLine(activity, statusText),
-      subtitleIcon: activity == null ? null : activityIcon(activity.kind),
-      muted: status == AppPresence.offline,
-      // On screen presence is only a dot and an opacity; this is how it is spoken.
-      stateDescription: status.word,
-      trailing: badge == null
-          ? null
-          : AppBadge(
-              variant: displayed.isBot
-                  ? AppBadgeVariant.tag
-                  : AppBadgeVariant.role,
-              label: badge,
-            ),
-      leading: UserAvatar.known(
-        userId: profile.id,
-        avatarUpdatedAt: displayed.avatarUpdatedAt,
-        name: displayed.displayName,
-        size: AppAvatarSize.s28,
-        presence: true,
+    // The chip is capped to a share of the row so a long role name ellipsizes there and never takes the member's own name.
+    final row = LayoutBuilder(
+      builder: (context, box) => AppListRow(
+        // Taller than a channel row: a 28px avatar's corner status dot crops at the default height.
+        height: 36,
+        label: displayed.displayName,
+        // What they are playing wins over a typed status; the card shows the activity.
+        subtitle: personLine(activity, statusText),
+        subtitleIcon: activity == null ? null : activityIcon(activity.kind),
+        muted: status == AppPresence.offline,
+        // On screen presence is only a dot and an opacity; this is how it is spoken.
+        stateDescription: status.word,
+        trailing: badge == null
+            ? null
+            : ConstrainedBox(
+                constraints: BoxConstraints(maxWidth: box.maxWidth * 0.4),
+                child: AppBadge(
+                  variant: displayed.isBot
+                      ? AppBadgeVariant.tag
+                      : AppBadgeVariant.role,
+                  label: badge,
+                ),
+              ),
+        leading: UserAvatar.known(
+          userId: profile.id,
+          avatarUpdatedAt: displayed.avatarUpdatedAt,
+          name: displayed.displayName,
+          size: AppAvatarSize.s28,
+          presence: true,
+        ),
+        selected: selected,
+        // Opens the profile, which is where every verb about a member lives now.
+        onTap: selectable
+            ? toggle
+            : selecting
+            ? null
+            : open,
       ),
-      selected: selected,
-      // Opens the profile, which is where every verb about a member lives now.
-      onTap: selectable
-          ? toggle
-          : selecting
-          ? null
-          : open,
     );
 
     return GestureDetector(

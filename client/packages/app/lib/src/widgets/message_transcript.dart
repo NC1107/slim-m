@@ -46,6 +46,7 @@ class MessageTranscript extends StatefulWidget {
     required this.historyKnown,
     this.channelName,
     this.channelIsThread = false,
+    this.channelIsVoice = false,
     this.channelTopic,
     required this.scrollController,
     required this.lastReadSeq,
@@ -91,6 +92,9 @@ class MessageTranscript extends StatefulWidget {
   /// oldest message. Null on a surface that has no such header (a DM, whose
   /// "name" is a person, or a voice channel), which simply omits it.
   final String? channelName;
+
+  /// Whether this is a voice channel's chat; picks the empty-state copy.
+  final bool channelIsVoice;
 
   /// Whether this transcript is a thread's own, which takes its own start
   /// copy rather than a channel welcome with an empty name in it.
@@ -307,6 +311,7 @@ class _MessageTranscriptState extends State<MessageTranscript> {
       name: widget.channelName,
       topic: widget.channelTopic,
       isThread: widget.channelIsThread,
+      isVoice: widget.channelIsVoice,
     );
   }
 

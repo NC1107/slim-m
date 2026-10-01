@@ -29,5 +29,17 @@
   {
     "content": "is @here around?",
     "mentions": ["here"]
+  },
+  {
+    "content": "\\@bob is escaped",
+    "mentions": []
+  },
+  {
+    "content": "\\\\@bob after an escaped backslash",
+    "mentions": ["bob"]
+  },
+  {
+    "content": "\\@bob but @amy is not",
+    "mentions": ["amy"]
   }
 ]

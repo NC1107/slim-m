@@ -76,6 +76,7 @@ Widget _harness({required Widget child, int permissions = Perm.sendMessages}) =>
 MemberModerateView _view(
   BuildContext host, {
   bool canManageRoles = true,
+  bool outranked = false,
   bool canOfferTimeoutChips = false,
   bool canIssueReset = false,
   bool canRemove = false,
@@ -88,6 +89,7 @@ MemberModerateView _view(
   profile: _profile,
   host: host,
   canManageRoles: canManageRoles,
+  outranked: outranked,
   canOfferTimeoutChips: canOfferTimeoutChips,
   canIssueReset: canIssueReset,
   canRemove: canRemove,
@@ -144,7 +146,7 @@ void main() {
     await tester.pump();
 
     expect(find.text('admin-only'), findsOneWidget);
-    expect(find.text('Needs permissions you do not hold'), findsOneWidget);
+    expect(find.text('Needs permissions you lack'), findsOneWidget);
     final row = find.ancestor(
       of: find.text('admin-only'),
       matching: find.byType(AppListRow),
@@ -308,5 +310,24 @@ void main() {
     expect(find.text('TIME OUT'), findsOneWidget);
     expect(find.text('ACCOUNT'), findsOneWidget);
     expect(find.text('Password reset code...'), findsOneWidget);
+  });
+
+  testWidgets('an outranked member shows the reason in place of time out', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      _harness(
+        child: Builder(builder: (context) => _view(context, outranked: true)),
+      ),
+    );
+    await tester.pump();
+
+    expect(
+      find.text(
+        'You cannot time out or remove maya: they hold permissions you do not.',
+      ),
+      findsOneWidget,
+    );
+    expect(find.text('TIME OUT'), findsNothing);
   });
 }

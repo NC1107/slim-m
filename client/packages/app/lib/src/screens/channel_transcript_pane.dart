@@ -58,6 +58,7 @@ class ChannelTranscriptPane extends ConsumerWidget {
     required this.hashChannelName,
     required this.channelTopic,
     required this.isThread,
+    this.isVoice = false,
     required this.lastReadSeq,
     required this.manuallyUnread,
     required this.onMarkRead,
@@ -76,6 +77,9 @@ class ChannelTranscriptPane extends ConsumerWidget {
   final String? hashChannelName;
   final String? channelTopic;
   final bool isThread;
+
+  /// A voice channel's chat, whose empty state is not the text channel's.
+  final bool isVoice;
   final int lastReadSeq;
 
   /// Mirrored from the server's own hand-mark flag; see `Channel.
@@ -206,6 +210,7 @@ class ChannelTranscriptPane extends ConsumerWidget {
                           historyKnown: historyKnown,
                           channelName: hashChannelName,
                           channelIsThread: isThread,
+                          channelIsVoice: isVoice,
                           channelTopic: channelTopic,
                           scrollController: scrollTracker.controller,
                           lastReadSeq: lastReadSeq,

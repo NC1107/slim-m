@@ -39,6 +39,7 @@ import '../providers/forward_targets.dart';
 import '../providers/message_extras.dart';
 import '../providers/providers.dart';
 import '../providers/toasts.dart';
+import 'channel_kind_icon.dart';
 import 'user_avatar.dart';
 import 'run_guarded.dart';
 import 'sheet_item_list.dart';
@@ -289,7 +290,14 @@ class _ForwardTargetSheetState extends ConsumerState<_ForwardTargetSheet>
                   name: target.label,
                   size: AppAvatarSize.s24,
                 )
-              : Icon(target.isDm ? AppIcons.account : AppIcons.hash),
+              : target.isDm
+              ? const Icon(AppIcons.account)
+              : ChannelKindIcon(
+                  isVoice: target.isVoice,
+                  restricted: target.restricted,
+                  color: tokens.textSecondary,
+                  size: AppSizes.icon20,
+                ),
           label: target.label,
           trailing: sendingHere
               ? const SizedBox(
