@@ -59,13 +59,15 @@ String? _focusedTapTargetLabel() => FocusManager.instance.primaryFocus?.context
     ?.findAncestorWidgetOfExactType<AuthorProfileTapTarget>()
     ?.semanticLabel;
 
-/// Tabs forward until focus lands inside the [AuthorProfileTapTarget] whose
-/// label matches [label], so neither test depends on how many other focusable
-/// things (the row's own context-menu stop, say) happen to sit ahead of it.
+/// Tabs onto the row, then steps right through its controls until focus lands
+/// inside the [AuthorProfileTapTarget] whose label matches [label]. The row is
+/// one tab stop; its avatar and name ride the arrow keys.
 Future<bool> _tabTo(WidgetTester tester, String label) async {
+  await tester.sendKeyEvent(LogicalKeyboardKey.tab);
+  await tester.pumpAndSettle();
   for (var step = 0; step < 8; step++) {
     if (_focusedTapTargetLabel() == label) return true;
-    await tester.sendKeyEvent(LogicalKeyboardKey.tab);
+    await tester.sendKeyEvent(LogicalKeyboardKey.arrowRight);
     await tester.pumpAndSettle();
   }
   return _focusedTapTargetLabel() == label;
@@ -152,7 +154,7 @@ void main() {
           FocusHighlightStrategy.automatic;
     });
 
-    testWidgets('Tab reaches the avatar and Enter opens the popover', (
+    testWidgets('the arrow keys reach the avatar and Enter opens the popover', (
       tester,
     ) async {
       await tester.pumpWidget(harness(_row(), overrides: _resolvedProfile()));

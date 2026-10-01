@@ -12,6 +12,7 @@ import 'package:slimm_design_system/design_system.dart';
 
 import '../providers/user_profiles.dart';
 import 'member_profile.dart';
+import 'message_row_roving.dart';
 
 /// Wraps [child] so a tap (or its own accessible action) opens [authorId]'s
 /// profile - the exact popover [showMemberProfile] already opens from the
@@ -78,39 +79,42 @@ class _AuthorProfileTapTargetState
 
     void open() => unawaited(showMemberProfile(context, ref, profile: profile));
 
-    return Semantics(
-      button: true,
-      label: widget.semanticLabel,
-      excludeSemantics: true,
-      onTap: open,
-      child: FocusableActionDetector(
-        mouseCursor: SystemMouseCursors.click,
-        onShowFocusHighlight: (v) => setState(() => _focused = v),
-        actions: <Type, Action<Intent>>{
-          ActivateIntent: CallbackAction<ActivateIntent>(
-            onInvoke: (_) => open(),
-          ),
-        },
-        child: GestureDetector(
-          onTap: open,
-          excludeFromSemantics: true,
-          child: Stack(
-            clipBehavior: Clip.none,
-            children: [
-              widget.child,
-              // Only mounted while focus-highlighted, so a pointer-only run draws nothing extra.
-              if (_focused)
-                Positioned.fill(
-                  child: IgnorePointer(
-                    child: DecoratedBox(
-                      decoration: BoxDecoration(
-                        border: Border.all(color: tokens.focusRing, width: 2),
-                        borderRadius: BorderRadius.circular(AppRadii.control),
+    return RovingStop(
+      builder: (context, node) => Semantics(
+        button: true,
+        label: widget.semanticLabel,
+        excludeSemantics: true,
+        onTap: open,
+        child: FocusableActionDetector(
+          focusNode: node,
+          mouseCursor: SystemMouseCursors.click,
+          onShowFocusHighlight: (v) => setState(() => _focused = v),
+          actions: <Type, Action<Intent>>{
+            ActivateIntent: CallbackAction<ActivateIntent>(
+              onInvoke: (_) => open(),
+            ),
+          },
+          child: GestureDetector(
+            onTap: open,
+            excludeFromSemantics: true,
+            child: Stack(
+              clipBehavior: Clip.none,
+              children: [
+                widget.child,
+                // Only mounted while focus-highlighted, so a pointer-only run draws nothing extra.
+                if (_focused)
+                  Positioned.fill(
+                    child: IgnorePointer(
+                      child: DecoratedBox(
+                        decoration: BoxDecoration(
+                          border: Border.all(color: tokens.focusRing, width: 2),
+                          borderRadius: BorderRadius.circular(AppRadii.control),
+                        ),
                       ),
                     ),
                   ),
-                ),
-            ],
+              ],
+            ),
           ),
         ),
       ),

@@ -12,6 +12,7 @@ import 'package:slimm_design_system/design_system.dart';
 import 'bot_menu_sections.dart';
 import 'context_menu_region.dart';
 import 'hover_reveal.dart';
+import 'message_row_roving.dart';
 
 /// What the menu can do for one message. The caller (which knows authorship
 /// and permissions; the menu deliberately does not) decides each `can*`
@@ -288,21 +289,24 @@ class _MessageContextMenuRegionState extends State<MessageContextMenuRegion> {
   @override
   Widget build(BuildContext context) {
     final tokens = Theme.of(context).extension<AppTokens>()!;
-    return ContextMenuRegion(
-      itemsBuilder: _items,
-      onOpenChanged: (open) => HoverRevealScope.maybeOf(context)?.pin(open),
-      onVisibilityChanged: (open) =>
-          HoverRevealScope.maybeOf(context)?.reportMenuOpen(open),
-      onHoldChanged: (holding) => setState(() => _holding = holding),
-      child: AnimatedContainer(
-        duration: _holding
-            ? AppMotion.reduced(context, kLongPressTimeout)
-            : AppMotion.reduced(context, AppMotion.fast),
-        curve: Curves.linear,
-        color: _holding
-            ? tokens.accentSoft.withValues(alpha: 0.5)
-            : Colors.transparent,
-        child: widget.child,
+    return MessageRowRoving(
+      builder: (context, rowNode) => ContextMenuRegion(
+        focusNode: rowNode,
+        itemsBuilder: _items,
+        onOpenChanged: (open) => HoverRevealScope.maybeOf(context)?.pin(open),
+        onVisibilityChanged: (open) =>
+            HoverRevealScope.maybeOf(context)?.reportMenuOpen(open),
+        onHoldChanged: (holding) => setState(() => _holding = holding),
+        child: AnimatedContainer(
+          duration: _holding
+              ? AppMotion.reduced(context, kLongPressTimeout)
+              : AppMotion.reduced(context, AppMotion.fast),
+          curve: Curves.linear,
+          color: _holding
+              ? tokens.accentSoft.withValues(alpha: 0.5)
+              : Colors.transparent,
+          child: widget.child,
+        ),
       ),
     );
   }

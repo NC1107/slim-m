@@ -38,9 +38,12 @@ const Offset _buttonDrop = Offset(0, 4);
 /// follower did, so it closes on one instead, `ContextMenuRegion`'s own
 /// answer to the same trade.
 class EmojiPickerButton extends StatefulWidget {
-  const EmojiPickerButton({super.key, required this.onSelect});
+  const EmojiPickerButton({super.key, required this.onSelect, this.focusNode});
 
   final ValueChanged<String> onSelect;
+
+  /// Lets a row that walks its own controls with the arrow keys own this stop.
+  final FocusNode? focusNode;
 
   @override
   State<EmojiPickerButton> createState() => _EmojiPickerButtonState();
@@ -121,6 +124,7 @@ class _EmojiPickerButtonState extends State<EmojiPickerButton> {
         ),
       ),
       child: AppIconButton(
+        focusNode: widget.focusNode,
         icon: AppIcons.smile,
         semanticLabel: 'Add a reaction',
         iconSize: AppSizes.icon16,
