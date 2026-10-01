@@ -8,6 +8,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:slimm_api/api.dart' as api;
+import 'package:slimm_app/src/action_labels.dart';
 import 'package:slimm_app/src/providers/user_profiles.dart';
 import 'package:slimm_app/src/widgets/author_profile_tap_target.dart';
 import 'package:slimm_app/src/widgets/message_context_menu.dart';
@@ -212,7 +213,8 @@ void main() {
     await _focusBefore(tester);
     await _key(tester, LogicalKeyboardKey.tab);
     await _key(tester, LogicalKeyboardKey.contextMenu);
-    for (final label in ['Add reaction', 'Reply', 'Reply in thread', 'Edit']) {
+    expect(find.byTooltip(ActionLabels.addReaction), findsOneWidget);
+    for (final label in ['Reply', 'Reply in thread', 'Edit']) {
       expect(find.text(label), findsOneWidget, reason: label);
     }
   });

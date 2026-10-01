@@ -12,6 +12,7 @@ library;
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:slimm_app/src/action_labels.dart';
 import 'package:slimm_app/src/widgets/animated_menu_portal.dart';
 import 'package:slimm_app/src/widgets/emoji_picker.dart';
 import 'package:slimm_app/src/widgets/emoji_picker_grid.dart';
@@ -309,9 +310,9 @@ void main() {
 
     await tester.longPressAt(pressPoint(tester));
     await tester.pumpAndSettle();
-    expect(find.byTooltip('Add reaction'), findsOneWidget);
+    expect(find.byTooltip(ActionLabels.addReaction), findsOneWidget);
 
-    await tester.tap(find.byTooltip('Add reaction'));
+    await tester.tap(find.byTooltip(ActionLabels.addReaction));
     await tester.pumpAndSettle();
     expect(
       find.byType(EmojiPickerPanel),

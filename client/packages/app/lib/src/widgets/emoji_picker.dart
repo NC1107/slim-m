@@ -141,7 +141,7 @@ class _EmojiPickerButtonState extends State<EmojiPickerButton> {
         null => AppIconButton(
           focusNode: widget.focusNode,
           icon: AppIcons.smile,
-          semanticLabel: 'Add a reaction',
+          semanticLabel: ActionLabels.addReaction,
           iconSize: AppSizes.icon16,
           onPressed: _toggle,
         ),

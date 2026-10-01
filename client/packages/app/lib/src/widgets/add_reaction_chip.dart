@@ -8,6 +8,8 @@ import 'dart:ui' show PathMetric;
 import 'package:flutter/material.dart';
 import 'package:slimm_design_system/design_system.dart';
 
+import '../action_labels.dart';
+
 /// Matches [AppChip.reaction]'s own height so the two share a line.
 const double _chipHeight = 24;
 
@@ -26,11 +28,11 @@ class AddReactionChip extends StatelessWidget {
   Widget build(BuildContext context) {
     final tokens = Theme.of(context).extension<AppTokens>()!;
     return Tooltip(
-      message: 'Add reaction',
+      message: ActionLabels.addReaction,
       excludeFromSemantics: true,
       child: FocusableTapTarget(
         onTap: onTap,
-        semanticLabel: 'Add reaction',
+        semanticLabel: ActionLabels.addReaction,
         ringRadius: AppRadii.full,
         builder: (context, focused, hovered) => CustomPaint(
           painter: _DashedPillPainter(
