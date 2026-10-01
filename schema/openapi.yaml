@@ -7549,6 +7549,9 @@ paths:
         type is sniffed from the bytes against the inline image allowlist,
         never taken from a header. The bytes reuse the content-addressed
         attachment store, so an image already present costs no second copy.
+        A name that is a standard unicode emoji's shortcode is refused with
+        409, since the custom emoji would shadow it. An image identical to an
+        existing emoji's is accepted and names that emoji in `same_image_as`.
       parameters:
         - name: name
           in: query
@@ -7843,6 +7846,11 @@ components:
         created_at:
           type: integer
           format: int64
+        same_image_as:
+          type: string
+          description: >-
+            Only on the upload response: the name of an older emoji with
+            identical image bytes. The new emoji is still added.
     Error:
       type: object
       required: [error]

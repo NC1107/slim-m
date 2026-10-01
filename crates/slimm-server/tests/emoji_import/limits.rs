@@ -22,7 +22,7 @@ async fn a_file_over_the_size_ceiling_is_refused() {
 
     let oversized = png(&vec![0u8; MAX_IMAGE_BYTES as usize]);
     write(&dir, "huge.png", &oversized);
-    write(&dir, "wave.png", &png(b"wave"));
+    write(&dir, "my_wave.png", &png(b"wave"));
 
     let report = import_directory(&store, &media, &dir)
         .await
@@ -40,9 +40,9 @@ async fn a_file_over_the_size_ceiling_is_refused() {
                 }
             ),
             (
-                "wave.png".to_owned(),
+                "my_wave.png".to_owned(),
                 Outcome::Imported {
-                    name: "wave".to_owned()
+                    name: "my_wave".to_owned()
                 }
             ),
         ]
@@ -134,9 +134,9 @@ async fn hitting_the_cap_reports_what_was_left_out_and_keeps_the_rest() {
     }
 
     let (dir, _packdir) = pack_dir();
-    write(&dir, "a.png", &png(b"a"));
-    write(&dir, "b.png", &png(b"b"));
-    write(&dir, "d.png", &png(b"d"));
+    write(&dir, "aa.png", &png(b"a"));
+    write(&dir, "bb.png", &png(b"b"));
+    write(&dir, "dd.png", &png(b"d"));
     write(&dir, "notes.txt", b"read me first");
 
     let report = import_directory(&store, &media, &dir)
@@ -147,13 +147,13 @@ async fn hitting_the_cap_reports_what_was_left_out_and_keeps_the_rest() {
         outcomes(&report),
         vec![
             (
-                "a.png".to_owned(),
+                "aa.png".to_owned(),
                 Outcome::Imported {
-                    name: "a".to_owned()
+                    name: "aa".to_owned()
                 }
             ),
-            ("b.png".to_owned(), Outcome::AtCapacity),
-            ("d.png".to_owned(), Outcome::AtCapacity),
+            ("bb.png".to_owned(), Outcome::AtCapacity),
+            ("dd.png".to_owned(), Outcome::AtCapacity),
             ("notes.txt".to_owned(), Outcome::AtCapacity),
         ]
     );
@@ -167,7 +167,7 @@ async fn hitting_the_cap_reports_what_was_left_out_and_keeps_the_rest() {
         "at the cap, never over it"
     );
     assert!(
-        catalog.iter().any(|e| e.name == "a"),
+        catalog.iter().any(|e| e.name == "aa"),
         "what fit before the cap stays imported"
     );
 

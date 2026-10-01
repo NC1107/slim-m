@@ -64,6 +64,10 @@ pub struct CustomEmojiDto {
     pub name: String,
     pub uploader_id: Option<String>,
     pub created_at: i64,
+    /// Upload response only: the name of an older emoji with exactly these
+    /// bytes, so a client can offer to keep that one instead.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub same_image_as: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -99,6 +103,7 @@ async fn list(
                 name: e.name,
                 uploader_id: e.uploader_id,
                 created_at: e.created_at,
+                same_image_as: None,
             })
             .collect(),
     ))
@@ -127,6 +132,13 @@ async fn upload(
     )
     .await
     .map_err(refusal)?;
+    let same_image_as = state
+        .store
+        .list_custom_emoji()
+        .await?
+        .into_iter()
+        .find(|e| e.sha256 == created.sha256 && e.id != created.id)
+        .map(|e| e.name);
 
     Ok((
         StatusCode::CREATED,
@@ -135,6 +147,7 @@ async fn upload(
             name: created.name,
             uploader_id: created.uploader_id,
             created_at: created.created_at,
+            same_image_as,
         }),
     ))
 }
@@ -194,6 +207,7 @@ async fn bulk_upload(
                     name: e.name,
                     uploader_id: e.uploader_id,
                     created_at: e.created_at,
+                    same_image_as: None,
                 })
                 .collect(),
         ),
@@ -226,6 +240,9 @@ fn refusal(err: AddError) -> ApiError {
         AddError::TooLarge => ApiError::BadRequest("emoji is too large"),
         AddError::UnsupportedType => ApiError::BadRequest("unsupported emoji type"),
         AddError::NameTaken => ApiError::Conflict("an emoji with that name already exists"),
+        AddError::BuiltinName => {
+            ApiError::Conflict("that name is a standard emoji's shortcode, pick another")
+        }
         AddError::Full => ApiError::Conflict("this deployment is at its emoji limit"),
         AddError::Storage(err) => {
             tracing::error!(error = %err, "failed to store an uploaded emoji");

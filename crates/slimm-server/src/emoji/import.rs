@@ -75,6 +75,8 @@ pub enum Refusal {
     /// The bytes are not an image this server stores. Sniffed from the
     /// content, so an extension that lies is caught here.
     NotAnImage,
+    /// The name is a standard unicode emoji's shortcode.
+    BuiltinName,
 }
 
 /// One line of the report: the filename as the operator wrote it, and what
@@ -157,6 +159,12 @@ impl fmt::Display for Refusal {
         match self {
             Refusal::UnusableName => {
                 write!(f, "the filename leaves no usable name (a-z, 0-9 or _)")
+            }
+            Refusal::BuiltinName => {
+                write!(
+                    f,
+                    "the name is a standard emoji's shortcode, rename the file"
+                )
             }
             Refusal::NameTooLong { length } => write!(
                 f,
@@ -269,6 +277,7 @@ async fn import_one(store: &Store, media: &Media, path: &Path) -> anyhow::Result
         Err(AddError::Full) => Ok(Outcome::AtCapacity),
         Err(AddError::NameTaken) => Ok(Outcome::NameTaken { name }),
         Err(AddError::UnusableName) => Ok(refused(Refusal::UnusableName)),
+        Err(AddError::BuiltinName) => Ok(refused(Refusal::BuiltinName)),
         Err(AddError::Empty) => Ok(refused(Refusal::Empty)),
         Err(AddError::TooLarge) => Ok(refused(Refusal::TooLarge {
             bytes: metadata.len(),

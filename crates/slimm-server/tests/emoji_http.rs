@@ -223,6 +223,48 @@ async fn a_duplicate_name_is_a_conflict() {
     assert_eq!(second.status(), StatusCode::CONFLICT);
 }
 
+/// The same name in another case or spacing is still the same name.
+#[tokio::test]
+async fn a_duplicate_name_in_another_spelling_is_a_conflict() {
+    let (store, _guard) = new_store().await;
+    let app = app(store.clone());
+    let admin = register(&store, "admin").await;
+
+    assert_eq!(
+        upload(&app, &admin, "party_parrot", png()).await.status(),
+        StatusCode::CREATED
+    );
+    let again = upload(&app, &admin, "Party%20Parrot", png()).await;
+    assert_eq!(again.status(), StatusCode::CONFLICT);
+}
+
+/// A custom `:bug:` would hide the standard bug emoji, so the name is refused.
+#[tokio::test]
+async fn a_standard_shortcode_is_refused() {
+    let (store, _guard) = new_store().await;
+    let app = app(store.clone());
+    let admin = register(&store, "admin").await;
+
+    let response = upload(&app, &admin, "Bug", png()).await;
+    assert_eq!(response.status(), StatusCode::CONFLICT);
+    let body = json_body(response).await;
+    assert!(body["error"].as_str().unwrap().contains("standard emoji"));
+}
+
+/// Identical bytes under a second name are allowed and reported.
+#[tokio::test]
+async fn identical_bytes_under_a_new_name_are_reported_not_blocked() {
+    let (store, _guard) = new_store().await;
+    let app = app(store.clone());
+    let admin = register(&store, "admin").await;
+
+    let first = json_body(upload(&app, &admin, "parrot_a", png()).await).await;
+    assert!(first.get("same_image_as").is_none());
+    let second = upload(&app, &admin, "parrot_two", png()).await;
+    assert_eq!(second.status(), StatusCode::CREATED);
+    assert_eq!(json_body(second).await["same_image_as"], "parrot_a");
+}
+
 /// An unusable name and a file that is not an image are both the caller's
 /// fault, so both are 400 rather than anything a retry would fix.
 #[tokio::test]
