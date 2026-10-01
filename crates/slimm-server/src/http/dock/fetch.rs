@@ -77,13 +77,25 @@ pub(super) async fn fetch_first(
     cap: usize,
 ) -> Result<Vec<u8>, FetchError> {
     for base in bases {
-        let url = base.join(path).map_err(|_| FetchError::Refused)?;
+        let url = joined_under(base, path).ok_or(FetchError::Refused)?;
         match fetch_capped(client, &url, allowed_host, cap).await {
             Err(FetchError::Missing) => continue,
             found => return found,
         }
     }
     Err(FetchError::Missing)
+}
+
+/// [path] resolved against [base], or `None` if the result is not still on
+/// [base]'s host and under its directory. A second line of defence behind the
+/// manifest's own path rule, since `Url::join` reads `%2e%2e` and `\` as structure.
+fn joined_under(base: &Url, path: &str) -> Option<Url> {
+    let url = base.join(path).ok()?;
+    let directory = &base.path()[..=base.path().rfind('/')?];
+    let same_origin = url.scheme() == base.scheme()
+        && url.host_str() == base.host_str()
+        && url.port_or_known_default() == base.port_or_known_default();
+    (same_origin && url.path().starts_with(directory)).then_some(url)
 }
 
 /// Reads at most [cap] bytes from [response], stopping the moment the body
@@ -101,4 +113,27 @@ async fn read_capped(mut response: reqwest::Response, cap: usize) -> Result<Vec<
         body.extend_from_slice(&chunk);
     }
     Ok(body)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn base() -> Url {
+        Url::parse("https://raw.githubusercontent.com/alice/addons/main/").unwrap()
+    }
+
+    #[test]
+    fn a_join_that_leaves_the_repo_directory_is_refused() {
+        assert!(joined_under(&base(), "modules/a/0.1.0/module.wasm").is_some());
+        for path in [
+            "%2e%2e/%2e%2e/bob/evil/main/m.wasm",
+            "\\bob\\evil\\main\\m.wasm",
+            "../bob/m.wasm",
+            "/bob/m.wasm",
+            "https://elsewhere.test/m.wasm",
+        ] {
+            assert!(joined_under(&base(), path).is_none(), "{path}");
+        }
+    }
 }
