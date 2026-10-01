@@ -55,7 +55,7 @@ So a person who calls a DM contact has no way to reach them unless that contact 
 ## 3. The report queue does not enforce per-channel moderator exclusion for a message inside a thread
 
 **Fixed 2026-08-02.** `channel_scopes_moderation` now resolves a thread to its parent through `Store::permission_channel` before deciding scoping, and `hidden_channels` was taught about the report-referenced channel ids `list_channels` never carries.
-See `CLAUDE.md`'s "Moderation reaching only the channel kind it was written for" and `crates/slimm-server/tests/report_thread_scoping.rs`.
+See the pre-trim `CLAUDE.md`'s "Moderation reaching only the channel kind it was written for" and `crates/slimm-server/tests/report_thread_scoping.rs`.
 The rest of this entry is kept for the record of what the gap was.
 
 **What is missing.** `channel_scopes_moderation` (`crates/slimm-server/src/store/channels.rs`) returns `false` for a thread's own channel, the same as it does for a DM:
@@ -70,7 +70,7 @@ The batched form, `hidden_channels`, has the identical gap: it is built from `st
 
 **Concretely:** an admin sets a per-channel overwrite denying a specific moderator `MANAGE_MESSAGES` (and typically `VIEW_CHANNEL`) on some channel - a private or sensitive channel, say. That moderator still holds `MANAGE_MESSAGES` at the deployment level for everything else. A message gets reported inside a thread hanging off a message in that excluded channel. The excluded moderator sees the report in their queue anyway, including the reported content snapshot (`ReportDto.snapshot`), because the report's channel id is a thread that both `hidden_channels` and `report_visible_in` treat as unscoped.
 
-**Why it matters.** This is exactly the class of bug the project has already found and fixed once in this same file (see `CLAUDE.md`'s "Read bounds" section: "a moderator denied MANAGE_MESSAGES in one channel could not read its reports but could still dismiss them"). Threads reopened the same shape by being modelled on the DM branch instead of the general one.
+**Why it matters.** This is exactly the class of bug the project has already found and fixed once in this same file (see the pre-trim `CLAUDE.md`'s "Read bounds" section: "a moderator denied MANAGE_MESSAGES in one channel could not read its reports but could still dismiss them"). Threads reopened the same shape by being modelled on the DM branch instead of the general one.
 
 **Urgent or latent.** Latent until a deployment actually uses per-channel overwrites to exclude a specific moderator from a specific channel *and* that channel grows a thread with a report in it. Real once it happens: the content snapshot is a genuine visibility leak, not just an inconsistency.
 

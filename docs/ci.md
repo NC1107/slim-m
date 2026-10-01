@@ -227,7 +227,7 @@ It matches text sources only and passes `--binary-files=without-match`, so a com
 ### SPDX headers on Rust source
 
 Every file under `crates/` needs an `SPDX-License-Identifier` header on its first line; this step fails and names the file otherwise.
-CLAUDE.md's own contribution rule says "a CI gate checks the Rust ones," and `find crates -name '*.rs'` is that scope exactly, not a gap - widening it to the Dart, Swift and Kotlin sources that also lack headers is a separate, smaller decision nobody has made yet.
+the pre-trim CLAUDE.md's own contribution rule says "a CI gate checks the Rust ones," and `find crates -name '*.rs'` is that scope exactly, not a gap - widening it to the Dart, Swift and Kotlin sources that also lack headers is a separate, smaller decision nobody has made yet.
 
 ### The file-size budget
 
@@ -972,7 +972,7 @@ Worth naming rather than assuming away: `release.yml` and `main-builds.yml` are 
 No such collision has been observed, and `release.yml` runs on every push to `main` regardless of path while this workflow only runs on a subset of those pushes, which keeps its counter behind; if that ever stops holding, the fix is to derive the build number from something workflow-independent, such as a count of commits.
 
 The server side pushes one native `linux/amd64` image to GHCR, tagged `sha-<commit>`, `main` and `latest`, with no arm64 build, no digest-then-merge manifest assembly and no cosign signing.
-amd64 only because nothing consumes an arm64 image from this path: the owner's live instance (`CLAUDE.md`'s "Running deployment" section) is an amd64 Ubuntu Docker host, and a released version still gets the full signed multi-arch manifest `release.yml` builds.
+amd64 only because nothing consumes an arm64 image from this path: the owner's live instance (the pre-trim `CLAUDE.md`'s "Running deployment" section) is an amd64 Ubuntu Docker host, and a released version still gets the full signed multi-arch manifest `release.yml` builds.
 Moving `latest` here is continuous deployment in the plain sense of the term: Watchtower on the live instance polls that tag, so a server merge reaches production within one build with nobody deploying it by hand, and a bad merge reaches it exactly as fast.
 That is the trade the owner asked for explicitly, not a gap: fast iteration on the one host that matters to him, at the cost of no gate between a merge and production.
 

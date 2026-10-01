@@ -58,7 +58,7 @@ Things that only become visible after reading several files.
 Server (`crates/slimm-server/src/`):
 
 - `main.rs` is a thin wrapper; everything lives in the library so integration tests can drive the real router.
-- `lib.rs::run` wires `AppState` (store, auth, hub, limiter, push, voice, media, gifs) and spawns the background sweeps: expired tokens, orphaned attachments, canvas ops, stale calls, message retention.
+- `lib.rs::run` wires `AppState` (store, auth, hub, limiter, push, voice, media, gifs, link_previews, dock, code_runner) and spawns the background sweeps: expired tokens, orphaned attachments, canvas ops, forward backfill, stale calls, ring, message retention.
 - `http/` and `store/` are both split one module per feature and mirror each other; a new feature usually means a matching pair plus a route in `http.rs` and an entry in `schema/openapi.yaml`.
 - `store.rs` keeps methods inherent on `Store` rather than behind a repository trait; that trait arrives when Postgres actually needs it.
 - `hub.rs` is two class-based broadcast channels (durable and ephemeral), not a per-scope router. Fan-out order across concurrent writers is best-effort, so clients apply events strictly by per-scope `seq`. A subscriber that lags past `CHANNEL_CAPACITY` is dropped, and the client resyncs over REST.
@@ -78,6 +78,7 @@ Client (`client/packages/`), layered bottom-up:
 sqlx validates applied migrations by version and checksum. Never edit, rename, delete, or renumber an applied migration. Fix mistakes with a new migration.
 
 `scripts/check-migration-versions.py` is the hygiene gate for duplicate versions and mutations.
+A new migration also needs `scripts/lock-migrations.py` run, because the lockfile gate lives in `scripts/lib`.
 
 This matters especially because **main is continuously deployed**: `main-builds.yml` can publish `latest`, and Watchtower deploys it to the live instance. A merge to main can therefore be a production deploy even without a release.
 
@@ -139,7 +140,8 @@ Never use `:memory:` for tests that depend on the multi-connection SQLite pool.
 - `scripts/commit-lint` (`npm ci && node check-parses.mjs`) - the PR title parses, and no commit body crashes release-please's parser. A body that crashes it is dropped from the changelog silently.
 - `scripts/check-ci-docs.py` - every workflow has a row in `docs/ci.md`'s table. It checks the row exists, never what the row says.
 - `actionlint` over every workflow, which also shellchecks the inline `run:` blocks, and `shellcheck` over every tracked `*.sh`. Both are pinned by image digest, because the runner's preinstalled shellcheck and the `stable` image are different versions that disagree; verify locally with the pinned digest, not with whatever `shellcheck` is on PATH. Both were green when they landed, so either failing means the change under review introduced it.
-- Inline in the workflow: no emoji in `client/` Dart/YAML/ARB sources, an SPDX header on the first line of every `crates/**/*.rs` file, orientation locked on phones only, the iOS Info.plist/broadcast-extension/notification-extension wiring checks, and unit tests for the e2e harness's own scenario logic.
+- `scripts/check-message-dto-boundary.py` - `data.dart` exports `Message` as a plain DTO, never a drift row.
+- Inline in the workflow: no emoji in `client/` Dart/YAML/ARB sources, an SPDX header on the first line of every `crates/**/*.rs` and Dart source file, orientation locked on phones only, the iOS Info.plist/broadcast-extension/notification-extension wiring checks, and unit tests for the e2e harness's own scenario logic.
 
 ## Local environment
 
