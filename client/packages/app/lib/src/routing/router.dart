@@ -12,6 +12,7 @@ import 'package:go_router/go_router.dart';
 
 import '../providers/providers.dart';
 import '../providers/threads.dart';
+import '../screens/not_found_screen.dart';
 import '../screens/admin/account_recovery_screen.dart';
 import '../screens/admin/analytics_screen.dart';
 import '../screens/admin/bots_screen.dart';
@@ -84,6 +85,7 @@ final routerProvider = Provider<GoRouter>((ref) {
       if (onJoinFlow) return Routes.channels;
       return null;
     },
+    errorBuilder: (context, state) => const NotFoundScreen(),
     routes: [
       // The join flow fades through like the shell's own pages, so signing in hands off into the app as one motion.
       GoRoute(
