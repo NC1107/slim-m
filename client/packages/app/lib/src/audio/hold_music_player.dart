@@ -39,7 +39,7 @@ const _noteLength = 2.4;
 /// Quieter than a chime: this runs for minutes, not a moment.
 const holdMusicVolume = 0.2;
 
-Uint8List _render(Object? _) => renderHoldLoop();
+Uint8List _renderLoop(Object? _) => renderHoldLoop();
 
 Uint8List renderHoldLoop() {
   final notes = [
@@ -53,16 +53,20 @@ Uint8List renderHoldLoop() {
   return scene_synth.encodeWav16(scene_synth.render(notes, tail: 0));
 }
 
-class AudioPlayersHoldMusicPlayer implements HoldMusicPlayer {
+/// The sink the loop plays through, so a test can stand in for the plugin.
+abstract class HoldLoopOutput {
+  Future<void> play(Uint8List wav);
+  Future<void> stop();
+  Future<void> dispose();
+}
+
+class _AudioPlayersOutput implements HoldLoopOutput {
   /// Built on first use, so a session that never enables hold music never touches the audio plugin.
   AudioPlayer? _created;
   AudioPlayer get _player => _created ??= AudioPlayer();
-  Uint8List? _wav;
 
   @override
-  Future<void> start() async {
-    final wav = _wav ?? await compute<Object?, Uint8List>(_render, null);
-    _wav = wav;
+  Future<void> play(Uint8List wav) async {
     await _player.stop();
     await _player.setReleaseMode(ReleaseMode.loop);
     await _player.play(
@@ -77,6 +81,44 @@ class AudioPlayersHoldMusicPlayer implements HoldMusicPlayer {
 
   @override
   Future<void> dispose() async => _created?.dispose();
+}
+
+class AudioPlayersHoldMusicPlayer implements HoldMusicPlayer {
+  AudioPlayersHoldMusicPlayer({
+    Future<Uint8List> Function()? render,
+    HoldLoopOutput? output,
+  }) : _render =
+           render ?? (() => compute<Object?, Uint8List>(_renderLoop, null)),
+       _output = output ?? _AudioPlayersOutput();
+
+  final Future<Uint8List> Function() _render;
+  final HoldLoopOutput _output;
+  Uint8List? _wav;
+
+  /// Bumped by every stop, so a start that was still rendering can tell it lost.
+  int _generation = 0;
+
+  @override
+  Future<void> start() async {
+    final generation = _generation;
+    final wav = _wav ?? await _render();
+    _wav = wav;
+    if (generation != _generation) return;
+    await _output.play(wav);
+    if (generation != _generation) await _output.stop();
+  }
+
+  @override
+  Future<void> stop() async {
+    _generation++;
+    await _output.stop();
+  }
+
+  @override
+  Future<void> dispose() async {
+    _generation++;
+    await _output.dispose();
+  }
 }
 
 final holdMusicPlayerProvider = Provider<HoldMusicPlayer>((ref) {
