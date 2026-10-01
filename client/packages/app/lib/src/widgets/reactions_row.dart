@@ -12,6 +12,7 @@ import 'package:slimm_design_system/design_system.dart';
 
 import 'custom_emoji_image.dart';
 import 'emoji_picker.dart';
+import 'reaction_chip_who.dart';
 import 'standard_emoji.dart';
 
 /// 16, not the 13 the chip's text glyph uses: 13 is a font size, and an emoji
@@ -58,8 +59,14 @@ class ReactionsRow extends StatefulWidget {
     required this.reactions,
     required this.onReactionTap,
     required this.onPickReaction,
+    this.messageId,
     this.customEmoji = const {},
   });
+
+  /// The message these chips sit under. With it, holding a chip (or
+  /// right-clicking it) lists who left that reaction; without it the chips are
+  /// plain toggles.
+  final String? messageId;
 
   final List<api.ReactionSummary> reactions;
   final ValueChanged<api.ReactionSummary> onReactionTap;
@@ -135,7 +142,7 @@ class _ReactionsRowState extends State<ReactionsRow> {
 
   Widget _chip(api.ReactionSummary reaction, {required bool exiting}) {
     final customId = customEmojiIdFor(reaction.emoji, widget.customEmoji);
-    return AppChip.reaction(
+    final chip = AppChip.reaction(
       // The deployment's own emoji wins a name clash; the key stays the tap target.
       emoji: customId == null
           ? standardEmojiFor(reaction.emoji) ?? reaction.emoji
@@ -150,6 +157,14 @@ class _ReactionsRowState extends State<ReactionsRow> {
         null => null,
       },
       onTap: exiting ? null : () => widget.onReactionTap(reaction),
+    );
+    final messageId = widget.messageId;
+    if (exiting || messageId == null) return chip;
+    return ReactionChipWho(
+      messageId: messageId,
+      reaction: reaction,
+      customEmoji: widget.customEmoji,
+      child: chip,
     );
   }
 
