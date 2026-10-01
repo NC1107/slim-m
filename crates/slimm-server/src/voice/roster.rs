@@ -39,17 +39,11 @@ fn lenient_i64<'de, D>(d: D) -> Result<Option<i64>, D::Error>
 where
     D: serde::Deserializer<'de>,
 {
-    #[derive(serde::Deserialize)]
-    #[serde(untagged)]
-    enum Raw {
-        Num(i64),
-        Text(String),
-    }
     use serde::Deserialize as _;
-    Ok(match Option::<Raw>::deserialize(d)? {
-        Some(Raw::Num(n)) => Some(n),
-        Some(Raw::Text(t)) => t.parse().ok(),
-        None => None,
+    Ok(match Option::<serde_json::Value>::deserialize(d)? {
+        Some(serde_json::Value::Number(n)) => n.as_i64(),
+        Some(serde_json::Value::String(t)) => t.parse().ok(),
+        _ => None,
     })
 }
 
