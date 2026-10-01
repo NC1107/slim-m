@@ -114,21 +114,35 @@ Future<void> _sheet(
 /// uses: that carries the whole unicode catalog and a search, and a phone
 /// already has both under the field in its own keyboard. Combining the two
 /// pickers on touch was asked for; duplicating the keyboard was not.
-class SpaceEmojiSheetBody extends ConsumerWidget {
+class SpaceEmojiSheetBody extends ConsumerStatefulWidget {
   const SpaceEmojiSheetBody({super.key, required this.onSelect});
 
   final ValueChanged<String> onSelect;
 
+  @override
+  ConsumerState<SpaceEmojiSheetBody> createState() =>
+      _SpaceEmojiSheetBodyState();
+}
+
+class _SpaceEmojiSheetBodyState extends ConsumerState<SpaceEmojiSheetBody> {
+  final _search = TextEditingController();
+
   /// A ceiling, not a height: a Space with four emoji gets one row.
   static const double _maxGridHeight = 260;
 
-  void _pick(WidgetRef ref, PickerEmoji emoji) {
+  @override
+  void dispose() {
+    _search.dispose();
+    super.dispose();
+  }
+
+  void _pick(PickerEmoji emoji) {
     ref.read(recentEmojiProvider.notifier).use(emoji.token);
-    onSelect(emoji.token);
+    widget.onSelect(emoji.token);
   }
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  Widget build(BuildContext context) {
     final tokens = Theme.of(context).extension<AppTokens>()!;
     final custom = ref.watch(customEmojiProvider);
 
@@ -143,38 +157,65 @@ class SpaceEmojiSheetBody extends ConsumerWidget {
             'This Space has no custom emoji yet. Native emoji are on your '
             'keyboard.',
           ),
-        AsyncData(value: final List<CustomEmoji> emoji) => Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Padding(
-              padding: const EdgeInsets.fromLTRB(
-                AppSpacing.s12,
-                0,
-                AppSpacing.s12,
-                AppSpacing.s8,
-              ),
-              child: Text(
-                'Space emoji',
-                style: AppText.label.copyWith(color: tokens.textSecondary),
-              ),
-            ),
-            ConstrainedBox(
-              constraints: const BoxConstraints(maxHeight: _maxGridHeight),
-              child: EmojiGrid(
-                shrinkWrap: true,
-                emoji: [for (final e in emoji) DeploymentEmoji(e)],
-                // No keyboard navigation in a sheet, so nothing is on deck.
-                highlighted: -1,
-                onTap: (picked) => _pick(ref, picked),
-              ),
-            ),
-          ],
-        ),
+        AsyncData(value: final List<CustomEmoji> emoji) => _column(tokens, [
+          for (final e in emoji)
+            if (emojiNameMatches(e.name, _search.text)) e,
+        ]),
         _ => const _SheetMessage('Loading the emoji for this Space...'),
       },
     );
   }
+
+  Widget _column(AppTokens tokens, List<CustomEmoji> shown) => Column(
+    mainAxisSize: MainAxisSize.min,
+    crossAxisAlignment: CrossAxisAlignment.stretch,
+    children: [
+      Padding(
+        padding: const EdgeInsets.fromLTRB(
+          AppSpacing.s12,
+          0,
+          AppSpacing.s12,
+          AppSpacing.s8,
+        ),
+        child: Text(
+          'Space emoji',
+          style: AppText.label.copyWith(color: tokens.textSecondary),
+        ),
+      ),
+      Padding(
+        padding: const EdgeInsets.fromLTRB(
+          AppSpacing.s8,
+          0,
+          AppSpacing.s8,
+          AppSpacing.s8,
+        ),
+        child: AppInput(
+          controller: _search,
+          placeholder: 'Search Space emoji',
+          semanticLabel: 'Search Space emoji',
+          icon: Icon(
+            AppIcons.search,
+            size: AppSizes.icon16,
+            color: tokens.textSecondary,
+          ),
+          onChanged: (_) => setState(() {}),
+        ),
+      ),
+      if (shown.isEmpty)
+        _SheetMessage('No emoji match "${_search.text.trim()}".')
+      else
+        ConstrainedBox(
+          constraints: const BoxConstraints(maxHeight: _maxGridHeight),
+          child: EmojiGrid(
+            shrinkWrap: true,
+            emoji: [for (final e in shown) DeploymentEmoji(e)],
+            // No keyboard navigation in a sheet, so nothing is on deck.
+            highlighted: -1,
+            onTap: _pick,
+          ),
+        ),
+    ],
+  );
 }
 
 /// One centered sentence, for a sheet with no grid to draw.

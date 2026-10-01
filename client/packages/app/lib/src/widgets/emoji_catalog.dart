@@ -233,14 +233,22 @@ List<PickerEmoji> _searchUnicode(String q) => [
       UnicodeEmoji(emoji),
 ];
 
-/// Substring match over the name between the colons, with any colons the
-/// user typed stripped first so `:parrot:` and `parrot` find the same thing.
+/// Whether a custom emoji named [name] belongs in a list filtered by
+/// [query]: a case-insensitive substring match with any typed colons
+/// stripped, so `:parrot:` and `Parrot` find the same thing. An empty query
+/// matches everything.
+bool emojiNameMatches(String name, String query) {
+  final needle = query.replaceAll(':', '').trim().toLowerCase();
+  return needle.isEmpty || name.contains(needle);
+}
+
+/// The picker's own search: nothing for an empty needle, since the picker
+/// shows no custom matches until something is typed.
 List<PickerEmoji> _searchCustom(String q, List<CustomEmoji> custom) {
-  final needle = q.replaceAll(':', '');
-  if (needle.isEmpty) return const [];
+  if (q.replaceAll(':', '').isEmpty) return const [];
   return [
     for (final emoji in custom)
-      if (emoji.name.contains(needle)) DeploymentEmoji(emoji),
+      if (emojiNameMatches(emoji.name, q)) DeploymentEmoji(emoji),
   ];
 }
 

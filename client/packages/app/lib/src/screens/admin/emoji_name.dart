@@ -57,11 +57,3 @@ bool isUsableEmojiName(String normalized) =>
 /// `CustomEmoji.shortcode` builds it, since this one has to describe an emoji
 /// that does not exist yet and so has no model to ask.
 String emojiShortcode(String normalized) => ':$normalized:';
-
-/// Whether an emoji named [name] belongs in a list filtered by [query]:
-/// a case-insensitive substring match with any typed colons ignored, so
-/// `:parrot:` and `Parrot` find the same thing. An empty query matches all.
-bool emojiNameMatches(String name, String query) {
-  final needle = query.replaceAll(':', '').trim().toLowerCase();
-  return needle.isEmpty || name.contains(needle);
-}

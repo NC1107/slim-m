@@ -21,12 +21,12 @@ import '../../routing/routes.dart';
 import '../settings_screen_scaffold.dart';
 import '../../widgets/confirm_dialog.dart';
 import '../../widgets/custom_emoji_image.dart';
+import '../../widgets/emoji_catalog.dart' show emojiNameMatches;
 import '../../widgets/run_guarded.dart';
 import '../../widgets/settings_entity_row.dart';
 import '../../widgets/settings_section_header.dart';
 import '../../widgets/sheet_item_list.dart';
 import 'emoji_bulk_upload_card.dart';
-import 'emoji_name.dart';
 import 'emoji_upload_card.dart';
 
 /// Marks the sizing box around the emoji list, so a test can measure it
