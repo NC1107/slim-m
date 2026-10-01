@@ -247,6 +247,10 @@ jobs:
             echo "tag=${GITHUB_REF_NAME}" >> "$GITHUB_OUTPUT"
           fi
 
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          sparse-checkout: scripts
+
       - uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7
         with:
           pattern: server-binary-*
@@ -266,15 +270,12 @@ jobs:
           gpg --batch --pinentry-mode loopback --passphrase-fd 0 <<< "$GPG_PASSPHRASE" \
             --armor --detach-sign --output SHA256SUMS.asc SHA256SUMS
 
-      - uses: softprops/action-gh-release@3d0d9888cb7fd7b750713d6e236d1fcb99157228 # v3
-        with:
+      # Retried, and fails when a required file is missing; scripts/upload-release-assets.sh.
+      - name: attach to the github release
+        env:
           # The same identity release-please creates the release with; see below.
-          token: ${{ secrets.RELEASE_PLEASE_TOKEN || secrets.GITHUB_TOKEN }}
-          tag_name: ${{ steps.ver.outputs.tag }}
-          files: |
-            dist/slimm-server-*
-            dist/SHA256SUMS
-            dist/SHA256SUMS.asc
+          GH_TOKEN: ${{ secrets.RELEASE_PLEASE_TOKEN || secrets.GITHUB_TOKEN }}
+        run: scripts/upload-release-assets.sh "${{ steps.ver.outputs.tag }}" 'dist/slimm-server-*' dist/SHA256SUMS '?dist/SHA256SUMS.asc'
 
   # The portable Linux tarball, always, plus whichever packaging formats have
   # their inputs in the repo. Each format gates on its own file. See docs/ci.md.
@@ -373,18 +374,6 @@ jobs:
             "dist/slim-m-client-${{ steps.ver.outputs.version }}.flatpak" \
             top.npcserver.slimm
 
-      # Non-blocking like the build step above, but fails by name with an ::error:: annotation when no bundle exists, so a broken build cannot hide behind a green run the way it did across every release through client-v0.61.0; see packaging/flatpak/README.md.
-      - name: verify flatpak bundle was produced
-        if: steps.pkg.outputs.flatpak == 'true'
-        continue-on-error: true
-        run: |
-          shopt -s nullglob
-          bundles=(dist/slim-m-client-*.flatpak)
-          if [ ${#bundles[@]} -eq 0 ]; then
-            echo "::error::build flatpak did not produce a .flatpak bundle; see its logs for the real failure"
-            exit 1
-          fi
-
       # In a Fedora container, not on the runner: the spec is written against
       # Fedora's macros and dependency generators, and Ubuntu's rpm has neither.
       - name: build rpm
@@ -422,17 +411,25 @@ jobs:
           gpg --batch --pinentry-mode loopback --passphrase-fd 0 <<< "$GPG_PASSPHRASE" \
             --armor --detach-sign --output SHA256SUMS.asc SHA256SUMS
 
-      - uses: softprops/action-gh-release@3d0d9888cb7fd7b750713d6e236d1fcb99157228 # v3
-        with:
-          # The same identity release-please creates the release with; see below.
-          token: ${{ secrets.RELEASE_PLEASE_TOKEN || secrets.GITHUB_TOKEN }}
-          tag_name: ${{ steps.ver.outputs.tag }}
-          files: |
-            dist/slim-m-client-*-linux-amd64.tar.gz
-            dist/*.flatpak
-            dist/*/*.rpm
-            dist/SHA256SUMS
-            dist/SHA256SUMS.asc
+      - name: attach to the github release
+        env:
+          GH_TOKEN: ${{ secrets.RELEASE_PLEASE_TOKEN || secrets.GITHUB_TOKEN }}
+        run: |
+          scripts/upload-release-assets.sh "${{ steps.ver.outputs.tag }}" \
+            'dist/slim-m-client-*-linux-amd64.tar.gz' \
+            '?dist/*.flatpak' '?dist/*/*.rpm' \
+            dist/SHA256SUMS '?dist/SHA256SUMS.asc'
+
+      # Last and unconditional on earlier failures, so a missing bundle turns the run red after everything else has attached.
+      - name: verify flatpak bundle was produced
+        if: always() && steps.pkg.outputs.flatpak == 'true'
+        run: |
+          shopt -s nullglob
+          bundles=(dist/slim-m-client-*.flatpak)
+          if [ ${#bundles[@]} -eq 0 ]; then
+            echo "::error::build flatpak did not produce a .flatpak bundle; see its logs for the real failure"
+            exit 1
+          fi
       - {if: failure(), uses: ./.github/actions/native-hooks-diagnose}
 
   # Re-signs the manifest after the tarball attaches, since desktop-clients may have finished first and signed without it. It defers when the Windows or macOS archive is not there yet, and desktop-clients then signs.
@@ -659,13 +656,14 @@ jobs:
             "dist/slim-m-client-android.aab"
           (cd dist && sha256sum ./*.apk ./*.aab > SHA256SUMS.android)
 
-      - uses: softprops/action-gh-release@3d0d9888cb7fd7b750713d6e236d1fcb99157228 # v3
+      # No aab: a Play upload format testers download by mistake; docs/INSTALL.md.
+      - name: attach to the github release
         if: steps.gate.outputs.ready == 'true'
-        with:
-          tag_name: ${{ steps.ver.outputs.tag }}
-          # No aab: a Play upload format testers download by mistake; docs/INSTALL.md.
-          files: |
-            client/packages/app/dist/slim-m-client-android.apk
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          scripts/upload-release-assets.sh "${{ steps.ver.outputs.tag }}" \
+            client/packages/app/dist/slim-m-client-android.apk \
             client/packages/app/dist/SHA256SUMS.android
       - {if: failure(), uses: ./.github/actions/native-hooks-diagnose}
 

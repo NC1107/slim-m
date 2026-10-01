@@ -63,8 +63,8 @@ jobs:
           if [ -n "$UPDATE_SIGNING_KEY" ]; then
             echo "ready=true" >> "$GITHUB_OUTPUT"
           else
-            echo "ready=false" >> "$GITHUB_OUTPUT"
-            echo "::warning::UPDATE_SIGNING_KEY is not configured. Add it to publish a signed update manifest. Skipping."
+            echo "::error::UPDATE_SIGNING_KEY is not configured, so $TAG has no signed update manifest and no desktop client can self-update to it."
+            exit 1
           fi
 
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7

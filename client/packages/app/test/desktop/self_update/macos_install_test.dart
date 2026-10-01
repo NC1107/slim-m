@@ -29,7 +29,11 @@ Future<void> _accept(Directory bundle) async {}
 VerifiedUpdate _update(Directory state, String version) {
   final file = File('${state.path}/.staging/pkg-$version.zip')
     ..createSync(recursive: true);
-  return VerifiedUpdate(version: version, tag: 'client-v$version', file: file);
+  return VerifiedUpdate.forTest(
+    version: version,
+    tag: 'client-v$version',
+    file: file,
+  );
 }
 
 void main() {
