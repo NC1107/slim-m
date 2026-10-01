@@ -167,7 +167,7 @@ final rosterEntriesProvider = Provider.autoDispose
           ? ref.watch(membersProvider)
           : ref.watch(channelMembersProvider(channelId));
       ref.watch(presenceControllerProvider.select(reachablePresenceKey));
-      ref.watch(presenceVisibilityDisplayProvider);
+      ref.watch(ownVisibilityProvider);
       final roster = members.valueOrNull ?? [];
       final statusOf = presenceOfAll(ref, roster.map((m) => m.id));
       return rosterEntries(groupRoster(roster, statusOf));

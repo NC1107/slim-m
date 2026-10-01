@@ -93,18 +93,24 @@ final presenceControllerProvider =
     );
 
 /// The visibility the caller chose in this session, or null before they
-/// choose one, which is every launch.
-///
-/// Nothing reads the stored preference back: `PATCH /presence` echoes only the
-/// value just set, and `GET /presence` and `presence.changed` resolve the
-/// caller's own id to their true connection state, so a hidden user's client
-/// sees itself online. Until the server returns the preference (for instance
-/// on `GET /me`), a fresh launch shows the reported state and cannot tell
-/// hidden from online. Persisting the last choice on the device would be worse
-/// than that: a stale "appearing offline" would tell someone they are hidden
-/// while another device had made them visible.
-///
-/// Surfaces never read this directly; `presenceForProvider` combines it with
-/// what the server reports.
+/// choose one. Written by the status menu and the tray; read through
+/// [ownVisibilityProvider], which falls back to what the server stored.
 final presenceVisibilityDisplayProvider =
     StateProvider<api.PresenceVisibility?>((ref) => null);
+
+/// The caller's own visibility: a choice made this session, else the one the
+/// server stored (`GET /me`), else null while that has not loaded or when the
+/// server is too old to say.
+///
+/// The server answers the caller's own id as online even when they chose to
+/// appear offline, so without the stored value a fresh launch told a hidden
+/// member they were visible. It is not persisted on the device: a stale copy
+/// would say hidden after another device had made them visible.
+final ownVisibilityProvider = Provider<api.PresenceVisibility?>((ref) {
+  final chosen = ref.watch(presenceVisibilityDisplayProvider);
+  if (chosen != null) return chosen;
+  final stored = ref.watch(
+    effectiveMeProvider.select((me) => me?.presenceVisibility),
+  );
+  return stored == null ? null : api.PresenceVisibility.parse(stored);
+});

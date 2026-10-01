@@ -46,7 +46,7 @@ class _FakeSource implements NowPlayingSource {
 }
 
 class _Harness {
-  _Harness({this.source}) {
+  _Harness({this.source, this.storedVisibility}) {
     container = ProviderContainer(
       overrides: [
         keyStoreProvider.overrideWithValue(InMemoryKeyStore()),
@@ -58,6 +58,18 @@ class _Harness {
             baseUrl: Uri.parse('http://localhost:8080'),
             session: ref.watch(sessionProvider),
             httpClient: MockClient((request) async {
+              // The stored visibility is read from /me; it is not an activity call.
+              if (request.url.path == '/me') {
+                final stored = storedVisibility;
+                if (stored == null) return http.Response('{}', 404);
+                return http.Response(
+                  '{"id":"self","username":"self","display_name":"Self",'
+                  '"created_at":0,"permissions":0,'
+                  '"presence_visibility":"$stored"}',
+                  200,
+                  headers: {'content-type': 'application/json'},
+                );
+              }
               calls.add(
                 '${request.method} ${request.url.path}'
                 '${request.body.isEmpty ? '' : ' ${request.body}'}',
@@ -73,6 +85,7 @@ class _Harness {
   }
 
   final _FakeSource? source;
+  final String? storedVisibility;
   final events = StreamController<api.ServerEvent>.broadcast(sync: true);
   final calls = <String>[];
   late final ProviderContainer container;
@@ -166,6 +179,20 @@ void main() {
     await h.settle();
     source.play(const NowPlaying(title: 'Secret'));
     await h.settle();
+    expect(h.calls, isEmpty);
+    expect(source.open, isFalse);
+  });
+
+  test('a member the server has as appearing offline shares nothing from a '
+      'fresh launch', () async {
+    final source = _FakeSource();
+    final h = _Harness(source: source, storedVisibility: 'hidden');
+    addTearDown(h.dispose);
+    await h.start(enabled: true);
+    await h.settle();
+    source.play(const NowPlaying(title: 'Secret'));
+    await h.settle();
+
     expect(h.calls, isEmpty);
     expect(source.open, isFalse);
   });

@@ -28,7 +28,7 @@ class ActivityPublisher {
       _ref.listen<bool>(feed.available, (_, _) => _refresh());
     }
     _ref.listen<api.PresenceVisibility?>(
-      presenceVisibilityDisplayProvider,
+      ownVisibilityProvider,
       (_, _) => _refresh(),
     );
     _events = _ref.read(liveEventsProvider).listen(_onEvent);
@@ -42,8 +42,7 @@ class ActivityPublisher {
   api.PresenceActivity? _sent;
 
   bool get _hidden =>
-      _ref.read(presenceVisibilityDisplayProvider) ==
-      api.PresenceVisibility.hidden;
+      _ref.read(ownVisibilityProvider) == api.PresenceVisibility.hidden;
 
   bool _wanted(ActivityFeed feed) =>
       _ref.read(feed.enabled) && _ref.read(feed.available) && !_hidden;

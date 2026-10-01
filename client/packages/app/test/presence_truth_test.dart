@@ -37,57 +37,60 @@ class _StubSyncController extends SyncController {
 
 /// Answers `/me`, and `/presence` the way the server does: at most 100 ids
 /// per request, a 400 beyond that.
-ProviderContainer _container({List<List<String>>? presenceRequests}) =>
-    ProviderContainer(
-      overrides: [
-        keyStoreProvider.overrideWithValue(InMemoryKeyStore()),
-        sessionProvider.overrideWithValue(api.SessionStore(tokens: _tokens)),
-        syncControllerProvider.overrideWith(_StubSyncController.new),
-        apiProvider.overrideWith((ref) {
-          final client = api.SlimmApi(
-            baseUrl: Uri.parse('http://localhost:8080'),
-            session: ref.watch(sessionProvider),
-            httpClient: MockClient((request) async {
-              const json = {'content-type': 'application/json'};
-              if (request.url.path == '/me') {
-                return http.Response(
-                  jsonEncode({
-                    'id': 'self',
-                    'username': 'self',
-                    'display_name': 'Self',
-                    'created_at': 0,
-                    'permissions': 0,
-                  }),
-                  200,
-                  headers: json,
-                );
-              }
-              if (request.url.path == '/presence') {
-                final ids = request.url.queryParameters['ids']!.split(',');
-                presenceRequests?.add(ids);
-                if (ids.length > 100) {
-                  return http.Response(
-                    '{"error":"too many ids"}',
-                    400,
-                    headers: json,
-                  );
-                }
-                return http.Response(
-                  jsonEncode([
-                    for (final id in ids) {'user_id': id, 'status': 'online'},
-                  ]),
-                  200,
-                  headers: json,
-                );
-              }
-              return http.Response('{}', 404, headers: json);
-            }),
-          );
-          ref.onDispose(client.close);
-          return client;
+ProviderContainer _container({
+  List<List<String>>? presenceRequests,
+  String? storedVisibility,
+}) => ProviderContainer(
+  overrides: [
+    keyStoreProvider.overrideWithValue(InMemoryKeyStore()),
+    sessionProvider.overrideWithValue(api.SessionStore(tokens: _tokens)),
+    syncControllerProvider.overrideWith(_StubSyncController.new),
+    apiProvider.overrideWith((ref) {
+      final client = api.SlimmApi(
+        baseUrl: Uri.parse('http://localhost:8080'),
+        session: ref.watch(sessionProvider),
+        httpClient: MockClient((request) async {
+          const json = {'content-type': 'application/json'};
+          if (request.url.path == '/me') {
+            return http.Response(
+              jsonEncode({
+                'id': 'self',
+                'username': 'self',
+                'display_name': 'Self',
+                'created_at': 0,
+                'permissions': 0,
+                'presence_visibility': ?storedVisibility,
+              }),
+              200,
+              headers: json,
+            );
+          }
+          if (request.url.path == '/presence') {
+            final ids = request.url.queryParameters['ids']!.split(',');
+            presenceRequests?.add(ids);
+            if (ids.length > 100) {
+              return http.Response(
+                '{"error":"too many ids"}',
+                400,
+                headers: json,
+              );
+            }
+            return http.Response(
+              jsonEncode([
+                for (final id in ids) {'user_id': id, 'status': 'online'},
+              ]),
+              200,
+              headers: json,
+            );
+          }
+          return http.Response('{}', 404, headers: json);
         }),
-      ],
-    );
+      );
+      ref.onDispose(client.close);
+      return client;
+    }),
+  ],
+);
 
 Future<void> _pumpFooter(WidgetTester tester, ProviderContainer c) async {
   await tester.pumpWidget(
@@ -133,6 +136,37 @@ void main() {
       tester.widget<AppAvatar>(find.byType(AppAvatar)).status,
       AppPresence.dnd,
     );
+  });
+
+  testWidgets('a member who chose to appear offline sees that on a fresh '
+      'launch, from what the server stored', (tester) async {
+    final container = _container(storedVisibility: 'hidden');
+    addTearDown(container.dispose);
+    container.read(presenceControllerProvider.notifier).state = {
+      'self': api.PresenceState.online,
+    };
+    await _pumpFooter(tester, container);
+
+    expect(find.text('appearing offline'), findsOneWidget);
+    expect(find.text('online'), findsNothing);
+    expect(
+      tester.widget<AppAvatar>(find.byType(AppAvatar)).status,
+      AppPresence.hidden,
+    );
+  });
+
+  testWidgets('a choice made this session wins over the stored one', (
+    tester,
+  ) async {
+    final container = _container(storedVisibility: 'hidden');
+    addTearDown(container.dispose);
+    await _pumpFooter(tester, container);
+    container.read(presenceVisibilityDisplayProvider.notifier).state =
+        api.PresenceVisibility.online;
+    await tester.pumpAndSettle();
+
+    expect(find.text('online'), findsOneWidget);
+    expect(find.text('appearing offline'), findsNothing);
   });
 
   test('a roster past the server batch ceiling is still all seeded', () async {

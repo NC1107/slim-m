@@ -55,7 +55,7 @@ final presenceForProvider = Provider.autoDispose.family<AppPresence, String>((
   final reported = ref.watch(
     presenceControllerProvider.select((map) => map[userId]),
   );
-  final chosen = isSelf ? ref.watch(presenceVisibilityDisplayProvider) : null;
+  final chosen = isSelf ? ref.watch(ownVisibilityProvider) : null;
   return resolvePresence(reported: reported, isSelf: isSelf, chosen: chosen);
 });
 
@@ -73,7 +73,7 @@ final ownPresenceProvider = Provider.autoDispose<AppPresence>((ref) {
 Map<String, AppPresence> presenceOfAll(Ref ref, Iterable<String> userIds) {
   final selfId = ref.read(sessionProvider).tokens?.userId;
   final reported = ref.read(presenceControllerProvider);
-  final chosen = ref.read(presenceVisibilityDisplayProvider);
+  final chosen = ref.read(ownVisibilityProvider);
   return {
     for (final id in userIds)
       id: resolvePresence(
