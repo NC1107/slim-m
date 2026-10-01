@@ -311,3 +311,24 @@ async fn a_plain_code_block_with_no_app_surface_is_unaffected() {
     assert_eq!(runs[0].module_id, "dice");
     assert_eq!(runs[0].output, "rolled a 4");
 }
+
+/// The module alone is not the surface's key: its own module naming another command is refused.
+#[tokio::test]
+async fn the_surfaces_own_module_with_another_command_is_refused() {
+    let (s, _guard) = new_store("slimm-app-surface-other-command").await;
+    let (_owner, _attacker, channel_id, owner_token, _attacker_token) = scene(&s).await;
+    let router = app(s.clone());
+
+    let message_id = launch_life(&router, channel_id, &owner_token).await;
+    let response = router
+        .oneshot(post(
+            &format!("/messages/{message_id}/blocks/0/run"),
+            &owner_token,
+            json!({ "module_id": "life", "command": "other", "input": "" }),
+        ))
+        .await
+        .unwrap();
+    assert_eq!(response.status(), StatusCode::FORBIDDEN);
+    let stored = s.code_runs_for_messages(&[message_id]).await.unwrap();
+    assert!(stored.iter().all(|(_, runs)| runs.is_empty()));
+}
