@@ -28,6 +28,7 @@ use super::wasm_fixtures::sha256_hex;
 pub struct World {
     pub store: Store,
     pub router: Router,
+    pub hub: Hub,
     pub everyone: RoleId,
     pub user: User,
     pub token: String,
@@ -55,10 +56,11 @@ pub async fn world(name: &str) -> World {
         .await
         .unwrap()
         .access_token;
+    let hub = Hub::new();
     let router = http::router(AppState {
         store: store.clone(),
         auth: Auth::new(2).unwrap(),
-        hub: Hub::new(),
+        hub: hub.clone(),
         limiter: RateLimiter::new(),
         push: PushSender::disabled(),
         voice: VoiceService::disabled(),
@@ -71,6 +73,7 @@ pub async fn world(name: &str) -> World {
     World {
         store,
         router,
+        hub,
         everyone,
         user,
         token,
