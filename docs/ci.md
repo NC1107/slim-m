@@ -11,10 +11,10 @@ Each section below is named for its workflow file.
 | Workflow | Runs on | What it gates |
 | --- | --- | --- |
 | `server-ci` | changes under `crates/` or `.sqlx/`, `schema/openapi.yaml`, the Cargo files, `rust-toolchain.toml`, `docker/server.Dockerfile`, or its own workflow file | fmt, clippy, sqlx cache check, tests, release build, binary size budget |
-| `client-ci` | changes under `client/`, or to `schema/openapi.yaml`, `scripts/desktop-shell-smoke.sh` or its own workflow file; `update-golden-references` also by hand (workflow_dispatch) | dart analyze and format in one job, every package's tests plus the web build in another, so a typo reports in about a minute rather than fourteen; `update-golden-references` regenerates design_system's golden PNGs for a human to commit |
+| `client-ci` | changes under `client/`, or to `schema/openapi.yaml`, `scripts/desktop-shell-smoke.sh`, `scripts/chrome-tests.sh` or its own workflow file; `update-golden-references` also by hand (workflow_dispatch) | dart analyze and format in one job, every package's tests plus the web build in another, the pure-logic tests listed in `client/chrome-tests.txt` compiled to JavaScript and run in Chrome in a third, so a typo reports in about a minute rather than fourteen; `update-golden-references` regenerates design_system's golden PNGs for a human to commit |
 | `client-macos-ci` | a nightly schedule, and by hand | that the Dart and Swift compile against the macOS SDK. Compile-only, unsigned, and not a required check |
 | `client-windows-ci` | pushes to `main` that touch `client/` or `packaging/windows/`, a nightly schedule, and by hand; not pull requests | that the native plugin graph links against the Windows SDK, and the Windows launcher's Go tests. Compile-only, and not a required check |
-| `client-ios-ci` | changes under `client/packages/app/ios/`, `rtc/`, `platform/`, the pubspec files, on pull requests and pushes to `main` | every `Runner` source file is registered in `project.pbxproj` (ubuntu, always), the iOS CallKit XCTest and extension-embeds-no-frameworks checks on macOS, and an unsigned Release-configuration device build when a native-relevant path changed |
+| `client-ios-ci` | changes under `client/packages/app/ios/`, `rtc/`, `platform/`, `data/`, the pubspec files, on pull requests and pushes to `main` | every `Runner` source file is registered in `project.pbxproj` (ubuntu, always), the iOS CallKit XCTest and extension-embeds-no-frameworks checks on macOS, and an unsigned Release-configuration device build when a native-relevant path changed |
 | `schema-ci` | changes under `schema/`, `redocly.yaml` on pull requests; every push to `main` unconditionally | redocly lint, the additive-only oasdiff gate against a PR's base on pull requests, and the same gate against the immediate parent commit on every push to `main` (required for a release; see below) |
 | `audio-ci` | changes under `assets/audio/` | the seven notification sounds rebuild to the bytes that are committed, and the family is level with itself |
 | `hygiene` | every pull request, and every push to `main` | iOS purpose strings, the iOS broadcast extension is wired up, orientation is locked on phones only, no emoji in UI source, SPDX headers on Rust source, the file-size budget, the comment cap, and the `scripts/lib` unit tests, which include the two structural gates on `required_checks` |
@@ -107,10 +107,27 @@ CMake skips the download when the file exists and only MD5-checks what it just d
 A failed download leaves an empty archive and the log says only `Integrity check failed`, so `native-hooks-diagnose` reports a missing or empty archive as a failed download.
 With both caches restored and no network, a full `flutter build linux --release` succeeds.
 
+### Logic tests also run as JavaScript
+
+The `test-chrome` job (`logic tests under dart2js (chrome)`) runs `scripts/chrome-tests.sh`, which feeds every file named in `client/chrome-tests.txt` to `flutter test --platform chrome`, one invocation per package.
+dart2js evaluates integer shifts and 64-bit maths differently from the VM, so a bug can exist only in the web build: web ids once minted a wrong timestamp and the canvas grid key collided (#1540), both found only by running the suite under Chrome by hand.
+The list holds 220 files (api, app, design_system, platform, rtc, voice_canvas), chosen by running every candidate that imports no `dart:io`, `dart:ffi`, drift or platform channel and keeping the ones that pass.
+A file is opt-in: run `flutter test --platform chrome <file>` first and add it only if it passes.
+Locally the whole list takes about nine minutes; the job has no `needs`, so it runs beside the test shards and does not lengthen the PR's critical path, at the cost of one extra runner of roughly ten minutes per run.
+It is not in `verify-client-ci`'s `required_checks`.
+
+### Runner labels are pinned
+
+Every `runs-on` and matrix `runner` names `ubuntu-24.04` (or `ubuntu-24.04-arm`), never `ubuntu-latest`.
+GitHub moves `ubuntu-latest` to Ubuntu 26 on 2026-10-19, which would change the glibc floor of the Linux tarball and rpm built on the runner and split the amd64 legs from the arm64 ones.
+`scripts/lib/test_runners_are_pinned.py` refuses the label in any workflow.
+Moving to a new image is a deliberate PR, dispatched against an existing tag first.
+`windows-latest` and `macos-latest` are not pinned: no incident or notice covers them yet, and the iOS and macOS jobs depend on the Xcode that `macos-latest` carries.
+
 ### Goldens are not a separate job
 
 Golden-file assertions (`matchesGoldenFile`) live inside each package's ordinary `flutter test` suite, not in a job of their own.
-Golden PNGs are sensitive to the exact Flutter engine and Skia build and to font rendering, so goldens are generated and verified on the same `stable` channel on `ubuntu-latest`.
+Golden PNGs are sensitive to the exact Flutter engine and Skia build and to font rendering, so goldens are generated and verified on the same `stable` channel on `ubuntu-24.04`.
 If goldens start flaking across runs, pin an exact Flutter version in the workflow instead of floating on `stable`, and regenerate the goldens with `flutter test --update-goldens` on that same pinned version so both sides render identically.
 
 design_system's two golden-bearing suites (`golden_matrix_test.dart`, `presence_desaturation_test.dart`) gate their pixel comparisons behind the compile-time flag `--dart-define=SLIMM_GOLDENS=true`, checked with `const bool.fromEnvironment('SLIMM_GOLDENS')`.
@@ -136,13 +153,13 @@ Client 0.21.2 shipped a category on a private engine class from `ClipboardPasteB
 Separately, a new Swift file left out of `project.pbxproj`'s Sources build phase is skipped by `xcodebuild` with no error at all, so no test on either side can see it: not the native build (nothing failed) and not the Dart suite (it passes against a method channel that would have no handler).
 
 Two checks close this, at very different costs.
-`pbxproj-registration` is a grep over `project.pbxproj` with no Xcode involved, so it runs on `ubuntu-latest` unconditionally, ahead of the macOS jobs.
+`pbxproj-registration` is a grep over `project.pbxproj` with no Xcode involved, so it runs on `ubuntu-24.04` unconditionally, ahead of the macOS jobs.
 The `ios-unit-tests` job gained a second build step, `flutter build ios --release --no-codesign`: a real, unsigned, device-target Release build, which is what takes the same linking path `build ipa` does.
 That step is narrowed to the `changes` job's `native` path filter rather than "main is never trusted on a filter alone": unlike the XCTest job, a linking failure can only come from a native source file, `project.pbxproj`, or a dependency version, since Dart code takes no part in native linking.
 Both checks are in `verify-client-ci`'s `required_checks`, since each can fail with the other green.
 
 It lives in `client-ios-ci.yml` rather than beside the Dart job because it is the expensive one by an order of magnitude: 14 minutes against 5, measured across recent runs, which made `client-ci` a median of 11 minutes when the Dart half finishes in a third of that.
-A GitHub workflow cannot path-filter one job, so the split is what lets it be gated on the paths that can actually change its answer: the iOS project, the plugins carrying CallKit and WebRTC, and the dependency set, which is how a Dart-side change reaches an Xcode build.
+A GitHub workflow cannot path-filter one job, so the split is what lets it be gated on the paths that can actually change its answer: the iOS project, the plugins carrying CallKit and WebRTC, `data/` (its encrypted database compiles native sqlite code, and a change there once shipped an iOS launch failure with no iOS job run), and the dependency set, which is how a Dart-side change reaches an Xcode build.
 A push to `main` uses the same filter, since it gates nothing except a release, and the release commit always matches it: release-please bumps `client/packages/app/pubspec.yaml`, which is in the filter.
 CocoaPods is cached on the lockfiles, since rebuilding those pods is most of what the project-generation step spends its five minutes on.
 
@@ -379,7 +396,7 @@ It builds the release server binary from source, builds a real Flutter web bundl
 Nothing here is pulled pre-built, other than the pinned third-party actions and the LiveKit image itself.
 `E2E_REBUILD=1` is set explicitly so the web bundle is always built fresh from the checked-out commit.
 A cached build silently screenshots stale code instead, which has cost a confused debugging cycle before (see `CLAUDE.md`).
-Chrome is not installed by this workflow: `ubuntu-latest` ships Google Chrome already, and the harness's own prerequisite checks fail loudly and by name if a future runner image ever drops it.
+Chrome is not installed by this workflow: `ubuntu-24.04` ships Google Chrome already, and the harness's own prerequisite checks fail loudly and by name if a future runner image ever drops it.
 The only Python dependency beyond the standard library is `websocket-client`, since the harness drives Chrome directly over the DevTools Protocol rather than through Selenium or a browser driver.
 
 Not path-gated, on purpose, unlike every other workflow here: it runs on every push to `main` regardless of what changed.
@@ -636,7 +653,7 @@ A tag whose verify succeeded is never touched, even if a later build job failed;
 
 ### server-image and server-image-merge
 
-`server-image` builds one single-arch image per architecture on a native runner (amd64 on `ubuntu-latest`, arm64 on `ubuntu-24.04-arm`), each pushed to GHCR by digest with an SBOM and max provenance.
+`server-image` builds one single-arch image per architecture on a native runner (amd64 on `ubuntu-24.04`, arm64 on `ubuntu-24.04-arm`), each pushed to GHCR by digest with an SBOM and max provenance.
 There is no QEMU cross-compilation.
 It needs no secrets beyond the automatic `GITHUB_TOKEN` (`packages: write` to push to GHCR), and no cosign key material is stored.
 Every image job (here, `main-builds`' `server-image` and `web-image`) names its image `ghcr.io/<owner>/<image>`, with the owner taken from `GITHUB_REPOSITORY_OWNER` and lowercased, so the images follow the repository from `NC1107` to `Slim-m-org` rather than pushing to a namespace the moved repo's token cannot write.
@@ -1087,7 +1104,7 @@ Triggering only on `packaging/flatpak/top.npcserver.slimm.yaml` and `packaging/f
 
 ### What this does and does not prove
 
-It builds on `ubuntu-latest`, the same runner `release.yml`'s `linux-client` job uses, and installs the same `linux-build-deps` composite action, so it links against the same host packages, notably `libayatana-appindicator3-dev`.
+It builds on `ubuntu-24.04`, the same runner `release.yml`'s `linux-client` job uses, and installs the same `linux-build-deps` composite action, so it links against the same host packages, notably `libayatana-appindicator3-dev`.
 `packaging/flatpak/README.md` documents a real host-dependent link: `tray_manager`'s CMake picks `ayatana-appindicator3-0.1` or the older `appindicator3-0.1` from whichever the build host's pkg-config offers, and a Fedora desktop build links a different soname than Ubuntu CI does.
 Building on the same Ubuntu runner CI already uses for the raw Linux build means this check cannot diverge that way itself; it does not and cannot prove anything about a contributor's own machine, since it never builds on one.
 
@@ -1107,11 +1124,11 @@ So the step fails on any of: the captured log being empty (the launch never happ
 This workflow's very first run failed the `build flatpak` step: `libayatana-indicator`'s CMake configure could not find `libayatana-ido3-0.4` via `pkg-config`, even though `ayatana-ido` (which provides it) builds directly before it in the module order.
 The real cause, read from that run's own log rather than reasoned from the manifest text: `ayatana-ido` installed to `/app/lib64/pkgconfig`, not `/app/lib/pkgconfig`, because CMake's `GNUInstallDirs` module defaults `CMAKE_INSTALL_LIBDIR` to `lib64` on any 64-bit Linux system lacking `/etc/debian_version`, which the `org.freedesktop.Sdk//25.08` build sandbox is.
 `flatpak-builder` has shipped an unconditional `-DCMAKE_INSTALL_LIBDIR:PATH='lib'` default for `cmake`/`cmake-ninja` modules since July 2024 specifically to paper over this, but Ubuntu 24.04's apt package is `flatpak-builder 1.4.2-1build2` (read from the failing run's own `apt-get install` log), which predates that default: checked directly against that tag's own `src/builder-module.c`, it only sets `CMAKE_INSTALL_LIBDIR` when a module's manifest sets `build-options.libdir` explicitly.
-`org.flatpak.Builder`, the newer, Flathub-published tool this manifest's local verification passes use, already carries the safe default, which is why this never surfaced before this workflow existed: nothing had ever built this manifest with the specific `flatpak-builder` version `ubuntu-latest` installs.
+`org.flatpak.Builder`, the newer, Flathub-published tool this manifest's local verification passes use, already carries the safe default, which is why this never surfaced before this workflow existed: nothing had ever built this manifest with the specific `flatpak-builder` version `ubuntu-24.04` installs.
 Fixed by adding `"build-options": {"libdir": "lib"}` to the three `cmake-ninja` modules in the chain, individually rather than once at a shared parent: `flatpak-builder`'s own option resolution does not walk an intermediate parent module, only a module's own options and the top-level manifest's, and a single manifest-wide setting would have broken the `autotools`/`meson` modules that currently work by relying on their own different default.
 Full account, including why the `autotools`/`meson` modules were confirmed rather than assumed safe: `packaging/flatpak/README.md`'s "fifth defect" section.
 
-The next run past that fix got further and hit the identical shape twice more, each caught by this workflow doing exactly what it exists to do: `libplacebo` (a `meson` module) had the same `lib64` problem the `cmake-ninja` chain did, needing the same `build-options.libdir: lib` fix; and once every module built, the export step itself failed validating the app's icon, because `flatpak build-export` checks icons through gdk-pixbuf **on the CI runner**, and `ubuntu-latest` carries no gdk-pixbuf image loaders by default.
+The next run past that fix got further and hit the identical shape twice more, each caught by this workflow doing exactly what it exists to do: `libplacebo` (a `meson` module) had the same `lib64` problem the `cmake-ninja` chain did, needing the same `build-options.libdir: lib` fix; and once every module built, the export step itself failed validating the app's icon, because `flatpak build-export` checks icons through gdk-pixbuf **on the CI runner**, and `ubuntu-24.04` carries no gdk-pixbuf image loaders by default.
 `librsvg2-common` (confirmed against Ubuntu's own package-contents search for noble/amd64) provides the missing SVG loader; added to both `flatpak-ci.yml`'s and `release.yml`'s `build flatpak` steps, since `release.yml`'s own flatpak build had never gotten far enough to hit this either.
 `packaging/flatpak/README.md`'s sixth-defect section and its follow-up section frame all three real defects here (the appindicator soname, the libdir default, this icon loader) as one pattern: the build host leaking into the result in places the sandbox does not cover.
 
@@ -1125,7 +1142,7 @@ Four fix commits landed in the same PR that introduced this workflow (three mani
 Once it is green, the build itself (the harder half of this check, and the half that just proved three times over that it can catch a real defect) is confirmed for this exact `flatpak-builder`/CMake/meson/sandbox/runner combination.
 Still unconfirmed even after a green build: the launch check's own assertions past that point.
 `flatpak-builder` was not available locally while writing the launch-check logic, so the `124`-vs-any-other-nonzero-exit split (see above) is reasoned from documented `timeout` and `flatpak run` behavior, not confirmed against a live launch of this bundle.
-It is not yet confirmed that `flatpak run` actually reaches the plugin-loading stage within the 20-second timeout on a GitHub-hosted runner with no display attached at all, that unprivileged flatpak sandboxing works unmodified on `ubuntu-latest`'s current image, or that some other headless-environment quirk unrelated to a missing shared library (a portal or D-Bus service genuinely absent in that runner) does not also exit nonzero and trip the exit-code assertion.
+It is not yet confirmed that `flatpak run` actually reaches the plugin-loading stage within the 20-second timeout on a GitHub-hosted runner with no display attached at all, that unprivileged flatpak sandboxing works unmodified on `ubuntu-24.04`'s current image, or that some other headless-environment quirk unrelated to a missing shared library (a portal or D-Bus service genuinely absent in that runner) does not also exit nonzero and trip the exit-code assertion.
 If a future run fails on exactly that shape, the fix is to loosen the exit-code assertion, not the `grep` patterns, which are the actual defect class this workflow exists to catch.
 
 ## Notes moved out of workflow headers

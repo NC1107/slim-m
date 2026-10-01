@@ -13,7 +13,7 @@ on:
 jobs:
   e2e:
     name: e2e has not been red for several runs in a row
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     # Scoped to the job, not the workflow: least privilege, one job needs it.
     permissions:
       contents: read
@@ -30,7 +30,7 @@ jobs:
   # Its own job so one red workflow never stops the other being checked; the script exits non-zero on a streak.
   main-builds:
     name: main-builds has not been red for several runs in a row
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     permissions:
       contents: read
       issues: write

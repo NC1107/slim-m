@@ -15,6 +15,7 @@ on:
       - "schema/openapi.yaml"
       # The smoke job runs this script, so a change to it must trigger the job that exercises it.
       - "scripts/desktop-shell-smoke.sh"
+      - "scripts/chrome-tests.sh"
       # A release-please version bump (CHANGELOG + the two pubspecs) is
       # deliberately NOT excluded here. verify-release-checks.yml gates every
       # client publish job on this workflow's checks being present on the exact
@@ -33,6 +34,7 @@ on:
       - "schema/openapi.yaml"
       # The smoke job runs this script, so a change to it must trigger the job that exercises it.
       - "scripts/desktop-shell-smoke.sh"
+      - "scripts/chrome-tests.sh"
       # A release-please version bump (CHANGELOG + the two pubspecs) is
       # deliberately NOT excluded here. verify-release-checks.yml gates every
       # client publish job on this workflow's checks being present on the exact
@@ -63,7 +65,7 @@ jobs:
   # since each can fail with the other green.
   analyze-format:
     name: analyze, format check
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
@@ -107,7 +109,7 @@ jobs:
   # on faith: past some point queueing for runners costs more than it saves.
   test-shards:
     name: client tests (${{ matrix.label }})
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 25
     strategy:
       fail-fast: false
@@ -202,7 +204,7 @@ jobs:
   test-web:
     name: test and web build
     needs: [test-shards]
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
@@ -231,6 +233,28 @@ jobs:
 
       - {if: failure(), uses: ./.github/actions/native-hooks-diagnose}
 
+  # Dart compiled to JavaScript, which the VM suites cannot see: see docs/ci.md, `client-ci`.
+  test-chrome:
+    name: logic tests under dart2js (chrome)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - name: set up flutter (stable channel)
+        uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2
+        with:
+          channel: stable
+          flutter-version: 3.47.0
+          cache: true
+
+      - name: resolve workspace dependencies
+        working-directory: client
+        run: flutter pub get --enforce-lockfile
+
+      - name: flutter test --platform chrome
+        run: scripts/chrome-tests.sh
+
   # A native desktop plugin's own CMake is invisible to analyze, test and the
   # web build alike: adding audioplayers put a gstreamer-1.0 pkg-config
   # requirement into the Linux build that nothing on a pull request compiled,
@@ -239,7 +263,7 @@ jobs:
   # so it runs in parallel and its apt cost is not paid by every other check.
   linux-compiles:
     name: linux desktop compiles
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
@@ -282,7 +306,7 @@ jobs:
   linux-desktop-shell-smoke:
     name: linux desktop shell smoke (Xvfb)
     needs: [linux-compiles]
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
@@ -321,7 +345,7 @@ jobs:
   update-golden-references:
     name: generate golden references (manual)
     if: github.event_name == 'workflow_dispatch'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7

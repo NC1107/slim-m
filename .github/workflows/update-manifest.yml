@@ -46,7 +46,7 @@ concurrency:
 jobs:
   sign:
     name: sign update manifest
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     # write, not read: the last step attaches the manifest and signature to the github release.
     permissions:
       contents: write

@@ -28,7 +28,7 @@ jobs:
   # Compile-only gate on every pull request, without a full measurement run per push.
   compile-gate:
     if: github.event_name == 'pull_request'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
       - uses: actions-rust-lang/setup-rust-toolchain@166cdcfd11aee3cb47222f9ddb555ce30ddb9659 # v1
@@ -38,7 +38,7 @@ jobs:
   # Real benchmarks on a published release, for hand-curation into perf/baselines/; see docs/ci.md.
   benchmark:
     if: github.event_name == 'release' && !startsWith(github.event.release.tag_name, 'schema-v')
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
       - uses: actions-rust-lang/setup-rust-toolchain@166cdcfd11aee3cb47222f9ddb555ce30ddb9659 # v1
