@@ -22,6 +22,7 @@ import 'package:go_router/go_router.dart';
 import 'package:slimm_api/api.dart' as api;
 import 'package:slimm_design_system/design_system.dart';
 
+import '../message_preview.dart';
 import '../providers/user_profiles.dart';
 import 'author_label.dart';
 import 'message_jump.dart';
@@ -99,7 +100,10 @@ class ThreadParentCard extends ConsumerWidget {
         cachedDisplayName: parent.parentAuthorDisplayName,
         resolution: resolution,
       );
-      final snippet = _snippet(parent.parentContent ?? '');
+      final snippet = previewSnippet(
+        parent.parentContent ?? '',
+        maxRunes: _snippetMaxRunes,
+      );
       body = Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -194,14 +198,4 @@ class ThreadParentCard extends ConsumerWidget {
       ),
     );
   }
-}
-
-/// A one-line, rune-safe truncation - matches `ReplyQuote._snippet`, since
-/// `String.substring` cuts mid-surrogate on a codepoint outside the BMP.
-String _snippet(String content) {
-  final oneLine = content.replaceAll('\n', ' ').trim();
-  if (oneLine.isEmpty) return '(no text)';
-  final runes = oneLine.runes.toList(growable: false);
-  if (runes.length <= _snippetMaxRunes) return oneLine;
-  return '${String.fromCharCodes(runes.take(_snippetMaxRunes))}…';
 }

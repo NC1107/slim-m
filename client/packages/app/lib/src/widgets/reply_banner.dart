@@ -21,6 +21,7 @@ import 'package:slimm_api/api.dart' as api;
 import 'package:slimm_data/data.dart';
 import 'package:slimm_design_system/design_system.dart';
 
+import '../message_preview.dart';
 import '../providers/attachment_bytes.dart';
 import '../providers/media_preferences.dart';
 import '../providers/message_extras.dart';
@@ -58,7 +59,7 @@ class ReplyBanner extends ConsumerWidget {
       ),
     );
     // A text-less parent is named by what it carried, not left blank.
-    final text = message.content.replaceAll('\n', ' ').trim();
+    final text = plainPreview(message.content);
     final snippet = text.isNotEmpty ? text : _attachmentSummary(attachments);
     // Only a single-attachment, text-less parent gets a thumbnail: several attachments already read as a count.
     final soleAttachment = text.isEmpty && attachments.length == 1
