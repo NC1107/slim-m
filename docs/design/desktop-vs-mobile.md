@@ -25,7 +25,7 @@ Platform checks are only ever for capability (push, tray, file pickers), never f
 - **expanded** `>= 1000` - adds the member pane.
 
 A resize crossing a threshold animates at 180ms.
-On compact: back is `compact_channel_app_bar`, the rail becomes `channel_rail_drawer`, and members drill in from the channel header rather than a drawer.
+On compact: back is `compact_channel_app_bar`, the rail becomes `channel_rail_drawer`, and the member list is an end drawer (`compact_drawer_scaffold.dart`) opened from the channel header or an edge swipe, not a drill-in route.
 
 ## Which surface? Answer in order, stop at the first yes
 
@@ -86,7 +86,8 @@ Every desktop affordance must state its compact equivalent, or it is not done.
 | context menu / popover / modal | bottom sheet, handle, 44px rows | a floating anchored surface under a thumb |
 | tooltip with a shortcut | a visible label, or nothing | tooltips on touch |
 | keyboard shortcut (Cmd-K, R, E) | a reachable on-screen path to the same command | the shortcut as the only path |
-| side pane (members, pins) | a drill-in route with back (180ms + 30% parallax) | overlay drawers that trap scroll |
+| member pane | an end drawer from the right edge (header button or edge swipe), closed by selecting a member or tapping the scrim | a second routed screen for a list the channel stays behind |
+| pins | `pinned_messages_sheet`, a bottom sheet (rule 3) | a drawer that traps scroll |
 | inline edit-in-place | the same, composer expanded to fit | a separate edit screen |
 | drag to reorder | long-press lifts, same drop rules | reorder hidden behind an edit mode |
 | full-focus overlay (floating card) | full-screen takeover, same two actions | a desktop-only accept/decline pair |
