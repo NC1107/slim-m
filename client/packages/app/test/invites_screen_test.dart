@@ -21,6 +21,7 @@ import 'package:slimm_app/src/screens/admin/invites_screen.dart';
 import 'package:slimm_app/src/widgets/toast_overlay.dart';
 import 'package:slimm_design_system/design_system.dart';
 import 'package:slimm_platform/platform.dart';
+import 'package:slimm_app/src/action_labels.dart';
 
 const _tokens = TokenPair(
   userId: 'user-1',
@@ -168,7 +169,7 @@ void main() {
     });
 
     await tester.enterText(find.byType(TextField).first, '5');
-    await tester.tap(find.text('Create invite'));
+    await tester.tap(find.text(ActionLabels.createInvite));
     await tester.pumpAndSettle();
 
     expect(posts, hasLength(1));
@@ -204,7 +205,7 @@ void main() {
     });
 
     // Blank is the deliberate way to ask for unlimited; it must still work.
-    await tester.tap(find.text('Create invite'));
+    await tester.tap(find.text(ActionLabels.createInvite));
     await tester.pumpAndSettle();
 
     expect(posts, hasLength(1));
@@ -247,7 +248,7 @@ void main() {
         findsOneWidget,
       );
 
-      await tester.tap(find.text('Create invite'));
+      await tester.tap(find.text(ActionLabels.createInvite));
       await tester.pumpAndSettle();
 
       expect(posted, isFalse);
@@ -284,14 +285,14 @@ void main() {
       // This type deliberately escapes uncaught; a zone catches it here instead.
       Object? escaped;
       await runZonedGuarded(() async {
-        await tester.tap(find.text('Create invite'));
+        await tester.tap(find.text(ActionLabels.createInvite));
         await tester.pump();
         await tester.pump();
       }, (error, stack) => escaped = error);
 
       expect(escaped, isA<TypeError>());
       expect(find.text('Creating...'), findsNothing);
-      expect(find.text('Create invite'), findsOneWidget);
+      expect(find.text(ActionLabels.createInvite), findsOneWidget);
 
       final button = tester.widget<AppButton>(find.byType(AppButton));
       expect(button.disabled, isFalse);
@@ -321,7 +322,7 @@ void main() {
         );
       });
 
-      await tester.tap(find.text('Create invite'));
+      await tester.tap(find.text(ActionLabels.createInvite));
       await tester.pumpAndSettle();
 
       expect(find.byType(SnackBar), findsNothing);

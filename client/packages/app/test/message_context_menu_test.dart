@@ -20,6 +20,7 @@ import 'package:slimm_app/src/widgets/message_row.dart';
 import 'package:slimm_design_system/design_system.dart';
 
 import 'message_row_harness.dart';
+import 'package:slimm_app/src/action_labels.dart';
 
 /// The glyph in the picker's first cell, read off the grid rather than
 /// hardcoded: the catalog comes from the third-party `emojis` package, so a
@@ -360,9 +361,9 @@ void main() {
 
     await tester.longPressAt(pressPoint(tester));
     await tester.pumpAndSettle();
-    expect(find.text('Add reaction'), findsOneWidget);
+    expect(find.text(ActionLabels.addReaction), findsOneWidget);
 
-    await tester.tap(find.text('Add reaction'));
+    await tester.tap(find.text(ActionLabels.addReaction));
     await tester.pumpAndSettle();
     expect(
       find.byType(EmojiPickerPanel),

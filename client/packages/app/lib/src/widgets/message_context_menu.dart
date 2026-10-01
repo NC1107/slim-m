@@ -12,6 +12,7 @@ import 'package:slimm_design_system/design_system.dart';
 import 'bot_menu_sections.dart';
 import 'context_menu_region.dart';
 import 'hover_reveal.dart';
+import '../action_labels.dart';
 import 'message_row_roving.dart';
 
 /// What the menu can do for one message. The caller (which knows authorship
@@ -187,7 +188,7 @@ class _MessageContextMenuRegionState extends State<MessageContextMenuRegion> {
 
     return [
       AppMenuItem(
-        label: 'Add reaction',
+        label: ActionLabels.addReaction,
         leading: AppIcons.smile,
         onTap: () => run(widget.onAddReaction),
       ),

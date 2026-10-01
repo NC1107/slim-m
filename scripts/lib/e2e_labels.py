@@ -11,7 +11,7 @@ nobody remembered was duplicated across three files.
 COMPOSER = "Message composer"
 SEND = "Send message"
 ATTACH = "Attach a file"
-ADD_REACTION = "Add a reaction"
+ADD_REACTION = "Add reaction"
 REMOVE_ATTACHMENT = "Remove attachment"
 
 # Rail and navigation
@@ -43,7 +43,7 @@ WHO_CAN_JOIN_ROW = "Who can join, currently"
 JOIN_OPEN = "Anyone with the address"
 JOIN_INVITE = "People with an invite"
 ROLES = "Roles"
-NEW_ROLE = "New role"
+NEW_ROLE = "Create role"
 ROLE_NAME = "Role name"
 CREATE_ROLE = "Create role"
 
