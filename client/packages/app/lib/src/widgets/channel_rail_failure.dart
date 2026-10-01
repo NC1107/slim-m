@@ -69,9 +69,7 @@ RailFailure? emptyRailFailure(SyncFailure? failure) => switch (failure) {
     retryable: true,
   ),
   SyncFailure.refused => const RailFailure(
-    message:
-        'The server refused this session, so it sent no channels. '
-        'Sign in again.',
+    message: 'The server refused this session, so it sent no channels.',
     retryable: false,
     retryLabel: 'Sign in again',
   ),
