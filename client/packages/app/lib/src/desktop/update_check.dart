@@ -17,6 +17,8 @@ import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:http/http.dart' as http;
 import 'package:slimm_platform/platform.dart';
 
+import 'self_update/self_update_target.dart' show recordedFailedVersion;
+
 /// The repository whose `client-v*` releases this build updates from.
 const clientReleaseRepo = 'Slim-m-org/slim-m';
 
@@ -71,10 +73,15 @@ typedef CheckForClientUpdate =
 /// there is none, the check failed, [currentVersion] cannot be read, or this
 /// is not a self-updatable desktop build's concern. [client] and [format] are
 /// injectable for tests.
+///
+/// A release at or below the version a rollback last went back from is never
+/// offered: it already failed to start here. [failedVersion] defaults to the
+/// record of the running install.
 Future<ClientUpdate?> checkForClientUpdate({
   required String currentVersion,
   http.Client? client,
   InstallFormat? format,
+  String? failedVersion,
 }) async {
   final installFormat = format ?? currentInstallFormat();
   if (installFormat == InstallFormat.unknown) return null;
@@ -110,6 +117,8 @@ Future<ClientUpdate?> checkForClientUpdate({
 
     if (bestVersion == null || bestUrl == null) return null;
     if (!isNewer(bestVersion, currentVersion)) return null;
+    final failed = failedVersion ?? recordedFailedVersion();
+    if (failed != null && !isNewer(bestVersion, failed)) return null;
     return ClientUpdate(
       version: bestVersion,
       releaseUrl: bestUrl,
