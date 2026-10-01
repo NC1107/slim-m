@@ -293,7 +293,7 @@ impl Store {
         .await?;
 
         if !attachment_ids.is_empty() {
-            link_attachments(&mut tx, id, attachment_ids).await?;
+            link_attachments(&mut tx, id, author_id, attachment_ids).await?;
         }
 
         if let Some(origin) = &forward {
