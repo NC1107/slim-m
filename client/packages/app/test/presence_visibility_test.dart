@@ -196,7 +196,7 @@ void main() {
           'connected is the connection vocabulary the header dot owns; it is '
           'what made the owner read this row as a connection indicator',
     );
-    expect(find.text('unknown'), findsNothing);
+    expect(find.text(unknownPresenceLabel), findsOneWidget);
   });
 
   testWidgets('the status menu marks nothing current until a choice is made', (

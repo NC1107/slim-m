@@ -378,10 +378,9 @@ class RailUserFooter extends ConsumerWidget {
     final (statusLabel, presence) = presenceDisplayOf(visibility);
     // A typed status joins the presence word rather than replacing it, so both facts the member pane shows about you show here too (design review note 7).
     final statusText = me.valueOrNull?.statusText;
-    final secondLine = [
-      ?statusLabel,
-      if (statusText != null && statusText.isNotEmpty) statusText,
-    ].join(' · ');
+    final secondLine = statusText != null && statusText.isNotEmpty
+        ? '$statusLabel · $statusText'
+        : statusLabel;
 
     // Mirrors [RailHeader]: the raised bar and its top border bleed to the
     // screen edge while [SafeArea] lifts the content off the home indicator.
@@ -451,14 +450,13 @@ class RailUserFooter extends ConsumerWidget {
                               height: 1.25,
                             ),
                           ),
-                          if (secondLine.isNotEmpty)
-                            Text(
-                              secondLine,
-                              overflow: TextOverflow.ellipsis,
-                              style: AppText.micro.copyWith(
-                                color: tokens.textSecondary,
-                              ),
+                          Text(
+                            secondLine,
+                            overflow: TextOverflow.ellipsis,
+                            style: AppText.micro.copyWith(
+                              color: tokens.textSecondary,
                             ),
+                          ),
                         ],
                       ),
                     ),

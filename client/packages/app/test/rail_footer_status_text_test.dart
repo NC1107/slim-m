@@ -5,8 +5,8 @@
 /// ("online · swagging"), the same pair the member pane shows for everyone
 /// else (design review note 7).
 ///
-/// With no choice known there is no generic word at all: see
-/// `presenceDisplayOf`. Nothing on this line reports the socket.
+/// The generic word is `status unknown` rather than the `connected` it was:
+/// see `presenceDisplayOf`. Nothing on this line reports the socket.
 library;
 
 import 'dart:convert';
@@ -20,6 +20,7 @@ import 'package:slimm_api/api.dart' as api;
 import 'package:slimm_app/src/providers/providers.dart';
 import 'package:slimm_app/src/providers/sync_controller.dart';
 import 'package:slimm_app/src/widgets/channel_rail_frame.dart';
+import 'package:slimm_app/src/widgets/presence_menu.dart';
 import 'package:slimm_design_system/design_system.dart';
 import 'package:slimm_platform/platform.dart';
 
@@ -95,46 +96,35 @@ Future<void> _pumpFooter(
 }
 
 void main() {
-  testWidgets(
-    'a typed status is the whole second line while no presence word is '
-    'known',
-    (tester) async {
-      final container = _container(statusText: 'heads down, back in an hour');
-      addTearDown(container.dispose);
-      await _pumpFooter(tester, container);
+  testWidgets('a typed status joins the presence word rather than replacing '
+      'it', (tester) async {
+    final container = _container(statusText: 'heads down, back in an hour');
+    addTearDown(container.dispose);
+    await _pumpFooter(tester, container);
 
-      expect(find.text('heads down, back in an hour'), findsOneWidget);
-    },
-  );
+    expect(
+      find.text('$unknownPresenceLabel · heads down, back in an hour'),
+      findsOneWidget,
+    );
+  });
 
-  /// Every Text in the footer except the avatar initials.
-  List<String> footerTexts(WidgetTester tester) => tester
-      .widgetList<Text>(
-        find.descendant(
-          of: find.byType(RailUserFooter),
-          matching: find.byType(Text),
-        ),
-      )
-      .map((t) => t.data ?? '')
-      .where((text) => text != 'SE')
-      .toList();
-
-  testWidgets('with no status text set and no choice known, the footer shows '
-      'the name and no second line', (tester) async {
+  testWidgets('with no status text set, the generic word still shows', (
+    tester,
+  ) async {
     final container = _container();
     addTearDown(container.dispose);
     await _pumpFooter(tester, container);
 
-    expect(footerTexts(tester), ['Self']);
+    expect(find.text(unknownPresenceLabel), findsOneWidget);
   });
 
-  testWidgets('a status cleared back to empty leaves no second line', (
+  testWidgets('a status cleared back to empty falls back to the generic word', (
     tester,
   ) async {
     final container = _container(statusText: '');
     addTearDown(container.dispose);
     await _pumpFooter(tester, container);
 
-    expect(footerTexts(tester), ['Self']);
+    expect(find.text(unknownPresenceLabel), findsOneWidget);
   });
 }
