@@ -15,6 +15,7 @@ import 'dart:convert';
 
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
@@ -25,6 +26,8 @@ import 'package:slimm_app/src/providers/providers.dart';
 import 'package:slimm_app/src/widgets/channel_rail_sections.dart';
 import 'package:slimm_data/data.dart';
 import 'package:slimm_design_system/design_system.dart';
+
+import 'ui_snapshot_support.dart';
 
 const _tokens = api.TokenPair(
   userId: 'u-me',
@@ -99,6 +102,8 @@ Widget _harness(ProviderContainer container, Widget child) =>
     );
 
 void main() {
+  setUpAll(loadRealFonts);
+
   testWidgets('the menu marks the chosen notification mode with a check, '
       'not only a tint', (tester) async {
     final container = _container();
@@ -132,6 +137,28 @@ void main() {
     );
     expect(checkIn('Mentions only'), findsOneWidget);
     expect(checkIn('Mute channel'), findsNothing);
+
+    for (final label in [
+      'Mute channel',
+      'Mentions only',
+      'Notify me off hours',
+    ]) {
+      final paragraph = tester.renderObject<RenderParagraph>(
+        find.descendant(
+          of: find.widgetWithText(AppMenuItem, label),
+          matching: find.text(label),
+        ),
+      );
+      final full = TextPainter(
+        text: paragraph.text,
+        textDirection: TextDirection.ltr,
+      )..layout();
+      expect(
+        paragraph.size.width,
+        greaterThanOrEqualTo(full.width - 0.5),
+        reason: '$label is cut off by the menu width',
+      );
+    }
     container.dispose();
   });
 
