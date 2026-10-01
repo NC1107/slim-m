@@ -31,6 +31,7 @@ import 'user_profiles.dart';
 import 'watch_room.dart';
 
 part 'sync_controller_events.dart';
+part 'sync_controller_reset.dart';
 
 /// How the connection is doing, for the UI to show honestly rather than
 /// pretending everything is fine while messages silently stop arriving.
@@ -309,27 +310,6 @@ class SyncController extends StateNotifier<SyncStatus> {
         }),
       );
     }
-  }
-
-  /// Drops a scope's cached messages and both its cursors, then refetches the
-  /// newest page.
-  ///
-  /// [MessageStore.resetChannel] clears the op cursor to null as well as
-  /// rewinding the message one, so the next catch-up adopts a fresh head
-  /// rather than asking from a seq the server may have swept past.
-  Future<void> _resetScope(
-    int generation,
-    SlimmApi api,
-    MessageStore store,
-    String channelId,
-  ) async {
-    await store.resetChannel(channelId);
-    final fresh = await retryWhenRateLimited(
-      () => api.listMessages(channelId, limit: 50),
-      wait: _ref.read(rateLimitWaitProvider),
-    );
-    if (generation != _generation) return;
-    await store.applyMessages(fresh);
   }
 
   /// Runs one catch-up round against the current generation.
