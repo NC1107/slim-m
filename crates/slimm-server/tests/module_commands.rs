@@ -274,6 +274,10 @@ async fn a_fuel_exhausting_module_answers_cleanly_instead_of_hanging() {
 
 /// The request the wasm sees carries `command`, `input` and an opaque
 /// `caller.id`, and nothing else about the caller.
+///
+/// Opaque has to survive somebody who knows the recipe. The id was a bare
+/// sha256 of the module id and the user id, both of which any member can
+/// read, so hashing the member list gave back the person behind every id.
 #[tokio::test]
 async fn the_wasm_receives_an_opaque_caller_id_and_nothing_else() {
     let (s, _guard) = store("slimm-module-cmd-caller").await;
@@ -283,27 +287,42 @@ async fn the_wasm_receives_an_opaque_caller_id_and_nothing_else() {
     let token = s.open_session(member.id, "phone").await.unwrap();
     let router = app(s);
 
-    let response = router
-        .oneshot(req_json(
-            "POST",
-            "/modules/code-exec/commands/run",
-            token.access_token.as_str(),
-            json!({ "input": "hi" }),
-        ))
-        .await
-        .unwrap();
-    assert_eq!(response.status(), StatusCode::OK);
-    let echoed = json_body(response).await["output"]
-        .as_str()
-        .unwrap()
-        .to_owned();
+    let mut answers = Vec::new();
+    for _ in 0..2 {
+        let response = router
+            .clone()
+            .oneshot(req_json(
+                "POST",
+                "/modules/code-exec/commands/run",
+                token.access_token.as_str(),
+                json!({ "input": "hi" }),
+            ))
+            .await
+            .unwrap();
+        assert_eq!(response.status(), StatusCode::OK);
+        answers.push(
+            json_body(response).await["output"]
+                .as_str()
+                .unwrap()
+                .to_owned(),
+        );
+    }
+    let echoed = &answers[0];
+    assert_eq!(echoed, &answers[1], "the id is stable for one person");
 
-    let mut hasher = Sha256::new();
-    hasher.update(format!("slim-module-caller-v1\0code-exec\0{}", member.id));
-    let expected = slimm_server::media::to_hex(&hasher.finalize());
-    assert_eq!(
-        echoed,
-        format!("{{'command':'run','input':'hi','caller':{{'id':'{expected}'}}}}")
+    let id = echoed
+        .strip_prefix("{'command':'run','input':'hi','caller':{'id':'")
+        .and_then(|rest| rest.strip_suffix("'}}"))
+        .unwrap_or_else(|| panic!("the request carries more than it should: {echoed}"));
+    assert_eq!(id.len(), 64);
+    assert!(id.chars().all(|c| c.is_ascii_hexdigit()));
+
+    let mut public = Sha256::new();
+    public.update(format!("slim-module-caller-v1\0code-exec\0{}", member.id));
+    assert_ne!(
+        id,
+        slimm_server::media::to_hex(&public.finalize()),
+        "the id can be recomputed from the module id and a user id anybody can list"
     );
     assert!(!echoed.contains(&member.id.to_string()));
     assert!(!echoed.contains("Nia"));

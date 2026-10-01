@@ -112,18 +112,6 @@ struct ModuleCaller {
     id: String,
 }
 
-/// Stable per (module, user) and opaque: it never equals a user id and does
-/// not match across modules, so it cannot be used to follow a person around.
-fn module_caller_id(module_id: &str, user_id: UserId) -> String {
-    use sha2::{Digest, Sha256};
-    let mut hasher = Sha256::new();
-    hasher.update(b"slim-module-caller-v1\0");
-    hasher.update(module_id.as_bytes());
-    hasher.update(b"\0");
-    hasher.update(user_id.to_string().as_bytes());
-    crate::media::to_hex(&hasher.finalize())
-}
-
 #[derive(Deserialize)]
 struct ModuleWireResponse {
     ok: bool,
@@ -222,11 +210,12 @@ pub(crate) async fn execute_command_in(
         ));
     }
     let limits = RunLimits::from(&module.runtime_limits);
+    let caller_key = state.store.module_caller_key().await?;
     let request_json = serde_json::to_vec(&ModuleWireRequest {
         command,
         input,
         caller: ModuleCaller {
-            id: module_caller_id(module_id, user_id),
+            id: super::module_caller::module_caller_id(&caller_key, module_id, user_id),
         },
     })
     .map_err(|_| ApiError::Internal)?;
