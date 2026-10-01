@@ -15,7 +15,9 @@ from __future__ import annotations
 
 import os
 import subprocess
+import tempfile
 import textwrap
+import unittest
 from pathlib import Path
 
 SCRIPT = Path(__file__).resolve().parents[1] / "report-advisory-issue.sh"
@@ -56,68 +58,80 @@ def run(
     return [line for line in calls.read_text().splitlines() if line]
 
 
-def test_a_found_advisory_opens_an_issue(tmp_path: Path) -> None:
-    calls = run(tmp_path, "found")
-    assert any(c.startswith("issue create") for c in calls), calls
+class ReportAdvisoryIssueTest(unittest.TestCase):
+    """Was seven bare functions, which `unittest discover` never collected."""
+
+    def setUp(self) -> None:
+        scratch = tempfile.TemporaryDirectory()
+        self.addCleanup(scratch.cleanup)
+        self.tmp_path = Path(scratch.name)
+
+    def test_a_found_advisory_opens_an_issue(self) -> None:
+        calls = run(self.tmp_path, "found")
+        self.assertTrue(any(c.startswith("issue create") for c in calls), calls)
 
 
-def test_a_found_advisory_does_not_open_a_second_issue(tmp_path: Path) -> None:
-    """The check runs daily; without this it would file one issue per day."""
-    calls = run(tmp_path, "found", existing="42")
-    assert not any(c.startswith("issue create") for c in calls), calls
+    def test_a_found_advisory_does_not_open_a_second_issue(self) -> None:
+        """The check runs daily; without this it would file one issue per day."""
+        calls = run(self.tmp_path, "found", existing="42")
+        self.assertFalse(any(c.startswith("issue create") for c in calls), calls)
 
 
-def test_another_watchdog_can_supply_its_own_label_and_body(tmp_path: Path) -> None:
-    calls = run(
-        tmp_path,
-        "found",
-        extra={
-            "WATCHDOG_LABEL": "release-incomplete",
-            "WATCHDOG_TITLE": "a release is missing assets",
-            "WATCHDOG_BODY": "INCOMPLETE client-v9.9.9",
-        },
-    )
-    created = next(c for c in calls if c.startswith("issue create"))
-    assert "--label release-incomplete" in created, created
-    assert "INCOMPLETE client-v9.9.9" in created, created
-    assert "cargo deny" not in created, created
+    def test_another_watchdog_can_supply_its_own_label_and_body(self) -> None:
+        calls = run(
+            self.tmp_path,
+            "found",
+            extra={
+                "WATCHDOG_LABEL": "release-incomplete",
+                "WATCHDOG_TITLE": "a release is missing assets",
+                "WATCHDOG_BODY": "INCOMPLETE client-v9.9.9",
+            },
+        )
+        created = next(c for c in calls if c.startswith("issue create"))
+        self.assertIn("--label release-incomplete", created)
+        self.assertIn("INCOMPLETE client-v9.9.9", created)
+        self.assertNotIn("cargo deny", created)
 
 
-def test_a_clean_scan_closes_an_open_issue(tmp_path: Path) -> None:
-    calls = run(tmp_path, "clean", existing="42")
-    assert any(c.startswith("issue close 42") for c in calls), calls
+    def test_a_clean_scan_closes_an_open_issue(self) -> None:
+        calls = run(self.tmp_path, "clean", existing="42")
+        self.assertTrue(any(c.startswith("issue close 42") for c in calls), calls)
 
 
-def test_a_clean_scan_with_nothing_open_does_nothing(tmp_path: Path) -> None:
-    calls = run(tmp_path, "clean")
-    assert not any(c.startswith("issue close") for c in calls), calls
-    assert not any(c.startswith("issue create") for c in calls), calls
+    def test_a_clean_scan_with_nothing_open_does_nothing(self) -> None:
+        calls = run(self.tmp_path, "clean")
+        self.assertFalse(any(c.startswith("issue close") for c in calls), calls)
+        self.assertFalse(any(c.startswith("issue create") for c in calls), calls)
 
 
-def test_an_unrecognised_status_refuses_rather_than_guessing(tmp_path: Path) -> None:
-    """A typo in the workflow's own expression must not read as 'clean'.
+    def test_an_unrecognised_status_refuses_rather_than_guessing(self) -> None:
+        """A typo in the workflow's own expression must not read as 'clean'.
 
-    `ADVISORY_STATUS` is built from a GitHub Actions ternary, so a future edit
-    to that expression could produce something neither branch expects; the
-    dangerous reading is the silent one, where an advisory scan quietly closes
-    the very issue it should have opened.
-    """
-    env = dict(os.environ)
-    env.update(
-        GITHUB_REPOSITORY="owner/repo",
-        ADVISORY_STATUS="",
-        GH_CALLS=str(tmp_path / "unused.txt"),
-    )
-    done = subprocess.run(
-        ["bash", str(SCRIPT)], env=env, capture_output=True, text=True
-    )
-    assert done.returncode != 0, done.stdout
+        `ADVISORY_STATUS` is built from a GitHub Actions ternary, so a future edit
+        to that expression could produce something neither branch expects; the
+        dangerous reading is the silent one, where an advisory scan quietly closes
+        the very issue it should have opened.
+        """
+        env = dict(os.environ)
+        env.update(
+            GITHUB_REPOSITORY="owner/repo",
+            ADVISORY_STATUS="",
+            GH_CALLS=str(self.tmp_path / "unused.txt"),
+        )
+        done = subprocess.run(
+            ["bash", str(SCRIPT)], env=env, capture_output=True, text=True
+        )
+        self.assertNotEqual(done.returncode, 0, done.stdout)
 
 
-def test_the_script_is_the_one_the_workflow_runs() -> None:
-    """A test against a script no workflow calls proves nothing."""
-    workflow = (
-        SCRIPT.parents[1] / ".github/workflows/advisory-watchdog.yml"
-    ).read_text()
-    assert "scripts/report-advisory-issue.sh" in workflow
-    assert textwrap.dedent(workflow).count("check advisories") >= 1
+    def test_the_script_is_the_one_the_workflow_runs(self) -> None:
+        """A test against a script no workflow calls proves nothing."""
+        workflow = (
+            SCRIPT.parents[1] / ".github/workflows/advisory-watchdog.yml"
+        ).read_text()
+        self.assertIn("scripts/report-advisory-issue.sh", workflow)
+        self.assertGreaterEqual(textwrap.dedent(workflow).count("check advisories"), 1)
+
+
+if __name__ == "__main__":
+    unittest.main()
