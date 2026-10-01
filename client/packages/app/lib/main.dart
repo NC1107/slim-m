@@ -52,6 +52,7 @@ import 'src/widgets/server_identity_change_gate.dart';
 import 'src/widgets/incoming_call_overlay.dart';
 import 'src/widgets/picture_in_picture_gate.dart';
 import 'src/widgets/popout_host.dart';
+import 'src/widgets/moderation_error_host.dart';
 import 'src/widgets/toast_overlay.dart';
 
 /// Entry point.
@@ -334,6 +335,7 @@ Widget appChromeBuilder(BuildContext context, Widget? child) => Consumer(
                 ),
               ),
               const Positioned.fill(child: ToastOverlay()),
+              const Positioned.fill(child: ModerationErrorHost()),
               const Positioned.fill(child: WebUpdatePill()),
               const Positioned.fill(child: IncomingCallOverlay()),
               // Last, so a locked screen covers a toast or a ring too, not just the routed app underneath.
