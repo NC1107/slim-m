@@ -379,3 +379,36 @@ async fn a_device_that_reports_background_stops_being_counted_as_viewing() {
     report_lifecycle(&state, &laptop_token, "background").await;
     assert!(!viewing.is_viewing(alice, channel.id));
 }
+
+#[tokio::test]
+async fn a_read_beyond_the_channel_head_announces_the_clamped_marker() {
+    let (store, _guard) = new_store().await;
+    seed_everyone(&store).await;
+    let channel = store.create_channel("general", "text").await.unwrap();
+    let state = state_for(&store);
+    let (alice, phone_token, _phone_ticket) = account(&store, "alice").await;
+    let (_desktop_token, desktop_ticket) = device(&store, alice).await;
+    let (_bob, bob_token, _bob_ticket) = account(&store, "bob").await;
+    send(&state, &bob_token, channel.id).await;
+    let addr = serve(state.clone()).await;
+    let mut desktop = connect(addr, &desktop_ticket).await;
+
+    let response = http::router(state.clone())
+        .oneshot(request(
+            "PUT",
+            &format!("/channels/{}/read", channel.id),
+            &phone_token,
+            json!({ "seq": 99 }),
+        ))
+        .await
+        .unwrap();
+    assert_eq!(response.status(), StatusCode::OK);
+
+    let frame = frame_of_kind(&mut desktop, "read_state.changed")
+        .await
+        .expect("the other device must hear about the read");
+    assert_eq!(
+        frame["last_read_seq"], 1,
+        "the stored marker, not the asked-for 99"
+    );
+}
