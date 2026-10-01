@@ -18,6 +18,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:slimm_api/api.dart' as api;
 import 'package:slimm_app/src/providers/providers.dart';
 import 'package:slimm_app/src/providers/sync_controller.dart';
@@ -133,6 +134,9 @@ Override _storeEmpty() => databaseProvider.overrideWith((ref) {
 const _keyUnavailable = LocalDatabaseKeyUnavailable('keychain locked');
 
 void main() {
+  // The rail's category sections read the collapsed-category preference.
+  setUp(() => SharedPreferences.setMockInitialValues({}));
+
   testWidgets('a store that will not open shows a failure sized to its own '
       'content, near the top, leaving the rest of the rail empty', (
     tester,
