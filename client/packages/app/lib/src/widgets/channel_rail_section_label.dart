@@ -185,8 +185,9 @@ class _FoldButton extends StatelessWidget {
   Widget build(BuildContext context) {
     final tokens = Theme.of(context).extension<AppTokens>()!;
     final touch = AppTouchTargets.of(context);
+    // No `header: true`: the web engine renders a header as a bare h2 and drops the button role, the label-less expanded state and the tap.
     return Semantics(
-      header: true,
+      container: true,
       button: true,
       expanded: !collapsed,
       label: name,

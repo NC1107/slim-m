@@ -13,6 +13,8 @@
 /// screen reader could see.
 library;
 
+import 'dart:ui' show Tristate;
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -76,9 +78,21 @@ void main() {
     });
   });
 
-  testWidgets('a rail section is announced as a heading', (tester) async {
+  testWidgets('a foldable rail section is announced as an expandable button', (
+    tester,
+  ) async {
     await withShell(tester, () async {
       final node = tester.getSemantics(find.bySemanticsLabel('Text'));
+      expect(node.flagsCollection.isButton, isTrue);
+      expect(node.flagsCollection.isExpanded, Tristate.isTrue);
+    });
+  });
+
+  testWidgets('a section that does not fold is announced as a heading', (
+    tester,
+  ) async {
+    await withShell(tester, () async {
+      final node = tester.getSemantics(find.bySemanticsLabel('Channels'));
       expect(node.flagsCollection.isHeader, isTrue);
     });
   });
