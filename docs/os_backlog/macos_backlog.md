@@ -34,7 +34,7 @@ What follows is the finding as first written, kept as history: `packaging/` stil
 See "Notarization, code signing, and Gatekeeper are entirely unaddressed" below for what a real, distributable build still needs before this line can move to Confirmed.
 
 **Per-participant call volume (`Helper.setVolume`) is one of the three platforms confirmed to actually work, unlike its Linux and Windows siblings.**
-Confirmed from the pre-trim `CLAUDE.md`'s "Moderating a member" section: "Android, iOS, macOS work. Their native track lookups fall back to scanning the peer connection's transceivers, so a remote track is found."
+Confirmed from the pre-trim the pre-trim `CLAUDE.md`'s "Moderating a member" section: "Android, iOS, macOS work. Their native track lookups fall back to scanning the peer connection's transceivers, so a remote track is found."
 `client/packages/rtc/lib/src/audio_gain.dart`'s `supportsParticipantVolume` already includes `lk.PlatformType.macOS` in its allow-list (confirmed by reading the file), so now that a macOS target exists this control is enabled by the platform gate with no further client-side change needed - still unconfirmed on a real device, since the compile-only CI job proves it builds, not that a call's volume slider actually moves anything.
 This is the strongest positive signal anywhere in this file: it is read from source and matches the code that already ships and is tested on the two platforms (iOS, Android) that do have a real target.
 
@@ -63,7 +63,7 @@ Whether `flutter_webrtc`'s macOS desktop capturer actually enumerates and captur
 
 **Notarization, code signing, and Gatekeeper are entirely unaddressed - and, unlike the rest of this file, a real target now exists for that to block on.**
 `client-macos-ci.yml` deliberately builds `flutter build macos --debug` with no `DEVELOPMENT_TEAM` set, which ad-hoc-signs itself ("Sign to Run Locally") and needs no Apple account - fine for a compile check, useless for anything a person outside this box would run, since Gatekeeper refuses an ad-hoc-signed app on a machine that did not build it.
-What is genuinely still missing, itemised against the closest existing precedent (this project's own working iOS signing pipeline, documented in the pre-trim `CLAUDE.md`'s "Driving the Apple Developer portal" and "Push credentials and identifiers" sections):
+What is genuinely still missing, itemised against the closest existing precedent (this project's own working iOS signing pipeline, documented in the pre-trim the pre-trim `CLAUDE.md`'s "Driving the Apple Developer portal" and "Push credentials and identifiers" sections):
 a macOS-capable code-signing certificate under the same `76S78SUWVM` Apple team (either "Developer ID Application" for a direct-download `.dmg`, or a Mac App Store distribution certificate, which are mutually exclusive per the distribution channel actually chosen - that choice is not made anywhere in this repository);
 a notarization credential (`xcrun notarytool`'s app-specific password or an App Store Connect API key, the same kind of credential `~/.secrets/slim-m/asc-api-key-A94NDY63N8.p8` already is for iOS) stored the same way every other secret in `~/.secrets/slim-m/` is, plus its GitHub Actions secret counterpart;
 a release job - a macOS sibling to `release.yml`'s `ios-testflight` - that actually runs `codesign`, `xcrun notarytool submit --wait`, and `xcrun stapler staple` against a Release (not Debug) build, and either a `.dmg` or Mac App Store upload step depending on the distribution decision above;
