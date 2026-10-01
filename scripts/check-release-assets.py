@@ -44,6 +44,14 @@ REQUIRED = {
 }
 
 
+# Manifest platform -> the asset it must describe when that asset is attached (scripts/update-manifest.py PLATFORMS).
+MANIFEST_PLATFORMS = {
+    "linux-x64": r"slim-m-client-{v}-linux-amd64\.tar\.gz",
+    "windows-x64": r"slim-m-client-{v}-windows-x64\.zip",
+    "macos": r"slim-m-client-{v}-macos\.zip",
+}
+
+
 def describe(pattern, version):
     """A pattern as a readable file name, e.g. slim-m-client-0.89.0-windows-x64.zip."""
     name = pattern.format(v=version)
@@ -51,8 +59,25 @@ def describe(pattern, version):
     return name.replace("\\", "")
 
 
-def judge(tag, names, published_at, now, grace):
-    """Returns (status, missing): status is ok, pending, incomplete or ignored."""
+def unlisted_platforms(version, names, manifest_platforms):
+    """Platforms whose asset is attached but absent from the signed manifest."""
+    if manifest_platforms is None:
+        return []
+    return [
+        f"manifest.json listing {platform}"
+        for platform, pattern in MANIFEST_PLATFORMS.items()
+        if platform not in manifest_platforms
+        and any(re.fullmatch(pattern.format(v=version), n) for n in names)
+    ]
+
+
+def judge(tag, names, published_at, now, grace, manifest_platforms=None):
+    """Returns (status, missing): status is ok, pending, incomplete or ignored.
+
+    manifest_platforms is the platform set the release's manifest.json lists,
+    or None when it was not read; a client release is incomplete while the
+    manifest omits a platform whose asset is attached.
+    """
     prefix = next((p for p in REQUIRED if tag.startswith(p)), None)
     if prefix is None:
         return "ignored", []
@@ -62,6 +87,8 @@ def judge(tag, names, published_at, now, grace):
         for pattern in REQUIRED[prefix]
         if not any(re.fullmatch(pattern.format(v=version), n) for n in names)
     ]
+    if prefix == "client-v":
+        missing += unlisted_platforms(version, names, manifest_platforms)
     if not missing:
         return "ok", []
     if now - published_at < grace:
@@ -79,6 +106,17 @@ def gh_get(path):
 def usable_names(release):
     """Asset names, leaving out an empty upload, which is as good as absent."""
     return [a["name"] for a in release.get("assets", []) if a.get("size", 1) > 0]
+
+
+def manifest_platforms(repo, tag, names):
+    """Platforms the release's manifest.json lists, or None when there is none to read."""
+    if "manifest.json" not in names:
+        return None
+    done = subprocess.run(
+        ["gh", "release", "download", tag, "--repo", repo, "--pattern", "manifest.json", "--output", "-"],
+        capture_output=True, text=True, check=True,
+    )
+    return set(json.loads(done.stdout).get("artifacts", {}))
 
 
 def parse_time(stamp):
@@ -113,8 +151,10 @@ def main(argv=None):
     failed = False
     for release in releases_to_check(args.repo, args.tag, args.recent, now):
         tag = release["tag_name"]
+        names = usable_names(release)
+        listed = manifest_platforms(args.repo, tag, names) if tag.startswith("client-v") else None
         status, missing = judge(
-            tag, usable_names(release), parse_time(release["published_at"]), now, grace
+            tag, names, parse_time(release["published_at"]), now, grace, listed
         )
         if status == "ignored":
             continue

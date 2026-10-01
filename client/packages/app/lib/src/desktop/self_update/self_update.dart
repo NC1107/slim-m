@@ -33,8 +33,9 @@ class VerifiedUpdate {
 }
 
 /// Returns the verified download for [platformKey], or null when the newest
-/// release is not newer than [currentVersion] or has no artifact for this
-/// platform. Throws [SelfUpdateFailure] for every other stop; the staging
+/// release is not newer than [currentVersion]. Throws [SelfUpdateFailure] for
+/// every other stop, including a manifest with no artifact for this platform,
+/// which must never read as "nothing to do"; the staging
 /// directory then holds no finished file.
 Future<VerifiedUpdate?> fetchVerifiedUpdate({
   required String currentVersion,
@@ -75,7 +76,17 @@ Future<VerifiedUpdate?> fetchVerifiedUpdate({
   }
   if (!isNewer(manifest.version, currentVersion)) return null;
   final artifact = manifest.artifacts[platformKey];
-  if (artifact == null) return null;
+  if (artifact == null) {
+    throw SelfUpdateFailure(
+      SelfUpdateFailureKind.noArtifactForPlatform,
+      'Version ${manifest.version} is out, but it has no download for this '
+      'platform yet, so it cannot install itself. Get it from the release '
+      'page instead.',
+      detail: 'manifest lists: ${manifest.artifacts.keys.join(', ')}',
+      releaseUrl:
+          'https://github.com/$clientReleaseRepo/releases/tag/${manifest.tag}',
+    );
+  }
   final file = await downloadArtifact(
     artifact: artifact,
     stagingDir: stagingDir,

@@ -35,8 +35,8 @@ SERVER = [
 ]
 
 
-def judge(tag, names, published=OLD):
-    return mod.judge(tag, names, published, NOW, GRACE)
+def judge(tag, names, published=OLD, manifest=None):
+    return mod.judge(tag, names, published, NOW, GRACE, manifest)
 
 
 class CheckReleaseAssetsTest(unittest.TestCase):
@@ -82,6 +82,31 @@ class CheckReleaseAssetsTest(unittest.TestCase):
     def test_a_complete_release_inside_the_grace_period_is_ok(self):
         young = NOW - timedelta(minutes=30)
         self.assertEqual(judge("client-v0.89.0", CLIENT, published=young), ("ok", []))
+
+    def test_a_manifest_missing_an_attached_platform_is_incomplete(self):
+        listed = {"macos", "windows-x64"}
+        self.assertEqual(
+            judge("client-v0.89.0", CLIENT, manifest=listed),
+            ("incomplete", ["manifest.json listing linux-x64"]),
+        )
+
+    def test_a_manifest_listing_every_attached_platform_passes(self):
+        listed = {"macos", "windows-x64", "linux-x64"}
+        self.assertEqual(judge("client-v0.89.0", CLIENT, manifest=listed), ("ok", []))
+
+    def test_an_unattached_platform_is_not_blamed_on_the_manifest(self):
+        names = [n for n in CLIENT if "windows" not in n]
+        self.assertEqual(
+            judge("client-v0.89.0", names, manifest={"macos", "linux-x64"}),
+            ("incomplete", ["slim-m-client-0.89.0-windows-x64.zip"]),
+        )
+
+    def test_an_unread_manifest_is_not_judged(self):
+        self.assertEqual(judge("client-v0.89.0", CLIENT, manifest=None), ("ok", []))
+
+    def test_a_stale_manifest_inside_the_grace_period_is_pending(self):
+        status, _ = judge("client-v0.89.0", CLIENT, NOW - timedelta(minutes=5), {"macos"})
+        self.assertEqual(status, "pending")
 
     def test_an_unknown_tag_prefix_is_ignored(self):
         self.assertEqual(judge("schema-v0.77.0", []), ("ignored", []))

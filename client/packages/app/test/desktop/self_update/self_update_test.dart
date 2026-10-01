@@ -125,10 +125,11 @@ void main() {
     http.Client client, {
     List<String>? keys,
     String current = '0.89.0',
+    String platform = 'linux-x64',
     FreeSpace? freeSpace,
   }) => fetchVerifiedUpdate(
     currentVersion: current,
-    platformKey: 'linux-x64',
+    platformKey: platform,
     stagingDir: staging,
     client: client,
     trustedKeys: keys ?? [pub],
@@ -191,6 +192,19 @@ void main() {
       await failureOf(run(await _server(release), keys: onlyOld)),
       SelfUpdateFailureKind.badSignature,
     );
+  });
+
+  test('a newer release with no artifact for this platform says so', () async {
+    final client = await _server(_Release(key: key));
+    try {
+      await run(client, platform: 'macos');
+      fail('expected a SelfUpdateFailure');
+    } on SelfUpdateFailure catch (f) {
+      expect(f.kind, SelfUpdateFailureKind.noArtifactForPlatform);
+      expect(f.releaseUrl, endsWith('/releases/tag/client-v0.90.0'));
+      expect(f.message, contains('no download for this platform'));
+    }
+    expect(stagedNames(), isEmpty);
   });
 
   test(

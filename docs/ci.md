@@ -30,10 +30,10 @@ Each section below is named for its workflow file.
 | `server-binaries` | called by `release` | the static musl server binaries per arch, uploaded as run artifacts for `server-release-assets`, split out into its own file because `release` is past the 500-line budget |
 | `copr-publish` | called by `main-builds` and `copr-catch-up` | the Fedora COPR snapshot submission, split out into its own file once `main-builds` hit the 500-line ceiling; a failed submit is retried up to three times and then fails the job |
 | `desktop-clients` | `client-v*` tag pushes, and by hand with a tag input | unsigned Windows and macOS tester archives, attached to the client's GitHub release, with the Windows launcher built and its Go tests run on the way, then the signed `update-manifest` job. The two desktop platforms `release` does not package |
-| `update-manifest` | called by `desktop-clients` after its archives attach, and by hand with a tag input | signs a manifest (versions, artifact URLs, sha256s) of the desktop artifacts on a client release with the `UPDATE_SIGNING_KEY` secret, for the self-updater in decision 0041. Skips with a warning while the secret is unset |
+| `update-manifest` | called by `desktop-clients` after its archives attach and by `release` after the Linux tarball attaches, and by hand with a tag input | signs a manifest (versions, artifact URLs, sha256s) of the desktop artifacts on a client release with the `UPDATE_SIGNING_KEY` secret, for the self-updater in decision 0041. Signs only once every platform (`windows-x64`, `macos`, `linux-x64`) is attached, whichever producer finishes last. Skips with a warning while the secret is unset |
 | `release` | pushes to `main`, and by hand on a `server-v*` / `client-v*` tag ref | the whole publish pipeline, including the web image under the server's version |
 | `release-tag-watchdog` | an hourly schedule, and by hand | every release-please manifest's version has a matching git tag, catching a release PR that merged with no tag ever following it, and no merged release PR is still labelled `autorelease: pending`, which silently fails every later release run; and, in a second job, re-dispatches `release.yml` on the tag once when the release run's verify failed and the commit's required checks have since gone green |
-| `release-asset-watchdog` | an hourly schedule, and by hand | nothing. It checks every `client-v*` and `server-v*` release from the last 3 days against the asset set its kind always carries, and opens a deduplicated `release-incomplete` issue (and fails its own run) when one older than 90 minutes is missing a file |
+| `release-asset-watchdog` | an hourly schedule, and by hand | nothing. It checks every `client-v*` and `server-v*` release from the last 3 days against the asset set its kind always carries, and opens a deduplicated `release-incomplete` issue (and fails its own run) when one older than 90 minutes is missing a file, or when its `manifest.json` omits a platform whose asset is attached |
 | `red-streak-watchdog` | a daily schedule, and by hand | opens a GitHub issue once `e2e` or `main-builds` has failed 3 consecutive completed runs on `main`, closes it once that workflow is green again; does not gate anything |
 | `main-builds` | changes under `client/`, `crates/`, `packaging/`, the Cargo files, `rust-toolchain.toml`, `docker/server.Dockerfile`, `.sqlx/`, the web image's own files, the local actions and reusable workflows it calls, or its own workflow file, on every push to `main`, excluding a release commit's own files; and by hand, with a boolean per side | a Fedora COPR snapshot, an Android artifact, `latest` on the live server image, `latest` on the web image after a client change, and continuous TestFlight unless the repo variable `CONTINUOUS_TESTFLIGHT` is `false`, in which case iOS builds only from a client release in `release`, or when this is run by hand; never a version bump, changelog or GitHub Release |
 | `flatpak-ci` | changes to the flatpak manifest or its vendored shared-modules, on pull requests and every push to `main`; and by hand | builds the flatpak for real, installs it, and checks a headless launch does not fail with a missing shared library, the failure class `release.yml` cannot catch before a `client-v*` tag |
@@ -820,6 +820,8 @@ Nothing noticed, because `verify-release-checks` judges check-runs before publis
 
 `scripts/check-release-assets.py` lists releases through `gh api` (GET only) and compares each release's asset names with the set for its kind, kept in one `REQUIRED` table in the script.
 A `client-v*` release must hold `manifest.json`, `manifest.json.sig`, `SHA256SUMS`, `SHA256SUMS.android`, the rpm, the linux tarball, the flatpak, the macOS and Windows zips and the apk.
+A `client-v*` release whose `manifest.json` leaves out a platform whose archive is attached is incomplete too, because the manifest is what the self-updater trusts.
+The script downloads the manifest to read its platform list.
 A `server-v*` release must hold `SHA256SUMS` and the linux amd64 and arm64 binaries.
 `schema-v*` tags are anchors with no assets by design and are ignored.
 Names that carry the version are patterns filled from the tag, and an asset with size 0 counts as absent.
@@ -950,8 +952,13 @@ It downloads the desktop artifacts already attached to a client release (the Lin
 The desktop client fetches it and its signature from the release, verifies them, and only then downloads an artifact (`client/packages/app/lib/src/desktop/self_update/self_update.dart`), so a release without a manifest is a release nothing can update to.
 
 It is a reusable workflow rather than steps inside `release` because `release.yml` sits near its line budget, and `desktop-clients` is the one workflow that knows when the Windows and macOS archives are attached.
-`desktop-clients` calls it as its last job; by hand it takes a `tag` and a `require` list, which is how to backfill a release or to re-sign with `linux-x64` added once `release` has attached the tarball.
-The manifest lists whatever platforms are attached and fails only when a required one is missing, so the default of `windows-x64,macos` does not race the Linux tarball.
+The three archives come from two workflows that finish in no fixed order: `release` attaches the Linux tarball and `desktop-clients` the Windows and macOS archives.
+Both call this workflow with `defer: true` and the default `require` of `windows-x64,macos,linux-x64`.
+With `defer`, a call that finds a required archive not attached yet signs nothing and passes with a notice, and the producer that attaches the last archive signs the full manifest.
+The `update-manifest` job in `release` needs `linux-client` and names its result in its `if:` (`scripts/lib/test_conditional_jobs_keep_their_needs_gate.py`).
+Client 0.88.0 shipped a manifest without `linux-x64` because the only caller ran before the tarball existed; the Linux tarball updater then found no artifact for its platform.
+By hand it takes a `tag`, a `require` list and `defer`, which is how to backfill a release.
+Without `defer` a missing required platform fails the run.
 
 The secret is `UPDATE_SIGNING_KEY`, an ed25519 private key in PKCS8 PEM form, stored as a repository secret.
 While it is unset the job passes with a warning and does nothing, the same shape as `copr-publish` without `COPR_CONFIG`.
