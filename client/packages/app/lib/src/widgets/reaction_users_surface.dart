@@ -30,7 +30,9 @@ Future<void> showReactionUsers(
   }
 
   final box = anchor.findRenderObject() as RenderBox?;
-  final overlay = Overlay.of(anchor).context.findRenderObject() as RenderBox?;
+  final overlay =
+      Overlay.of(anchor, rootOverlay: true).context.findRenderObject()
+          as RenderBox?;
   final origin = box == null || overlay == null
       ? Offset.zero
       : box.localToGlobal(Offset.zero, ancestor: overlay);

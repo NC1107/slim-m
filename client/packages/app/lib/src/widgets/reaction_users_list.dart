@@ -89,6 +89,12 @@ class ReactionUsersBody extends ConsumerWidget {
               maxHeight: MediaQuery.sizeOf(context).height * 0.5,
             ),
             child: SheetItemList(
+              padding: const EdgeInsets.fromLTRB(
+                AppSpacing.s8,
+                0,
+                AppSpacing.s8,
+                AppSpacing.s8,
+              ),
               itemCount: ids.length + (state.hasMore || state.failed ? 1 : 0),
               itemBuilder: (context, i) {
                 if (i < ids.length) {
