@@ -42,4 +42,20 @@ void main() {
       findsOneWidget,
     );
   });
+
+  testWidgets('a voice channel says it is that channel\'s chat, not a DM', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      _harness(const ChannelStartHeader(name: 'vc', isVoice: true)),
+    );
+
+    expect(find.text('Chat for vc'), findsOneWidget);
+    expect(
+      find.text('This is the start of the chat for the vc voice channel.'),
+      findsOneWidget,
+    );
+    expect(find.textContaining('between the two of you'), findsNothing);
+    expect(find.byIcon(AppIcons.voice), findsOneWidget);
+  });
 }

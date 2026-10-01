@@ -28,6 +28,7 @@ import '../providers/admin_providers.dart';
 import '../providers/member_presence.dart' show membersProvider;
 import '../providers/providers.dart';
 import 'member_profile_sections.dart';
+import 'moderation_unavailable_caption.dart';
 import 'clear_totp_sheet.dart';
 import 'reset_code_sheet.dart';
 import 'run_guarded.dart';
@@ -38,6 +39,7 @@ class MemberModerateView extends ConsumerStatefulWidget {
     required this.profile,
     required this.host,
     required this.canManageRoles,
+    required this.outranked,
     required this.canOfferTimeoutChips,
     required this.canIssueReset,
     required this.canRemove,
@@ -55,6 +57,9 @@ class MemberModerateView extends ConsumerStatefulWidget {
   final BuildContext host;
 
   final bool canManageRoles;
+
+  /// The member holds permissions the viewer does not; see the gates.
+  final bool outranked;
   final bool canOfferTimeoutChips;
   final bool canIssueReset;
   final bool canRemove;
@@ -143,6 +148,19 @@ class _MemberModerateViewState extends ConsumerState<MemberModerateView>
             ),
           const AppMenuDivider(),
         ],
+        if (widget.outranked) ...[
+          Padding(
+            padding: const EdgeInsets.symmetric(
+              horizontal: AppSpacing.s12,
+              vertical: AppSpacing.s8,
+            ),
+            child: ModerationUnavailableCaption(
+              'You cannot time out or remove ${widget.profile.displayName}: '
+              'they hold permissions you do not.',
+            ),
+          ),
+          const AppMenuDivider(),
+        ],
         if (widget.canOfferTimeoutChips) ...[
           const AppMenuLabel('TIME OUT'),
           TimeoutDurationChips(onChosen: widget.onTimeOut),
@@ -224,9 +242,10 @@ class _RoleRow extends StatelessWidget {
     return AppListRow(
       leading: Icon(AppIcons.shield, color: tokens.textSecondary),
       label: role.name,
-      meta: role.isEveryone
-          ? 'Always granted'
-          : (grantable ? null : 'Needs permissions you do not hold'),
+      meta: role.isEveryone ? 'Always granted' : null,
+      subtitle: role.isEveryone || grantable
+          ? null
+          : 'Needs permissions you do not hold',
       trailing: Row(
         mainAxisSize: MainAxisSize.min,
         children: [

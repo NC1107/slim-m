@@ -44,6 +44,7 @@ class ChannelStartHeader extends StatelessWidget {
     required this.name,
     this.topic,
     this.isThread = false,
+    this.isVoice = false,
   });
 
   final String? name;
@@ -51,6 +52,9 @@ class ChannelStartHeader extends StatelessWidget {
 
   /// Whether this is a thread's own transcript rather than a channel's.
   final bool isThread;
+
+  /// A voice channel's chat: [name] is its name, shown without a hash.
+  final bool isVoice;
 
   @override
   Widget build(BuildContext context) {
@@ -81,6 +85,8 @@ class ChannelStartHeader extends StatelessWidget {
             child: Icon(
               isThread
                   ? AppIcons.thread
+                  : isVoice
+                  ? AppIcons.voice
                   : name != null
                   ? AppIcons.hash
                   : AppIcons.members,
@@ -92,6 +98,8 @@ class ChannelStartHeader extends StatelessWidget {
           Text(
             isThread
                 ? 'Thread'
+                : isVoice && name != null
+                ? 'Chat for $name'
                 : name != null
                 ? 'Welcome to #$name'
                 : 'This is the start of your conversation.',
@@ -100,6 +108,9 @@ class ChannelStartHeader extends StatelessWidget {
           const SizedBox(height: AppSpacing.s4),
           Text(switch ((isThread, name)) {
             (true, _) => 'Replies to the original message appear here.',
+            (false, final String n) when isVoice =>
+              topic ??
+                  'This is the start of the chat for the $n voice channel.',
             (false, final String n) =>
               topic ?? 'This is the start of the #$n channel.',
             (false, null) =>
