@@ -39,6 +39,7 @@ import 'composer_bot_mentions.dart';
 import 'composer_clipboard_image.dart';
 import 'composer_clipboard_paste.dart';
 import 'composer_extras.dart';
+import 'composer_list_keys.dart';
 import 'composer_slash.dart';
 import 'emoji_picker.dart';
 import 'gif_picker.dart';
@@ -98,6 +99,7 @@ class _ComposerState extends ConsumerState<Composer> {
   /// attachment", the one band `ComposerBanners` reserves for it.
   String? _attachmentError;
   late final FocusNode _focus = FocusNode(onKeyEvent: _onKey);
+  final ComposerListKeys _listKeys = ComposerListKeys();
 
   /// The composed text's own length and how far over [kMessageMaxChars] it
   /// sits, if at all. Tracked alongside [_hasText] rather than read fresh in
@@ -390,7 +392,9 @@ class _ComposerState extends ConsumerState<Composer> {
       unawaited(_editLastOwnMessage());
       return KeyEventResult.handled;
     }
-    if (_query == null || _suggestions.isEmpty) return KeyEventResult.ignored;
+    if (_query == null || _suggestions.isEmpty) {
+      return _listKeys.handle(event, widget.controller);
+    }
     if (event is! KeyDownEvent && event is! KeyRepeatEvent) {
       return KeyEventResult.ignored;
     }

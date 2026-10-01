@@ -81,10 +81,23 @@ void main() {
     expect(list.items.map((i) => i.text), ['first', 'second']);
   });
 
-  test('a two-space indent nests one level, and no further', () {
-    final blocks = splitMarkdownBlocks('- top\n  - nested\n- top again');
+  test('a two-space indent nests one level per step, to three levels', () {
+    final blocks = splitMarkdownBlocks(
+      '- top\n  - nested\n    - deeper\n- top again',
+    );
     final list = blocks.single as ListBlock;
-    expect(list.items.map((i) => i.depth), [0, 1, 0]);
+    expect(list.items.map((i) => i.depth), [0, 1, 2, 0]);
+  });
+
+  test('indent beyond the third level stays at the third', () {
+    final list = splitMarkdownBlocks('- a\n     - far').single as ListBlock;
+    expect(list.items.map((i) => i.depth), [0, 2]);
+  });
+
+  test('a bullet nested under a number stays in the same list', () {
+    final blocks = splitMarkdownBlocks('1. a\n  - b\n2. c');
+    final list = blocks.single as ListBlock;
+    expect(list.items.map((i) => i.ordered), [true, false, true]);
   });
 
   test('switching from bullets to numbers starts a new list block', () {

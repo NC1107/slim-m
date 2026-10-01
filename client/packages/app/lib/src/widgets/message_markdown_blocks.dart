@@ -31,12 +31,18 @@ class QuoteBlock extends MarkdownBlock {
   final String text;
 }
 
-/// One list item. [depth] is 0 or 1: nesting goes one level by a two-space
-/// indent, nothing deeper.
+/// How many list levels render: depth 0, 1 and 2. The composer's Tab stops at
+/// the same depth, so what it lets you type is what a message shows.
+const int kMaxListDepth = 3;
+
+/// One list item. [depth] runs 0 to [kMaxListDepth] - 1, two spaces of indent
+/// per level. [ordered] is the item's own marker kind, since a bullet can nest
+/// under a number (and the reverse) without ending the list it sits in.
 class ListItem {
-  const ListItem(this.depth, this.text);
+  const ListItem(this.depth, this.text, {this.ordered = false});
   final int depth;
   final String text;
+  final bool ordered;
 }
 
 class ListBlock extends MarkdownBlock {
@@ -56,8 +62,10 @@ final RegExp _heading = RegExp(r'^(#{1,3})[ \t]+(.*)$');
 /// (`forwarded_message_card.dart`) and no longer produce these, but ordinary
 /// hand-typed nested quotes still do.
 final RegExp _quote = RegExp(r'^(?:>[ \t]?)+(.*)$');
-final RegExp _bullet = RegExp(r'^( {2})?[-*][ \t]+(.*)$');
-final RegExp _ordered = RegExp(r'^( {2})?\d+\.[ \t]+(.*)$');
+final RegExp _bullet = RegExp(r'^( {0,5})[-*][ \t]+(.*)$');
+final RegExp _ordered = RegExp(r'^( {0,5})\d+\.[ \t]+(.*)$');
+
+int _depthOf(String indent) => (indent.length ~/ 2).clamp(0, kMaxListDepth - 1);
 
 /// Splits [text] into the block elements above.
 ///
@@ -120,9 +128,13 @@ List<MarkdownBlock> splitMarkdownBlocks(String text) {
     if (item != null) {
       flushParagraph();
       final isOrdered = ordered != null;
-      if (listItems.isNotEmpty && listOrdered != isOrdered) flushList();
-      listOrdered = isOrdered;
-      listItems.add(ListItem(item.group(1) != null ? 1 : 0, item.group(2)!));
+      final depth = _depthOf(item.group(1)!);
+      // Only a change of marker at the top level starts a new list; a nested one belongs to its parent.
+      if (listItems.isNotEmpty && depth == 0 && listOrdered != isOrdered) {
+        flushList();
+      }
+      if (listItems.isEmpty) listOrdered = isOrdered;
+      listItems.add(ListItem(depth, item.group(2)!, ordered: isOrdered));
       continue;
     }
     flushList();
@@ -154,26 +166,19 @@ class MarkdownQuote extends StatelessWidget {
   }
 }
 
-/// One rendered list, bullet or ordered, with up to one level of nested
-/// indent. [children] is already-built inline text per item, matching
-/// [items] one for one; this widget only lays markers and indentation
-/// around what it is handed.
+/// One rendered list, nested up to [kMaxListDepth] levels. [children] is
+/// already-built inline text per item, matching [items] one for one; this
+/// widget only lays markers and indentation around what it is handed.
 class MarkdownList extends StatelessWidget {
-  const MarkdownList({
-    super.key,
-    required this.ordered,
-    required this.items,
-    required this.children,
-  });
+  const MarkdownList({super.key, required this.items, required this.children});
 
-  final bool ordered;
   final List<ListItem> items;
   final List<Widget> children;
 
   @override
   Widget build(BuildContext context) {
     final tokens = Theme.of(context).extension<AppTokens>()!;
-    final markers = _markersFor(ordered, items);
+    final markers = _markersFor(items);
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -181,7 +186,7 @@ class MarkdownList extends StatelessWidget {
         for (var i = 0; i < items.length; i++)
           Padding(
             padding: EdgeInsets.only(
-              left: items[i].depth == 0 ? 0 : AppSpacing.s16,
+              left: items[i].depth * AppSpacing.s16,
               bottom: i == items.length - 1 ? 0 : AppSpacing.s4,
             ),
             child: Row(
@@ -203,21 +208,17 @@ class MarkdownList extends StatelessWidget {
   }
 }
 
-/// One marker per item: a bullet glyph, or a number that restarts at each
-/// depth-0 item, the way a nested sub-list normally counts.
-List<String> _markersFor(bool ordered, List<ListItem> items) {
-  final markers = <String>[];
-  var topCount = 0;
-  var nestedCount = 0;
-  for (final item in items) {
-    if (item.depth == 0) {
-      topCount++;
-      nestedCount = 0;
-      markers.add(ordered ? '$topCount.' : '•');
-    } else {
-      nestedCount++;
-      markers.add(ordered ? '$nestedCount.' : '–');
-    }
-  }
-  return markers;
+/// One marker per item: a bullet glyph per depth, or a number that restarts
+/// whenever a shallower item intervenes, the way a nested sub-list counts.
+List<String> _markersFor(List<ListItem> items) {
+  const bullets = ['•', '–', '◦'];
+  final counts = List.filled(kMaxListDepth, 0);
+  return [
+    for (final item in items)
+      () {
+        counts.fillRange(item.depth + 1, kMaxListDepth, 0);
+        counts[item.depth]++;
+        return item.ordered ? '${counts[item.depth]}.' : bullets[item.depth];
+      }(),
+  ];
 }
