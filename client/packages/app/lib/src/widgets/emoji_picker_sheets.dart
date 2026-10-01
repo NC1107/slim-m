@@ -189,7 +189,7 @@ class _SheetMessage extends StatelessWidget {
     return Padding(
       padding: const EdgeInsets.fromLTRB(
         AppSpacing.s16,
-        AppSpacing.s8,
+        0,
         AppSpacing.s16,
         AppSpacing.s24,
       ),

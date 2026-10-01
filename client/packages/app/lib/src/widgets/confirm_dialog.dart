@@ -62,7 +62,12 @@ class _ConfirmDialog extends StatelessWidget {
   Widget build(BuildContext context) {
     final tokens = Theme.of(context).extension<AppTokens>()!;
     return Padding(
-      padding: const EdgeInsets.all(AppSpacing.s16),
+      padding: const EdgeInsets.fromLTRB(
+        AppSpacing.s16,
+        0,
+        AppSpacing.s16,
+        AppSpacing.s16,
+      ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,

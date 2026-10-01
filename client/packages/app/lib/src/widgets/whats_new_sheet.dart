@@ -63,7 +63,12 @@ class _WhatsNewSheet extends StatelessWidget {
       key: whatsNewBodyBoxKey,
       constraints: BoxConstraints(maxHeight: _bodyCeiling(context)),
       child: Padding(
-        padding: const EdgeInsets.all(AppSpacing.s16),
+        padding: const EdgeInsets.fromLTRB(
+          AppSpacing.s16,
+          0,
+          AppSpacing.s16,
+          AppSpacing.s16,
+        ),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,

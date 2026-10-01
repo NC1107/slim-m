@@ -32,6 +32,13 @@ import '../../app_tokens.dart';
 /// modal that spans a wide screen stops reading as a modal at all.
 const double kSheetMaxWidth = 460;
 
+/// The gap between a dialog's top edge and its content.
+///
+/// A bottom sheet gets its top gap from the drag handle, so its content pads
+/// the sides and bottom only. The dialog has no handle, so it supplies this
+/// instead, once, and content never pads its own top edge.
+const double kSheetDialogTopInset = AppSpacing.s16;
+
 /// Shows [builder] as a bottom sheet on a phone and a dialog on a desktop.
 ///
 /// [maxWidth] widens the dialog for content that genuinely needs it, a grid of
@@ -126,11 +133,10 @@ class _SheetDialog extends StatelessWidget {
         explicitChildNodes: true,
         child: ConstrainedBox(
           constraints: BoxConstraints(maxWidth: maxWidth, maxHeight: ceiling),
-          child: scrolls
-              ? child
-              : SingleChildScrollView(
-                  child: child,
-                ),
+          child: Padding(
+            padding: EdgeInsets.only(top: bare ? 0 : kSheetDialogTopInset),
+            child: scrolls ? child : SingleChildScrollView(child: child),
+          ),
         ),
       ),
     );

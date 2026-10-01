@@ -158,7 +158,7 @@ class _CreateChannelSheetState extends ConsumerState<_CreateChannelSheet> {
     return Padding(
       padding: EdgeInsets.fromLTRB(
         AppSpacing.s16,
-        AppSpacing.s16,
+        0,
         AppSpacing.s16,
         MediaQuery.viewInsetsOf(context).bottom + AppSpacing.s16,
       ),
