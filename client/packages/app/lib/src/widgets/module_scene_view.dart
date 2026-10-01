@@ -214,7 +214,7 @@ class _ModuleSceneViewState extends State<ModuleSceneView> {
     } on api.RateLimitedException catch (e) {
       if (!mounted) return;
       _backOff(e.retryAfter);
-      if (_playing) {
+      if (_playing && !_pacing.exhausted) {
         setState(() => _busy = false);
         return;
       }
