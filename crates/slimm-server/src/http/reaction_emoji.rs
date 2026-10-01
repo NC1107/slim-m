@@ -6,9 +6,13 @@
 //! chip resolves it at draw time, so a deleted emoji keeps its reactions), or a
 //! custom emoji's id. Anything else is a sentence under somebody's message.
 
-use crate::emoji::MAX_NAME_LEN;
+/// Longer than a custom emoji's name may be: the standard set runs to 67.
+const MAX_SHORTCODE_LEN: usize = 80;
 
 /// True when `text` is a single emoji, a `:shortcode:` or an emoji id.
+///
+/// A shortcode may hold `+` and `-` as well as what a custom emoji name may:
+/// bots send the standard ones, and `:+1:`, `:t-rex:` and `:piñata:` are among them.
 pub(super) fn is_reaction(text: &str) -> bool {
     is_shortcode(text) || uuid::Uuid::parse_str(text).is_ok() || is_single_emoji(text)
 }
@@ -21,8 +25,10 @@ fn is_shortcode(text: &str) -> bool {
         return false;
     };
     !name.is_empty()
-        && name.len() <= MAX_NAME_LEN
-        && name.chars().all(|c| c.is_ascii_alphanumeric() || c == '_')
+        && name.len() <= MAX_SHORTCODE_LEN
+        && name
+            .chars()
+            .all(|c| c.is_alphanumeric() || matches!(c, '_' | '+' | '-'))
 }
 
 fn is_single_emoji(text: &str) -> bool {
@@ -131,6 +137,9 @@ mod tests {
             "\u{1F3F4}\u{E0067}\u{E0062}\u{E0073}\u{E0063}\u{E0074}\u{E007F}",
             "#\u{FE0F}\u{20E3}",
             ":party_parrot:",
+            ":+1:",
+            ":-1:",
+            ":t-rex:",
             "0190f1c2-7a3b-7c3e-8f00-1234567890ab",
         ] {
             assert!(is_reaction(ok), "{ok:?}");
@@ -155,5 +164,39 @@ mod tests {
         ] {
             assert!(!is_reaction(bad), "{bad:?}");
         }
+    }
+
+    /// Every emoji and shortcode the client's picker can send. Refusing one
+    /// here would mean a member cannot react with something the app offers.
+    #[test]
+    fn everything_the_picker_offers_is_accepted() {
+        let fixture: serde_json::Value =
+            serde_json::from_str(include_str!("../../tests/fixtures/picker_emoji.json")).unwrap();
+        let strings = |key: &str| -> Vec<String> {
+            fixture[key]
+                .as_array()
+                .unwrap()
+                .iter()
+                .map(|v| v.as_str().unwrap().to_owned())
+                .collect()
+        };
+        let chars = strings("chars");
+        assert!(
+            chars.len() > 3000,
+            "the fixture holds {} emoji",
+            chars.len()
+        );
+        let refused: Vec<_> = chars.iter().filter(|c| !is_reaction(c)).collect();
+        assert!(refused.is_empty(), "{} refused: {refused:?}", refused.len());
+
+        let refused: Vec<_> = strings("names")
+            .into_iter()
+            .filter(|name| !is_reaction(&format!(":{name}:")))
+            .collect();
+        assert!(
+            refused.is_empty(),
+            "{} shortcodes refused: {refused:?}",
+            refused.len()
+        );
     }
 }
