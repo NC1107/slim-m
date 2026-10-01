@@ -28,10 +28,12 @@ class NewDeviceBannerHost extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final alert = ref.watch(newDeviceAlertProvider);
     if (alert == null) return child;
+    final tokens = Theme.of(context).extension<AppTokens>()!;
     return Column(
       children: [
         Material(
-          type: MaterialType.transparency,
+          // Solid, so the callout's translucent warn fill never lands on the bare window.
+          color: tokens.surfaceBase,
           child: SafeArea(
             bottom: false,
             child: NewDeviceSignInBanner(alert: alert),

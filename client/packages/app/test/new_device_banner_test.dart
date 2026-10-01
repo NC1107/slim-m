@@ -167,6 +167,23 @@ void main() {
     );
   });
 
+  testWidgets('in dark the banner sits on the theme surface, not on the bare '
+      'window behind it', (tester) async {
+    final harness = await _pump(tester, brightness: Brightness.dark);
+    await _emit(tester, harness);
+
+    final backdrop = tester
+        .widgetList<Material>(
+          find.ancestor(
+            of: find.byType(NewDeviceSignInBanner),
+            matching: find.byType(Material),
+          ),
+        )
+        .first;
+
+    expect(backdrop.color, AppTokens.dark.surfaceBase);
+  });
+
   const viewports = {'phone': Size(390, 844), 'desktop': Size(1400, 880)};
   for (final viewport in viewports.entries) {
     for (final brightness in Brightness.values) {
