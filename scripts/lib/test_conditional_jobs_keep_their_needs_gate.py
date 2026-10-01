@@ -31,6 +31,7 @@ GATED_PAIRS = [
     ("release.yml", "server-release-assets", "server-binaries"),
     ("release.yml", "copr", "linux-client"),
     ("main-builds.yml", "copr", "linux-client"),
+    ("copr-catch-up.yml", "copr", "tarball"),
 ]
 
 

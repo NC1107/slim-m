@@ -653,7 +653,8 @@ Both halves of the fix are in `release.yml`: the condition names `needs.server-i
 `server-release-assets` had the same shape against `server-binaries` and carries the same fix, where the consequence was a GitHub Release with only one arch's binary attached.
 `copr` was the third instance of it, found by an audit on 2026-09-21, in both `release.yml` and `main-builds.yml`: it consumes `linux-client`'s tarball with an `if:` that named only `verify-client-ci` and the `changes` outputs.
 That one degraded quietly rather than publishing something wrong, because both COPR submission scripts run `set -uo pipefail` without `-e`, so a missing tarball became a `::warning::` and an exit 0 - a broken Linux client build showing green in a job nobody was watching.
-All four pairs are pinned by name now in `scripts/lib/test_conditional_jobs_keep_their_needs_gate.py`, which also records why a blanket "every need appears in the `if:`" rule was rejected: nine jobs legitimately omit `release-please`, because the gate reaches them through `verify-server-ci` / `verify-client-ci`.
+`copr-catch-up.yml`'s `copr` job was a fourth, consuming the `tarball` job's artifact behind an `if:` that named only the `check` output; it carries the same fix.
+All five pairs are pinned by name now in `scripts/lib/test_conditional_jobs_keep_their_needs_gate.py`, which also records why a blanket "every need appears in the `if:`" rule was rejected: nine jobs legitimately omit `release-please`, because the gate reaches them through `verify-server-ci` / `verify-client-ci`.
 
 `latest` is the rolling tag deployments track for auto-updates, since Watchtower polls a mutable tag.
 The version and sha tags stay alongside it, for pinning and for tracing an image back to its commit.

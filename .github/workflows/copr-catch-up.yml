@@ -65,7 +65,7 @@ jobs:
 
   copr:
     needs: [check, tarball]
-    if: needs.check.outputs.behind == 'true'
+    if: needs.check.outputs.behind == 'true' && needs.tarball.result == 'success'
     uses: ./.github/workflows/copr-publish.yml
     # Named rather than `inherit`, for the reason main-builds.yml's copr job gives.
     secrets:
