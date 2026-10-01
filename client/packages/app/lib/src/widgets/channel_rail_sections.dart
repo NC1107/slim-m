@@ -22,6 +22,7 @@ import '../routing/routes.dart';
 import 'category_header_menu.dart';
 import 'channel_grouping.dart';
 import 'channel_kind_icon.dart';
+import 'channel_move.dart';
 import 'channel_rail_channel_rows.dart';
 import 'channel_rail_reorder.dart';
 import 'channel_rail_section_label.dart';
@@ -206,6 +207,25 @@ class _ChannelCategorySectionsState
             canManage: canManage,
             reorderable: longPressDrags,
             dragHandleIndex: dragHandleIndex,
+            move: ChannelMoveActions(
+              canMove: (delta) =>
+                  groupsAfterStep(
+                    sections,
+                    channel.id,
+                    delta,
+                    collapsed: collapsed,
+                  ) !=
+                  null,
+              move: (delta) {
+                final groups = groupsAfterStep(
+                  sections,
+                  channel.id,
+                  delta,
+                  collapsed: collapsed,
+                );
+                if (groups != null) onReorder(groups);
+              },
+            ),
             channel: channel,
             row: (kebab) => channel.kind == 'voice'
                 ? VoiceChannelRow(

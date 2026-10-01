@@ -4,82 +4,39 @@
 /// category - the property backlog item #34 asked for. See
 /// docs/decisions/0006-channel-categories.md.
 ///
-/// A plain [Column] when nobody may reorder, so an ordinary member's rail is
-/// exactly what it always was. [ReorderableListView] takes over only for a
-/// manager, with every category's header and channel rows as one flat item
-/// list: that is what lets a drag cross a section boundary at all, since
-/// Flutter's [ReorderableListView] only ever reorders within itself, never
-/// between two separate instances.
+/// A plain [Column] when nobody may reorder, or when fewer than two channels
+/// exist (a lone header in a reorder list hit-tests a tap to the wrong render
+/// object, and there is nothing to reorder anyway). Otherwise every
+/// category's header and channel rows are one flat item list, which is what
+/// lets a drag cross a section boundary at all.
 ///
-/// Fewer than two channels anywhere in the rail also falls back to the plain
-/// column: there is nothing a drag could ever reorder, and it sidesteps a
-/// real layout defect found directly against this widget - a
-/// [ReorderableListView] holding exactly one item (a lone header, with no
-/// channel wrapped in a drag listener at all) reports the right semantics
-/// but hit-tests a tap on it to the wrong render object, gone the moment a
-/// second item is present.
+/// The list is a bare [SliverReorderableList] in a [ShrinkWrappingViewport],
+/// not a `ReorderableListView`: that owns an inner scrollable, so a drag's
+/// edge auto-scroll would act on a view that never moves and a channel could
+/// not be carried past the fold. Without one, the rail's own scroll view is
+/// the scrollable the drag scrolls.
 ///
-/// **A held drag's own settle animation does not honour `AppMotion` or the
-/// real OS reduce-motion toggle, and this is a closed, verified Flutter
-/// limitation rather than an open item.** Read against the pinned SDK's own
-/// source (`packages/flutter/lib/src/widgets/reorderable_list.dart` and
-/// `.../material/reorderable_list.dart`, Flutter 3.44.8) before touching this
-/// again: neither `ReorderableListView` nor `SliverReorderableList` exposes
-/// an `AnimationStyle` parameter at all, unlike roughly a dozen sibling
-/// Material widgets in the same SDK (`Chip`, `Dialog`, `BottomSheet`,
-/// `ExpansionTile`, `PopupMenuButton`, `Scaffold`, among others). The 250ms
-/// ease-in-out an item takes to slide out of a dragged item's way
-/// (`_ReorderableItemState.updateForGap`) is called with `animate: true` from
-/// exactly one private, hardcoded call site with no callback or theme
-/// extension reaching it, and the drag proxy's own 250ms elevation fade
-/// (`_DragInfo.startDrag`) is the same shape. Neither reads
-/// `MediaQuery.disableAnimationsOf` or `accessibleNavigationOf` anywhere, so
-/// the "self-reduces under real OS-level reduce motion" claim an earlier pass
-/// made about this widget does not hold under the source - what actually is
-/// accessibility-aware is a different path entirely: a screen reader in use
-/// (`accessibleNavigation`) makes Flutter attach custom semantic actions
-/// (move to start/before/after/end) that call `onReorderItem` directly with
-/// no drag and no animation at all, which is a real and correct fallback but
-/// is gated on a screen reader being active, not on the reduce-motion toggle
-/// a sighted low-motion user would set. A global `package:flutter/scheduler`
-/// `timeDilation` override was considered and rejected: it would reach the
-/// same result for this one widget only by scaling every animation in the
-/// whole app, including the busy-spinner exception `app_motion.dart`'s own
-/// doc comment already carves out on purpose. Closing this for real needs a
-/// vendored or forked reorder implementation, which this pass does not do.
+/// At pointer widths the whole row is the handle and a drag starts on the
+/// first movement. Below `kCompactWidth` a finger has no second gesture and
+/// every drag on the row is a scroll, so the held press stays the context
+/// menu's and the row shows a [ChannelDragGrip]: a 44px target that lifts only
+/// after a held press (`docs/design/desktop-vs-mobile.md`, "drag to reorder").
+/// Move up and Move down in the row menu are the path without a gesture, and
+/// a screen reader gets Flutter's own move actions on every row.
 ///
-/// **The drag could never actually start, on any platform, until the
-/// `reorderable` flag on [rowBuilder] existed.** `ManagedChannelRow` wraps
-/// every channel row in `ContextMenuRegion`, whose own long press
-/// (`Open channel`/`Manage channel...`) and `ReorderableDelayedDragStartListener`'s
-/// own held-press drag start are both a bare hold with no movement, timed
-/// against the same `kLongPressTimeout` window - two recognizers racing the
-/// identical gesture, and the context menu won every time this was driven
-/// through a real `startGesture`/`moveBy` sequence, on both a phone-width
-/// drawer and a docked desktop rail. Reported as "can't reorganize channels
-/// on mobile" because a phone has no fallback (no right-click); it was
-/// exactly as broken at desktop width, just harder to notice with a
-/// right-click sitting right there as an alternate route to the same menu.
-/// `rowBuilder`'s new second argument is what a caller uses to withhold the
-/// context menu's own long press exactly where, and only where, a row is
-/// actually wrapped in the drag listener that would otherwise lose to it -
-/// see `ManagedChannelRow`'s own `enableLongPress` wiring.
-///
-/// That withholding is correct at pointer widths and wrong at phone width,
-/// which is how the context menu became unreachable on mobile (reported
-/// 2026-08-13, "unable to hold press to pull up the menu of context options
-/// in this view", against the slide-over rail). A pointer reaches the menu by
-/// right-click, so a held press there can belong to the drag; a finger has no
-/// second gesture, so below `kCompactWidth` the held press stays the menu's
-/// and the row supplies an explicit drag handle instead - its own kebab,
-/// which touch already renders unconditionally, so this costs no new glyph.
+/// The settle animation of a held drag does not honour `AppMotion` or the OS
+/// reduce-motion toggle: [SliverReorderableList] takes no animation style and
+/// hardcodes its 250ms slide (Flutter 3.44, `reorderable_list.dart`).
+/// Closing that needs a vendored reorder implementation.
 library;
 
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart' show ViewportOffset;
 import 'package:slimm_api/api.dart' show ChannelOrderGroup;
 import 'package:slimm_data/data.dart';
 import 'package:slimm_design_system/design_system.dart';
 
+import 'channel_drag_grip.dart' show ChannelDragGrip;
 import 'rail_drag_lift.dart';
 
 /// One category's ordered channels, `null` for the implicit uncategorised
@@ -109,19 +66,14 @@ class ChannelRailItem extends RailItem {
 /// Renders [sections] as [rowBuilder]-built rows under [headerBuilder]-built
 /// headers, reorderable across every section by [canManage].
 ///
-/// No drag handle glyph, unlike the library's desktop default: the row
-/// already carries a manage kebab in its trailing slot, and a second glyph
-/// beside it would be one control too many. Instead the whole row is the
-/// handle. On touch a held press starts the move (the row's own listener,
-/// via `dragIndex`), because an immediate one would fight the list's scroll.
 /// With a mouse the drag starts immediately ([ReorderableDragStartListener]):
 /// there is no scroll gesture to fight, and a mouse press held still for half
-/// a second before moving is not a gesture anyone makes - the earlier
-/// [ReorderableDelayedDragStartListener] here read to the owner as "unable to
-/// drag channels" at all. A plain click still selects, since the immediate
-/// recogniser only claims the pointer once it has actually moved. Only
-/// channel rows carry a listener, so a header can never itself be picked up,
-/// however its slot may still shift as channels are dropped around it.
+/// a second before moving is not a gesture anyone makes - the earlier delayed
+/// listener here read to the owner as "unable to drag channels" at all. A
+/// plain click still selects, since the immediate recogniser only claims the
+/// pointer once it has actually moved. Only channel rows carry a listener, so
+/// a header can never itself be picked up, however its slot may still shift
+/// as channels are dropped around it.
 class ReorderableChannelRows extends StatelessWidget {
   const ReorderableChannelRows({
     super.key,
@@ -152,13 +104,13 @@ class ReorderableChannelRows extends StatelessWidget {
 
   /// Builds one channel's row, told whether *this render* actually wraps it
   /// in a drag listener - false in the plain-[Column] branch, true in the
-  /// [ReorderableListView] one - so a caller can withhold a competing
+  /// reorder-list one - so a caller can withhold a competing
   /// long-press gesture (a context menu, say) only where one would actually
   /// compete for the arena.
   /// [longPressDrags] says a held press on this row starts a move, so the
   /// row must withhold its own long-press context menu. [dragHandleIndex] is
   /// the opposite arrangement: non-null means the row keeps its long press
-  /// and supplies its own drag handle at that index instead.
+  /// and shows a [ChannelDragGrip] at that index instead.
   final Widget Function(
     Channel channel,
     bool longPressDrags,
@@ -197,47 +149,66 @@ class ReorderableChannelRows extends StatelessWidget {
       );
     }
     final touch = AppTouchTargets.of(context);
-    return ReorderableListView(
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
-      buildDefaultDragHandles: false,
-      proxyDecorator: (child, _, animation) =>
-          RailDragLift(animation: animation, child: child),
-      onReorderStart: (_) => onDragStart?.call(),
-      onReorderEnd: (_) => onDragEnd?.call(),
-      onReorderItem: (oldIndex, newIndex) {
-        final moved = items[oldIndex];
-        if (moved is! ChannelRailItem) return;
-        final rearranged = [...items]
-          ..removeAt(oldIndex)
-          ..insert(newIndex, moved);
-        onReorder(groupsFromRailItems(rearranged, sections));
-      },
-      children: [
-        for (var i = 0; i < items.length; i++)
-          switch (items[i]) {
-            HeaderRailItem(:final category) => KeyedSubtree(
-              key: ValueKey('header-${category?.id}'),
-              child: headerBuilder(category),
-            ),
-            ChannelRailItem(:final channel) =>
-              touch
-                  ? KeyedSubtree(
-                      key: ValueKey(channel.id),
-                      child: rowBuilder(channel, false, i),
-                    )
-                  : ReorderableDragStartListener(
-                      key: ValueKey(channel.id),
-                      index: i,
-                      child: RailGrabFeedback(
-                        child: rowBuilder(channel, true, null),
-                      ),
-                    ),
+    // Not a ReorderableListView: that owns an inner Scrollable, so a drag's
+    // edge auto-scroll would target a view that never moves. A bare viewport
+    // has no Scrollable, so the rail's own scroll view is the one that scrolls.
+    return ShrinkWrappingViewport(
+      offset: _fixedOffset,
+      axisDirection: AxisDirection.down,
+      crossAxisDirection: Viewport.getDefaultCrossAxisDirection(
+        context,
+        AxisDirection.down,
+      ),
+      slivers: [
+        SliverReorderableList(
+          itemCount: items.length,
+          proxyDecorator: (child, _, animation) =>
+              RailDragLift(animation: animation, child: child),
+          onReorderStart: (_) {
+            AppHaptics.impact();
+            onDragStart?.call();
           },
+          onReorderEnd: (_) {
+            AppHaptics.selection();
+            onDragEnd?.call();
+          },
+          onReorderItem: (oldIndex, newIndex) =>
+              _reorder(items, oldIndex, newIndex),
+          itemBuilder: (context, index) => _item(items, index, touch),
+        ),
       ],
     );
   }
+
+  void _reorder(List<RailItem> items, int oldIndex, int newIndex) {
+    final moved = items[oldIndex];
+    if (moved is! ChannelRailItem) return;
+    final rearranged = [...items]
+      ..removeAt(oldIndex)
+      ..insert(newIndex, moved);
+    onReorder(groupsFromRailItems(rearranged, sections));
+  }
+
+  Widget _item(List<RailItem> items, int i, bool touch) => switch (items[i]) {
+    HeaderRailItem(:final category) => KeyedSubtree(
+      key: ValueKey('header-${category?.id}'),
+      child: headerBuilder(category),
+    ),
+    ChannelRailItem(:final channel) =>
+      touch
+          ? KeyedSubtree(
+              key: ValueKey(channel.id),
+              child: rowBuilder(channel, false, i),
+            )
+          : ReorderableDragStartListener(
+              key: ValueKey(channel.id),
+              index: i,
+              child: RailGrabFeedback(child: rowBuilder(channel, true, null)),
+            ),
+  };
 }
+
+final _fixedOffset = ViewportOffset.zero();
 
 /// Walks [items] in order, attributing every channel to whichever header
 /// last preceded it, and answers one [ChannelOrderGroup] per category that

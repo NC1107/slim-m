@@ -80,13 +80,7 @@ class ChannelRail extends ConsumerStatefulWidget {
   /// Set alongside [scrollController]: [SelectionMarkerLayerState.selectedRect]
   /// is the selected row's position in the scroll view's own content
   /// coordinates, already computed for the marker bar - reused here rather
-  /// than a second row-geometry mechanism. `Scrollable.ensureVisible` was
-  /// tried first and does not reach far enough: the managed rail nests a
-  /// shrink-wrapped, never-scrollable `ReorderableListView` around every
-  /// row, and that is the nearest `Scrollable` a row's own context finds -
-  /// asking it to reveal itself within a viewport already exactly its own
-  /// content size is a no-op, so the outer scroll view this rail actually
-  /// needs to move never hears about it.
+  /// than a second row-geometry mechanism.
   final GlobalKey<SelectionMarkerLayerState>? markerLayerKey;
 
   /// The design's measured width at expanded layouts.

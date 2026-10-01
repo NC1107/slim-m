@@ -32,6 +32,7 @@ import '../providers/notification_schedule_controller.dart';
 import '../providers/providers.dart';
 import '../routing/routes.dart';
 import '../screens/channel_settings_screen.dart';
+import 'channel_move.dart';
 import 'mark_unread_action.dart';
 import 'channel_rail.dart' show selectedChannelId;
 
@@ -50,8 +51,9 @@ List<Widget> channelRowMenuItems(
   BuildContext context,
   VoidCallback close,
   Channel channel,
-  bool canManage,
-) {
+  bool canManage, {
+  ChannelMoveActions? move,
+}) {
   final container = ProviderScope.containerOf(context, listen: false);
   final current = container
       .read(channelNotificationOverridesProvider)
@@ -134,6 +136,22 @@ List<Widget> channelRowMenuItems(
       selected: allowedOffHours,
       onTap: toggleOffHours,
     ),
+    if (canManage && move != null) ...[
+      const AppMenuDivider(),
+      for (final (label, icon, delta) in [
+        ('Move up', AppIcons.moveUp, -1),
+        ('Move down', AppIcons.moveDown, 1),
+      ])
+        if (move.canMove(delta))
+          AppMenuItem(
+            label: label,
+            leading: icon,
+            onTap: () {
+              close();
+              move.move(delta);
+            },
+          ),
+    ],
     if (canManage || canManageRoles) ...[
       const AppMenuDivider(),
       AppMenuItem(

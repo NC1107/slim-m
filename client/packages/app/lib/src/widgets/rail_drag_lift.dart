@@ -32,7 +32,8 @@ class _RailGrabFeedbackState extends State<RailGrabFeedback> {
   bool _held = false;
 
   void _set(bool held) {
-    if (_held != held) setState(() => _held = held);
+    // A lifted row's slot is rebuilt as a gap, so this can be told after it is gone.
+    if (mounted && _held != held) setState(() => _held = held);
   }
 
   @override
@@ -78,6 +79,7 @@ class RailDragLift extends StatelessWidget {
             decoration: BoxDecoration(
               color: tokens.surfaceRaised,
               borderRadius: BorderRadius.circular(AppRadii.control),
+              border: Border.all(color: tokens.accent),
               boxShadow: AppShadows.menu,
             ),
             child: child,
