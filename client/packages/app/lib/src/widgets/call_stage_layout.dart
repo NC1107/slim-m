@@ -105,7 +105,10 @@ class CallStageLayout extends StatelessWidget {
         children: [
           _CallHeader(voice: voice),
           if (!isDm && voice.channelId != null)
-            WatchSessionBar(channelId: voice.channelId!),
+            WatchSessionGate(
+              channelId: voice.channelId!,
+              participantIds: [for (final p in voice.participants) p.identity],
+            ),
           // Withheld once the mirrored stage tile already says the same thing via its own caption.
           if (voice.screenSharing && sharer?.isLocal != true)
             const Padding(

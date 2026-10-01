@@ -13,6 +13,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:slimm_design_system/design_system.dart';
 
+import '../providers/member_presence.dart' show membersProvider;
 import '../providers/watch_room.dart';
 
 /// `1:23:45` past an hour, `3:07` before it.
@@ -23,6 +24,33 @@ String formatWatchTime(Duration d) {
   final s = total % 60;
   String two(int n) => n.toString().padLeft(2, '0');
   return h > 0 ? '$h:${two(m)}:${two(s)}' : '$m:${two(s)}';
+}
+
+/// Mounts [WatchSessionBar] only while a bot is on the call.
+///
+/// No session is the normal case and the server answers it with a 404, which
+/// the browser logs as an error on every call join; a session can only exist
+/// while its bot is a participant, so there is nothing to ask before then.
+class WatchSessionGate extends ConsumerWidget {
+  const WatchSessionGate({
+    super.key,
+    required this.channelId,
+    required this.participantIds,
+  });
+
+  final String channelId;
+  final Iterable<String> participantIds;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final present = participantIds.toSet();
+    final botOnCall = (ref.watch(membersProvider).valueOrNull ?? const []).any(
+      (m) => m.isBot && present.contains(m.id),
+    );
+    return botOnCall
+        ? WatchSessionBar(channelId: channelId)
+        : const SizedBox.shrink();
+  }
 }
 
 class WatchSessionBar extends ConsumerStatefulWidget {
