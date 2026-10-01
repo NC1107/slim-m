@@ -37,6 +37,11 @@ pub async fn new_store_with_pool() -> (Store, sqlx::SqlitePool, crate::support::
 }
 
 pub fn app_with_hub(store: Store, hub: Hub) -> Router {
+    app_with_media(store, hub, slimm_server::media::Media::for_tests())
+}
+
+/// The caller keeps a clone of `media` to look at the files on disk.
+pub fn app_with_media(store: Store, hub: Hub, media: slimm_server::media::Media) -> Router {
     http::router(AppState {
         store,
         auth: Auth::new(2).unwrap(),
@@ -44,7 +49,7 @@ pub fn app_with_hub(store: Store, hub: Hub) -> Router {
         limiter: RateLimiter::new(),
         push: PushSender::disabled(),
         voice: slimm_server::voice::VoiceService::disabled(),
-        media: slimm_server::media::Media::for_tests(),
+        media,
         gifs: slimm_server::http::gifs::GifSearch::disabled(),
         link_previews: slimm_server::http::link_preview::LinkPreviews::disabled(),
         dock: slimm_server::http::dock::Dock::disabled(),

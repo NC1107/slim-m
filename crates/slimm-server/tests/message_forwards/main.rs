@@ -12,6 +12,7 @@
 mod chains;
 mod core;
 mod deletion;
+mod deletion_files;
 mod fixtures;
 
 #[path = "../support/mod.rs"]
