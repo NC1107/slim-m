@@ -9,10 +9,18 @@ import 'package:flutter/material.dart';
 import 'package:slimm_design_system/design_system.dart';
 
 class MenuWithMore extends StatefulWidget {
-  const MenuWithMore({super.key, required this.primary, required this.more});
+  const MenuWithMore({
+    super.key,
+    required this.primary,
+    required this.more,
+    this.trailing = const [],
+  });
 
   final List<Widget> primary;
   final List<Widget> more;
+
+  /// Rows owned by someone else (a bot's own), shown on the first step after "More".
+  final List<Widget> trailing;
 
   @override
   State<MenuWithMore> createState() => _MenuWithMoreState();
@@ -42,6 +50,7 @@ class _MenuWithMoreState extends State<MenuWithMore> {
                 submenu: true,
                 onTap: () => setState(() => _showingMore = true),
               ),
+            ...widget.trailing,
           ];
     return Column(
       mainAxisSize: MainAxisSize.min,
