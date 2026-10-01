@@ -129,7 +129,10 @@ class _NotificationScheduleSectionState
       initialTime: start,
     );
     if (pickedStart == null || !mounted) return;
-    final pickedEnd = await showAppTimePicker(context: context, initialTime: end);
+    final pickedEnd = await showAppTimePicker(
+      context: context,
+      initialTime: end,
+    );
     if (pickedEnd == null) return;
     await _save(
       weekdays: current.days.map((d) => d.weekday).toSet(),

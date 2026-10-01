@@ -12,6 +12,7 @@ import 'package:flutter/material.dart';
 import 'package:slimm_design_system/design_system.dart';
 
 import '../whats_new/whats_new_content.dart';
+import 'release_notes_entry.dart';
 
 /// Marks the sizing box around the sheet's body, so a test can measure it
 /// directly rather than inferring the fix from a screenshot - the same
@@ -45,15 +46,41 @@ Future<void> showWhatsNewSheet(
   return showAppSheet<void>(
     context,
     scrolls: true,
-    builder: (context) =>
-        _WhatsNewSheet(entries: entries.reversed.toList(growable: false)),
+    builder: (context) => _NotesSheet(
+      title: "What's new",
+      buttonLabel: 'Got it',
+      entries: entries.reversed.toList(growable: false),
+      collapsible: false,
+    ),
   );
 }
 
-class _WhatsNewSheet extends StatelessWidget {
-  const _WhatsNewSheet({required this.entries});
+/// Shows every release, newest first, with the latest open and the rest folded.
+Future<void> showReleaseNotesSheet(BuildContext context) {
+  return showAppSheet<void>(
+    context,
+    scrolls: true,
+    builder: (context) => _NotesSheet(
+      title: 'Release notes',
+      buttonLabel: 'Close',
+      entries: whatsNewEntries.reversed.toList(growable: false),
+      collapsible: true,
+    ),
+  );
+}
 
+class _NotesSheet extends StatelessWidget {
+  const _NotesSheet({
+    required this.title,
+    required this.buttonLabel,
+    required this.entries,
+    required this.collapsible,
+  });
+
+  final String title;
+  final String buttonLabel;
   final List<WhatsNewEntry> entries;
+  final bool collapsible;
 
   @override
   Widget build(BuildContext context) {
@@ -82,7 +109,7 @@ class _WhatsNewSheet extends StatelessWidget {
                 ),
                 const SizedBox(width: AppSpacing.s8),
                 Text(
-                  "What's new",
+                  title,
                   style: AppText.heading.copyWith(color: tokens.textPrimary),
                 ),
               ],
@@ -93,15 +120,22 @@ class _WhatsNewSheet extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    for (final entry in entries)
-                      _WhatsNewEntrySection(entry: entry),
+                    for (var i = 0; i < entries.length; i++) ...[
+                      if (i > 0) _EntryDivider(color: tokens.borderSubtle),
+                      collapsible
+                          ? _FoldingEntry(
+                              entry: entries[i],
+                              initiallyOpen: i == 0,
+                            )
+                          : _OpenEntry(entry: entries[i]),
+                    ],
                   ],
                 ),
               ),
             ),
             const SizedBox(height: AppSpacing.s16),
             AppButton(
-              label: 'Got it',
+              label: buttonLabel,
               variant: AppButtonVariant.primary,
               full: true,
               onPressed: () => Navigator.of(context).pop(),
@@ -113,59 +147,86 @@ class _WhatsNewSheet extends StatelessWidget {
   }
 }
 
-class _WhatsNewEntrySection extends StatelessWidget {
-  const _WhatsNewEntrySection({required this.entry});
+class _EntryDivider extends StatelessWidget {
+  const _EntryDivider({required this.color});
+
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) => Padding(
+    padding: const EdgeInsets.symmetric(vertical: AppSpacing.s12),
+    child: Divider(height: 1, thickness: 1, color: color),
+  );
+}
+
+class _OpenEntry extends StatelessWidget {
+  const _OpenEntry({required this.entry});
 
   final WhatsNewEntry entry;
 
   @override
   Widget build(BuildContext context) {
-    final tokens = Theme.of(context).extension<AppTokens>()!;
-    return Padding(
-      padding: const EdgeInsets.only(bottom: AppSpacing.s16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            entry.headline,
-            style: AppText.ui.copyWith(
-              color: tokens.textPrimary,
-              fontWeight: AppWeights.semi,
-            ),
-          ),
-          const SizedBox(height: AppSpacing.s8),
-          for (final point in entry.points)
-            Padding(
-              padding: const EdgeInsets.only(bottom: AppSpacing.s8),
-              child: point.warn
-                  ? AppCallout(
-                      tone: AppCalloutTone.warn,
-                      child: Text(point.body),
-                    )
-                  : _Bullet(text: point.body),
-            ),
-        ],
-      ),
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        ReleaseNotesHeading(entry: entry),
+        const SizedBox(height: AppSpacing.s12),
+        ReleaseNotesPoints(entry: entry),
+      ],
     );
   }
 }
 
-/// A plain highlight, styled the way every other secondary-information line
-/// in this app is: [AppText.body] at [AppTokens.textSecondary].
-class _Bullet extends StatelessWidget {
-  const _Bullet({required this.text});
+/// A version whose points fold away, so the history stays scannable.
+class _FoldingEntry extends StatefulWidget {
+  const _FoldingEntry({required this.entry, required this.initiallyOpen});
 
-  final String text;
+  final WhatsNewEntry entry;
+  final bool initiallyOpen;
+
+  @override
+  State<_FoldingEntry> createState() => _FoldingEntryState();
+}
+
+class _FoldingEntryState extends State<_FoldingEntry> {
+  late bool _open = widget.initiallyOpen;
 
   @override
   Widget build(BuildContext context) {
     final tokens = Theme.of(context).extension<AppTokens>()!;
-    final style = AppText.body.copyWith(color: tokens.textSecondary);
-    return Row(
+    return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text('•  ', style: style),
-        Expanded(child: Text(text, style: style)),
+        Semantics(
+          button: true,
+          expanded: _open,
+          onTap: () => setState(() => _open = !_open),
+          label: 'Version ${widget.entry.version}, ${widget.entry.headline}',
+          child: ExcludeSemantics(
+            child: InkWell(
+              borderRadius: BorderRadius.circular(AppRadii.control),
+              onTap: () => setState(() => _open = !_open),
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(minHeight: AppSizes.rowTouch),
+                child: Row(
+                  children: [
+                    Expanded(child: ReleaseNotesHeading(entry: widget.entry)),
+                    const SizedBox(width: AppSpacing.s8),
+                    Icon(
+                      _open ? AppIcons.chevronUp : AppIcons.chevronDown,
+                      size: AppSizes.icon16,
+                      color: tokens.textSecondary,
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
+        if (_open) ...[
+          const SizedBox(height: AppSpacing.s12),
+          ReleaseNotesPoints(entry: widget.entry),
+        ],
       ],
     );
   }
