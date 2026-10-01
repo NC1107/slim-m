@@ -27,6 +27,7 @@ import 'sign_in_alternatives.dart';
 import 'sign_in_credential_fields.dart';
 import '../widgets/totp_sign_in_prompt.dart';
 import 'sign_in_error.dart';
+import 'sign_in_invite_notice.dart';
 
 /// Sign in or create an account on a chosen server.
 ///
@@ -293,6 +294,13 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
       return;
     }
 
+    if (_creatingAccount && !_targetsOfficial()) {
+      if (displayNameError(_displayName.text) case final tooLong?) {
+        setState(() => _error = (SignInErrorField.displayName, tooLong));
+        return;
+      }
+    }
+
     setState(() {
       _busy = true;
       _error = null;
@@ -426,20 +434,8 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
           // First of the three: the other two are about convenience,
           // this one is about whether you have any recourse here.
           if (_probed case final version?) ServerSafetyNotice(version: version),
-          // Only while creating an account, and not once a code is in hand.
-          if (_creatingAccount &&
-              _probed?.inviteRequired == true &&
-              ref.watch(pendingInviteProvider) == null)
-            const ServerNotice(
-              icon: AppIcons.invite,
-              message:
-                  'Joining needs an invite code once a Space has members. '
-                  'If this one is brand new, the first account you create '
-                  'becomes its admin. Otherwise ask a member for a code, '
-                  'then use "Use a different Space" below to redeem it. '
-                  'An admin can open joining to anyone in Settings, under '
-                  'Space.',
-            ),
+          if (_creatingAccount && _probed?.inviteRequired == true)
+            const InviteRequiredNotice(),
           if (_probed?.pushEnabled == false)
             const ServerNotice(
               icon: AppIcons.notificationsOff,

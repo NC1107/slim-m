@@ -21,7 +21,8 @@ import 'sign_in_error.dart';
 
 const usernameRule = 'Letters, digits, _ . and - only. Up to 32 characters.';
 const passwordRule = 'At least 8 characters.';
-const displayNameHelper = 'What others see. Defaults to your username.';
+const displayNameHelper =
+    'What others see. Defaults to your username. Up to 64 characters.';
 
 class SignInCredentialFields extends StatelessWidget {
   const SignInCredentialFields({
@@ -83,6 +84,7 @@ class SignInCredentialFields extends StatelessWidget {
             helper: displayNameHelper,
             child: AppInput(
               controller: displayName,
+              errorText: errorFor(SignInErrorField.displayName),
               textInputAction: TextInputAction.next,
               semanticLabel: 'Display name',
             ),
