@@ -104,6 +104,25 @@ void main() {
     ]);
   });
 
+  testWidgets('the role name field is announced as the role name', (
+    tester,
+  ) async {
+    final semantics = tester.ensureSemantics();
+    await _pump(
+      tester,
+      const api.Role(
+        id: 'r1',
+        name: 'Mod',
+        permissions: 0,
+        isEveryone: false,
+        createdAt: 0,
+      ),
+    );
+
+    expect(find.bySemanticsLabel('Role name'), findsOneWidget);
+    semantics.dispose();
+  });
+
   testWidgets('@everyone has no member-list control', (tester) async {
     await _pump(
       tester,

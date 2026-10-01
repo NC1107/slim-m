@@ -158,6 +158,20 @@ void main() {
     expect(find.textContaining('server address'), findsOneWidget);
   });
 
+  testWidgets('a pasted web address is refused in plain words and never '
+      'becomes a request path', (tester) async {
+    final result = await _pasteIntoDialog(
+      tester,
+      'https://chat.example/invite/abc234',
+    );
+
+    expect(result.chosen, isNull);
+    expect(result.probed, isNull, reason: 'nothing was sent to any server');
+    expect(find.textContaining('web address'), findsOneWidget);
+    expect(find.textContaining('slimm://join'), findsOneWidget);
+    expect(find.textContaining('server refused'), findsNothing);
+  });
+
   testWidgets('a tapped invite link opens the redeem dialog prefilled and '
       'consumes itself', (tester) async {
     await _pumpWithTappedInvite(tester);

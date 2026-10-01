@@ -5,9 +5,12 @@
 library;
 
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:package_info_plus/package_info_plus.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:slimm_app/src/providers/auto_update_preference.dart';
+import 'package:slimm_app/src/providers/providers.dart';
 import 'package:slimm_app/src/widgets/app_info_section.dart';
 import 'package:slimm_design_system/design_system.dart';
 import 'package:slimm_platform/platform.dart';
@@ -30,6 +33,47 @@ void main() {
     expect(find.textContaining('0.1.0'), findsOneWidget);
     expect(find.text('Debug log'), findsOneWidget);
     expect(find.text('Nothing caught this session'), findsOneWidget);
+  });
+
+  Future<void> pumpAbout(WidgetTester tester, String buildNumber) async {
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          appInfoProvider.overrideWith(
+            (ref) async => PackageInfo(
+              appName: 'slim-m',
+              packageName: 'top.npcserver.slimm',
+              version: '0.89.0',
+              buildNumber: buildNumber,
+            ),
+          ),
+        ],
+        child: MaterialApp(
+          theme: buildTheme(Brightness.light, AppTokens.light),
+          home: const Scaffold(
+            body: SingleChildScrollView(child: AppInfoSection()),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+  }
+
+  testWidgets('a build with no build number shows the bare version', (
+    tester,
+  ) async {
+    await pumpAbout(tester, '');
+
+    expect(find.text('0.89.0'), findsOneWidget);
+    expect(find.textContaining('()'), findsNothing);
+  });
+
+  testWidgets('a build number is shown in parentheses after the version', (
+    tester,
+  ) async {
+    await pumpAbout(tester, '42');
+
+    expect(find.text('0.89.0 (42)'), findsOneWidget);
   });
 
   /// Decision 0025: the switch that decides whether the splash installs an

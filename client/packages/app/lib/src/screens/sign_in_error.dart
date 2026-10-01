@@ -14,7 +14,17 @@ import '../api_failure.dart';
 /// Which field a failure lands on, per error grammar 03: an error belongs to
 /// the thing that failed, with that thing's content preserved.
 /// [SignInErrorField.form] is the fallback for failures no one field owns.
-enum SignInErrorField { server, username, password, form }
+enum SignInErrorField { server, username, displayName, password, form }
+
+/// The longest display name the server accepts, in characters (`validate_label`
+/// in the server's `http/auth.rs`).
+const displayNameMaxLength = 64;
+
+/// What to tell someone whose display name is past the server's limit, or null.
+String? displayNameError(String text) =>
+    text.trim().runes.length > displayNameMaxLength
+    ? 'Display name must be $displayNameMaxLength characters or fewer.'
+    : null;
 
 /// Where [e] belongs and what to say about it.
 ///
@@ -31,7 +41,7 @@ enum SignInErrorField { server, username, password, form }
   ),
   BadRequestException(:final message) => (
     _badRequestField(message),
-    sentenceCase(message),
+    sentenceCase(message.replaceFirst('display_name', 'display name')),
   ),
   RateLimitedException() => (
     SignInErrorField.form,
@@ -64,6 +74,7 @@ enum SignInErrorField { server, username, password, form }
 SignInErrorField _badRequestField(String message) =>
     switch (message.trimLeft().split(' ').first.toLowerCase()) {
       'username' => SignInErrorField.username,
+      'display_name' => SignInErrorField.displayName,
       'password' => SignInErrorField.password,
       _ => SignInErrorField.form,
     };

@@ -38,9 +38,7 @@ class UserProfile {
   /// When this user's avatar was last set, or null for no avatar. Not itself
   /// fetchable: pass it as a client-side cache key alongside
   /// [SlimmApi.fetchAvatar], since the fetch endpoint itself ignores any
-  /// query string. Absent (not just null) on a server older than the avatar
-  /// feature, which a caller must treat as unknown rather than as "no
-  /// avatar".
+  /// query string. Null means no avatar, so a caller must not request one.
   final int? avatarUpdatedAt;
 
   /// Role names, for a badge beside the member. Excludes `@everyone`, which

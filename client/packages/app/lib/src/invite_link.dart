@@ -57,3 +57,10 @@ String buildInviteLink({required Uri server, required String code}) => Uri(
 
   return (server: server, code: code);
 }
+
+/// Whether [code] has the shape of a pasted URL or path rather than a code.
+///
+/// Invite codes are bare letters and digits, so anything with a separator in it
+/// would otherwise be spliced into the check request's path.
+bool looksLikeWebAddress(String code) =>
+    RegExp(r'[/:?#\s]').hasMatch(code.trim());

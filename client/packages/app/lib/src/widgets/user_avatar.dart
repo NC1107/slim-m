@@ -13,7 +13,7 @@ import '../providers/user_profiles.dart';
 import 'image_decode.dart';
 
 /// For a caller that already holds a full profile (or `Me`) and so knows
-/// [userId] and [avatarUpdatedAt] outright: a member row, the caller's own
+/// [userId] and [avatarUpdatedAt] outright (a null one means no picture): a member row, the caller's own
 /// rail footer, the settings preview.
 class UserAvatar extends ConsumerWidget {
   const UserAvatar({
@@ -51,7 +51,8 @@ class UserAvatar extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final id = userId;
     ImageProvider? image;
-    if (id != null) {
+    // A null timestamp is the server's "no avatar", so asking would only 404.
+    if (id != null && avatarUpdatedAt != null) {
       final bytes = ref
           .watch(avatarBytesProvider((userId: id, updatedAt: avatarUpdatedAt)))
           .valueOrNull;

@@ -48,7 +48,9 @@ class AppInfoSection extends ConsumerWidget {
           leading: const Icon(AppIcons.info),
           label: 'Version',
           meta: info.when(
-            data: (i) => '${i.version} (${i.buildNumber})',
+            data: (i) => i.buildNumber.isEmpty
+                ? i.version
+                : '${i.version} (${i.buildNumber})',
             loading: () => 'Loading…',
             error: (e, _) => 'Unknown',
           ),

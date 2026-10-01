@@ -92,7 +92,7 @@ class _Row extends StatelessWidget {
         size: AppSizes.icon16,
       );
     } else if (suggestion.userId != null) {
-      leading = UserAvatar(
+      leading = AuthorAvatar(
         userId: suggestion.userId!,
         name: suggestion.label,
         size: AppSizes.icon16,

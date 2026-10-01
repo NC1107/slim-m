@@ -15,6 +15,8 @@
 ///   from one) records the current version as already seen and shows
 ///   nothing, so a new user's first screen is never a changelog for updates
 ///   that happened before they existed.
+///   A new account on an already-launched device gets the same treatment
+///   through [justRegisteredProvider].
 /// - **Never a gate.** [WhatsNewController] only ever decides what to show;
 ///   nothing reads its state to decide whether the app itself may proceed,
 ///   and the sheet it feeds is always dismissible.
@@ -41,6 +43,11 @@ const lastSeenWhatsNewVersionKey = 'slimm.whats_new.last_seen_version';
 /// feature entirely" and must keep showing the backlog; see [_check].
 const _neverTrackedVersion = '0.1.0';
 
+/// True from the moment this app registers an account until the controller has
+/// looked at it. A brand-new account has no history to catch up on, even on a
+/// device that has launched before and so is not a [isFreshInstallProvider].
+final justRegisteredProvider = StateProvider<bool>((ref) => false);
+
 /// The entries, if any, still owed to whoever is using this install. Starts
 /// empty and either stays that way or is populated once the async check in
 /// the constructor resolves.
@@ -56,7 +63,8 @@ class WhatsNewController extends StateNotifier<List<WhatsNewEntry>> {
       final prefs = await _ref.read(preferencesProvider.future);
       final version = (await PackageInfo.fromPlatform()).version;
 
-      if (_ref.read(isFreshInstallProvider)) {
+      if (_ref.read(isFreshInstallProvider) ||
+          _ref.read(justRegisteredProvider)) {
         await prefs.setString(lastSeenWhatsNewVersionKey, version);
         return;
       }
