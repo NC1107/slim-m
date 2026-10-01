@@ -100,6 +100,14 @@ class ChannelHeader extends ConsumerWidget {
         LayoutClass.of(
           context,
         ).fitsMemberPane(MediaQuery.sizeOf(context).width);
+    // Medium widths too narrow to dock the pane open the roster as a drawer.
+    final scaffold = Scaffold.maybeOf(context);
+    final opensMemberDrawer =
+        !isDm &&
+        !canToggleMembers &&
+        LayoutClass.of(context) == LayoutClass.medium &&
+        scaffold != null &&
+        scaffold.hasEndDrawer;
 
     final topic = this.topic;
     final hasTopic = topic != null && topic.isNotEmpty;
@@ -218,6 +226,14 @@ class ChannelHeader extends ConsumerWidget {
             active: searchOpen,
             onPressed: onToggleSearch,
           ),
+          if (opensMemberDrawer) ...[
+            const SizedBox(width: AppSpacing.s4),
+            AppIconButton(
+              icon: AppIcons.members,
+              semanticLabel: 'Show members',
+              onPressed: scaffold.openEndDrawer,
+            ),
+          ],
           if (canToggleMembers) ...[
             const SizedBox(width: AppSpacing.s4),
             AppIconButton(

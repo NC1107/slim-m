@@ -131,7 +131,15 @@ class HomeShell extends ConsumerWidget {
 
     final Widget scaffold;
     if (layout.showsBothPanes) {
-      scaffold = Scaffold(
+      Widget wideScaffold(bool isDm) => Scaffold(
+        // Where no pane docks, the roster is the same end drawer compact uses.
+        onEndDrawerChanged: (open) => endSelectionOnDrawerClose(ref, open),
+        endDrawer: isDm || membersFit || selected == null
+            ? null
+            : Drawer(
+                width: AppMemberPane.width,
+                child: SafeArea(child: AppMemberPane(channelId: selected)),
+              ),
         body: Row(
           children: [
             // The rail at full or compact width, or neither, plus its handle; see railSlot's own doc.
@@ -166,6 +174,9 @@ class HomeShell extends ConsumerWidget {
           ],
         ),
       );
+      scaffold = selected == null
+          ? wideScaffold(false)
+          : _withChannelKind(ref, selected, wideScaffold);
     } else if (selected != null) {
       // No rail here to carry the strip, so a call elsewhere gets its own row.
       final (voiceState, voiceChannelId) = ref.watch(
