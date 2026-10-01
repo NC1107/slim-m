@@ -109,7 +109,16 @@ SQLite3 Multiple Ciphers has no `sqlcipher_export`, which is why this is `VACUUM
 The end state is the same and it is checkable at each step.
 
 Before the rename the copy is checked with `PRAGMA integrity_check` and a row count for every table against the source.
-The staging file is created 0600 before the plaintext snapshot is written into it, and `temp_store` is set to memory on every keyed connection so SQLite does not spill plaintext temporary files.
+On Linux and macOS the staging file is created 0600 before the plaintext snapshot is written into it, and `temp_store` is set to memory on every keyed connection so SQLite does not spill plaintext temporary files.
+The mode is not narrowed on Windows, iOS or Android.
+On a phone the app's container is already closed to every other app, so there is nobody for 0600 to keep out.
+
+That exception exists because the first version did not have it.
+It narrowed the mode by running `chmod`, on every platform but Windows, and iOS does not let an app start a process.
+So on iOS the migration threw before it copied anything, on every launch, and an install with data from before encryption showed "The channel list saved on this device could not be opened" with a Retry that could only fail the same way.
+A fresh install never has a plaintext file to migrate, which is why CI and a clean TestFlight install both passed while every existing tester was locked out of 0.89.0.
+Nothing was lost: the plaintext file is untouched until the rename, so the fixed build migrates it on its first launch.
+`scripts/lib/test_client_process_spawns_are_guarded.py` now fails a client file that starts a process outside a `desktop/` directory without naming what keeps a phone away from it.
 An error from a statement that carried the key is rethrown without the statement text, because `SqliteException.toString` would otherwise print the key into a log.
 
 The replaced plaintext file's blocks are not scrubbed from the disk.

@@ -24,6 +24,7 @@ import 'package:slimm_app/src/providers/sync_controller.dart';
 import 'package:slimm_app/src/providers/sync_failure.dart';
 import 'package:slimm_app/src/routing/routes.dart';
 import 'package:slimm_app/src/widgets/channel_rail.dart';
+import 'package:slimm_app/src/widgets/channel_rail_failure.dart';
 import 'package:drift/native.dart';
 import 'package:slimm_data/data.dart';
 import 'package:slimm_design_system/design_system.dart';
@@ -173,6 +174,15 @@ void main() {
     expect(find.text('Retry'), findsOneWidget);
 
     await _teardown(tester, container);
+  });
+
+  // The owner's phone showed only the bare sentence, which fit any cause at all.
+  test('an unexpected failure to open the store names what failed', () {
+    final failure = localStoreRailFailure(StateError('disk on fire'));
+
+    expect(failure.message, contains('could not be opened'));
+    expect(failure.message, contains('StateError'));
+    expect(failure.retryable, isTrue);
   });
 
   testWidgets('an unreachable server and a refused session read differently, '

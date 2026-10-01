@@ -353,6 +353,59 @@ void main() {
     expect(file.statSync().modeString(), 'rw-------');
   }, testOn: 'linux');
 
+  group('where no process can be started', () {
+    late StagingHost real;
+    final started = <String>[];
+
+    setUp(() {
+      real = stagingHost;
+      started.clear();
+    });
+    tearDown(() => stagingHost = real);
+
+    void pretendToBe(String operatingSystem) {
+      stagingHost = StagingHost(
+        operatingSystem: operatingSystem,
+        run: (executable, arguments) {
+          started.add(executable);
+          throw ProcessException(
+            executable,
+            arguments,
+            'Operation not permitted',
+            1,
+          );
+        },
+      );
+    }
+
+    // iOS starts no process, so the old chmod failed there on every launch.
+    for (final phone in ['ios', 'android']) {
+      test('an existing plaintext database still migrates on $phone', () async {
+        await seedPlaintext(['a', 'b']);
+        pretendToBe(phone);
+
+        final db = await open(_FakeKeys());
+
+        expect(await categoryIds(db), ['a', 'b']);
+        await db.close();
+        expect(started, isEmpty);
+        expect(header(), isNot(_plainHeader));
+      });
+    }
+
+    test('a desktop that cannot narrow the mode refuses and keeps the data',
+        () async {
+      await seedPlaintext(['a', 'b']);
+      pretendToBe('linux');
+
+      await expectLater(open(_FakeKeys()), throwsA(isA<ProcessException>()));
+
+      expect(started, ['chmod']);
+      expect(header(), _plainHeader);
+      expect(File('${file.path}.encrypting').existsSync(), isFalse);
+    });
+  });
+
   test('two callers at once mint one key between them', () async {
     final keys = _FakeKeys();
 

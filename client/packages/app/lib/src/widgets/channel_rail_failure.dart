@@ -40,7 +40,10 @@ RailFailure localStoreRailFailure(Object error) => RailFailure(
           'cannot be read.',
     DatabaseEncryptionUnavailable() =>
       'This build cannot keep channels on this device.',
-    _ => 'The channel list saved on this device could not be opened.',
+    // Named, so a screenshot of this is enough to know what failed.
+    _ =>
+      'The channel list saved on this device could not be opened '
+          '(${error.runtimeType}).',
   },
   retryable: true,
 );
