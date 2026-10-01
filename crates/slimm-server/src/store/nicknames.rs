@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
-//! Space-local display names (decision 0053): what an administrator calls
+//! Space-local display names (decision 0055): what an administrator calls
 //! another member or bot, kept beside `users.display_name` rather than over it.
 //!
 //! The account's own name is never touched here, so renaming is always

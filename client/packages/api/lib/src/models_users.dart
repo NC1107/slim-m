@@ -38,7 +38,7 @@ class UserProfile {
   final String displayName;
 
   /// The space-local name an administrator gave this account, or null. See
-  /// `docs/decisions/0053-member-nicknames.md`.
+  /// `docs/decisions/0055-member-nicknames.md`.
   final String? nickname;
 
   /// The account's own name, whatever [nickname] is. Null on a server older

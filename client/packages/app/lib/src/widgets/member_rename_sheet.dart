@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// An administrator renaming somebody else's account inside this Space
-/// (`PUT`/`DELETE /members/{userId}/nickname`, decision 0053).
+/// (`PUT`/`DELETE /members/{userId}/nickname`, decision 0055).
 ///
 /// A nickname is what every reader sees; the account's own name stays what the
 /// account chose and is still shown to them in their own profile. So this sheet

@@ -1,4 +1,4 @@
-# 0053 - an administrator can give a member or bot a space-local name
+# 0055 - an administrator can give a member or bot a space-local name
 
 Status: accepted, 2026-10-01.
 

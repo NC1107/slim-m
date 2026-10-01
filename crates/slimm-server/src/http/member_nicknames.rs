@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
-//! Giving another member or bot a space-local display name (decision 0053).
+//! Giving another member or bot a space-local display name (decision 0055).
 //!
 //! Gated on KICK_MEMBERS and the same no-escalation rule as a timeout, since
 //! this is the same tier of act: changing how somebody else appears. The

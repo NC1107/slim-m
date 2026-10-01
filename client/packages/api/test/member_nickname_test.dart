@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// `PUT` and `DELETE /members/{userId}/nickname`, and the two profile fields
-/// that report a nickname: decision 0053.
+/// that report a nickname: decision 0055.
 library;
 
 import 'dart:convert';

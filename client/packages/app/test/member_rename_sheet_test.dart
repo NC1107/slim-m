@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
-/// Renaming somebody else from the member card (decision 0053): the row only
+/// Renaming somebody else from the member card (decision 0055): the row only
 /// where the gate allows it, the request it sends, and a failure that stays on
 /// the sheet as a persistent error rather than a SnackBar.
 library;
