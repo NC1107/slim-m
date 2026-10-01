@@ -49,8 +49,7 @@ class BackToButton extends StatelessWidget {
       tooltip: tooltip,
       onPressed: () => closeScreen(context, fallback),
     );
-    // An app bar gives its leading slot 56pt: the 44pt touch button plus the
-    // pointer layout's 8pt gutter does not fit, and squeezed the button to 40.
+    // The 56pt leading slot cannot hold a 44pt button plus the 8pt gutter, which squeezed it to 40.
     return AppTouchTargets.of(context)
         ? Center(child: button)
         : Padding(

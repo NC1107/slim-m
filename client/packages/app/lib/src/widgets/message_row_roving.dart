@@ -106,8 +106,7 @@ class _MessageRowRovingState extends State<MessageRowRoving> {
             () => _onAControl,
             (_) => _rowNode.requestFocus(),
           ),
-          // Always enabled: a disabled action here would shadow the app's own Tab
-          // handling instead of deferring to it.
+          // Always enabled: a disabled action here shadows the app's own Tab handling.
           NextFocusIntent: CallbackAction<NextFocusIntent>(
             onInvoke: (_) => _leaveRow(forward: true),
           ),
