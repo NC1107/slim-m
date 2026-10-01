@@ -200,10 +200,10 @@ void main() {
     );
 
     // Same text twice in tree order: the tappable marker first, the inert one second.
-    await tester.tap(find.text('(edited)').first);
+    await tester.tap(find.text('edited').first);
     expect(taps, 1);
     // Tapping the handler-less marker does nothing.
-    await tester.tap(find.text('(edited)').last);
+    await tester.tap(find.text('edited').last);
     expect(taps, 1, reason: 'the inert marker has no tap handler');
   });
 

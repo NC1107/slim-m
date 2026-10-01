@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// The edit history of one message, fetched on demand for the sheet the
-/// "(edited)" marker opens.
+/// "edited" marker opens.
 library;
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';

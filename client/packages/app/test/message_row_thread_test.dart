@@ -74,17 +74,15 @@ void main() {
   });
 
   testWidgets(
-    'a known last-reply time is appended, formatted the same way a day '
-    'divider would',
+    'a known last-reply time sits beside the count, formatted the same way a '
+    'day divider would',
     (tester) async {
       const lastReplyAt = 1700000000000;
       await tester.pumpWidget(
         _rowWith(threadReplyCount: 3, threadLastReplyAt: lastReplyAt),
       );
-      expect(
-        find.text('3 replies · Last reply ${formatMessageDay(lastReplyAt)}'),
-        findsOneWidget,
-      );
+      expect(find.text('3 replies'), findsOneWidget);
+      expect(find.text(formatMessageDay(lastReplyAt)), findsOneWidget);
     },
   );
 

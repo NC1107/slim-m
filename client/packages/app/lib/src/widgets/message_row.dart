@@ -215,7 +215,7 @@ class MessageRow extends StatelessWidget {
   /// a reply.
   final VoidCallback? onReplyTap;
 
-  /// Opens this message's edit history. Null leaves the "(edited)" marker
+  /// Opens this message's edit history. Null leaves the "edited" marker
   /// inert - a view-only surface, or a message with nothing to show.
   final VoidCallback? onViewEditHistory;
 
@@ -229,6 +229,9 @@ class MessageRow extends StatelessWidget {
   Widget build(BuildContext context) {
     final compact = LayoutClass.of(context) == LayoutClass.compact;
     final tokens = Theme.of(context).extension<AppTokens>()!;
+    final edited = message.editedAt != null && !editing
+        ? EditedMarker(onTap: onViewEditHistory)
+        : null;
     return HoverReveal(
       builder: (context, hovered, menuOpen, focusWithin) => Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -354,6 +357,7 @@ class MessageRow extends StatelessWidget {
                                           customEmoji: customEmoji,
                                           dim: message.pending,
                                           announceSending: message.pending,
+                                          trailing: edited,
                                         ),
                                       ),
                                     if (!editing && message.content.isNotEmpty)
@@ -393,8 +397,12 @@ class MessageRow extends StatelessWidget {
                                           currentChannelId: message.channelId,
                                         ),
                                       ),
-                                    if (message.editedAt != null && !editing)
-                                      EditedMarker(onTap: onViewEditHistory),
+                                    if (edited != null &&
+                                        message.content.isEmpty)
+                                      Padding(
+                                        padding: const EdgeInsets.only(top: 2),
+                                        child: edited,
+                                      ),
                                     if (poll != null)
                                       Padding(
                                         padding: const EdgeInsets.only(

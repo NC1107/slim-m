@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
-/// The sheet the "(edited)" marker opens: every version a message has held,
+/// The sheet the "edited" marker opens: every version a message has held,
 /// oldest first, ending with its current content, each labelled with when it
 /// became the message's text.
 ///

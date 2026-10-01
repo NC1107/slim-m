@@ -65,9 +65,15 @@ class MessageBody extends StatelessWidget {
     this.customEmoji = const {},
     this.dim = false,
     this.announceSending = false,
+    this.trailing,
   });
 
   final String content;
+
+  /// A short note set after the last word of the body, as part of the same
+  /// line of text (the edited marker). A body that does not end in running
+  /// text (a code block last) shows it on a line of its own instead.
+  final Widget? trailing;
 
   /// The message these blocks belong to, so a fenced code block's Run result
   /// is shared against `(messageId, block index)` and seen by everyone. Null
@@ -121,10 +127,16 @@ class MessageBody extends StatelessWidget {
         final widgets = <Widget>[];
         // Counts only fenced blocks, so a block's index (the shared-run key) is stable regardless of the text around it.
         var codeBlockIndex = 0;
-        for (final block in splitMessageBlocks(content)) {
+        final blocks = splitMessageBlocks(content);
+        var trailed = false;
+        for (final block in blocks) {
           switch (block) {
             case TextBlock(:final text):
-              for (final md in splitMarkdownBlocks(text)) {
+              final mds = splitMarkdownBlocks(text);
+              for (final md in mds) {
+                final last =
+                    identical(block, blocks.last) && identical(md, mds.last);
+                trailed = trailed || (last && trailing != null);
                 widgets.add(
                   _buildMarkdownBlock(
                     md,
@@ -132,6 +144,7 @@ class MessageBody extends StatelessWidget {
                     knownRoleNames: knownRoleNames,
                     customEmoji: customEmoji,
                     color: baseColor,
+                    trailing: last ? trailing : null,
                   ),
                 );
               }
@@ -145,6 +158,10 @@ class MessageBody extends StatelessWidget {
                 ),
               );
           }
+        }
+
+        if (trailing != null && !trailed) {
+          widgets.add(Padding(padding: _trailingLineInset, child: trailing));
         }
 
         return Column(
@@ -166,6 +183,9 @@ class MessageBody extends StatelessWidget {
   }
 }
 
+/// A sub-grid optical gap above a trailing note that has to sit on its own line.
+const _trailingLineInset = EdgeInsets.only(top: 2);
+
 /// Picks the type step and rendering shell for one [MarkdownBlock], then
 /// hands its text to [_MessageTextRun] for inline parsing. Only headings
 /// change the type style, from the scale's own three largest steps, never an
@@ -176,6 +196,7 @@ Widget _buildMarkdownBlock(
   required Set<String> knownRoleNames,
   required Map<String, String> customEmoji,
   required Color color,
+  Widget? trailing,
 }) {
   switch (block) {
     case ParagraphBlock(:final text):
@@ -185,6 +206,7 @@ Widget _buildMarkdownBlock(
         knownRoleNames: knownRoleNames,
         customEmoji: customEmoji,
         color: color,
+        trailing: trailing,
       );
     case HeadingBlock(:final level, :final text):
       final style = switch (level) {
@@ -199,6 +221,7 @@ Widget _buildMarkdownBlock(
         customEmoji: customEmoji,
         color: color,
         baseStyle: style,
+        trailing: trailing,
       );
     case QuoteBlock(:final text):
       return MarkdownQuote(
@@ -208,6 +231,7 @@ Widget _buildMarkdownBlock(
           knownRoleNames: knownRoleNames,
           customEmoji: customEmoji,
           color: color,
+          trailing: trailing,
         ),
       );
     case ListBlock(:final items):
@@ -221,6 +245,7 @@ Widget _buildMarkdownBlock(
               knownRoleNames: knownRoleNames,
               customEmoji: customEmoji,
               color: color,
+              trailing: identical(item, items.last) ? trailing : null,
             ),
         ],
       );
@@ -238,8 +263,10 @@ class _MessageTextRun extends ConsumerStatefulWidget {
     required this.customEmoji,
     required this.color,
     this.baseStyle = AppText.body,
+    this.trailing,
   });
 
+  final Widget? trailing;
   final String text;
   final Set<String> knownUsernames;
   final Set<String> knownRoleNames;
@@ -323,18 +350,29 @@ class _MessageTextRunState extends ConsumerState<_MessageTextRun> {
     return Text.rich(
       TextSpan(
         style: style,
-        children: _buildSpans(
-          parseInline(widget.text),
-          _InlineContext(
-            knownUsernames: widget.knownUsernames,
-            knownRoleNames: widget.knownRoleNames,
-            customEmoji: widget.customEmoji,
-            ambientStyle: style,
-            linkColor: tokens.accent,
-            makeLinkRecognizer: _makeLinkRecognizer,
-            makeMessageLinkRecognizer: _makeMessageLinkRecognizer,
+        children: [
+          ..._buildSpans(
+            parseInline(widget.text),
+            _InlineContext(
+              knownUsernames: widget.knownUsernames,
+              knownRoleNames: widget.knownRoleNames,
+              customEmoji: widget.customEmoji,
+              ambientStyle: style,
+              linkColor: tokens.accent,
+              makeLinkRecognizer: _makeLinkRecognizer,
+              makeMessageLinkRecognizer: _makeMessageLinkRecognizer,
+            ),
           ),
-        ),
+          if (widget.trailing case final trailing?)
+            WidgetSpan(
+              alignment: PlaceholderAlignment.baseline,
+              baseline: TextBaseline.alphabetic,
+              child: Padding(
+                padding: const EdgeInsets.only(left: AppSpacing.s4),
+                child: trailing,
+              ),
+            ),
+        ],
       ),
     );
   }
