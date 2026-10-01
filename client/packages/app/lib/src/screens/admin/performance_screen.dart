@@ -27,13 +27,14 @@ import '../../widgets/success_flash.dart';
 import '../settings_screen_scaffold.dart';
 import 'canvas_cap_section.dart';
 import 'screen_share_cap_section.dart';
+import '../../action_labels.dart';
 
 class PerformanceScreen extends StatelessWidget {
   const PerformanceScreen({super.key});
 
   @override
   Widget build(BuildContext context) => const SettingsScreenScaffold(
-    title: 'Performance',
+    title: ActionLabels.retentionAndLimits,
     backTooltip: 'Back to Space settings',
     backFallback: Routes.spaceSettings,
     child: PerformancePane(),

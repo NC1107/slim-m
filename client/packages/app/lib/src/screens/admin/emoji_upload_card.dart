@@ -23,6 +23,7 @@ import '../../providers/providers.dart';
 import '../../widgets/image_decode.dart';
 import '../../widgets/settings_section_header.dart';
 import 'emoji_name.dart';
+import '../../action_labels.dart';
 
 /// Picks an image and returns its bytes, or null if nothing was chosen.
 typedef EmojiImagePicker = Future<List<int>?> Function();
@@ -175,7 +176,7 @@ class _EmojiUploadCardState extends ConsumerState<EmojiUploadCard> {
         ),
         const SizedBox(height: AppSpacing.s12),
         AppButton(
-          label: _submitting ? 'Adding...' : 'Add emoji',
+          label: _submitting ? 'Creating...' : ActionLabels.createEmoji,
           icon: AppIcons.smile,
           variant: AppButtonVariant.primary,
           full: true,

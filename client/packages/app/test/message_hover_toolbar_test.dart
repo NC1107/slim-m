@@ -17,6 +17,7 @@ import 'package:slimm_data/data.dart';
 import 'package:slimm_design_system/design_system.dart';
 
 import 'message_row_harness.dart';
+import 'package:slimm_app/src/action_labels.dart';
 
 MessageActions _actions({
   bool canReply = true,
@@ -217,7 +218,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Copy text'), findsOneWidget);
-    expect(find.text('Add reaction'), findsOneWidget);
+    expect(find.text(ActionLabels.addReaction), findsOneWidget);
     final button = tester.getRect(find.byKey(MessageHoverToolbar.overflowKey));
     final menu = tester.getRect(find.byType(AppMenu));
     expect(
@@ -416,7 +417,7 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(find.text('Add reaction'), findsOneWidget);
+    expect(find.text(ActionLabels.addReaction), findsOneWidget);
     expect(find.byType(AppMenu), findsNothing, reason: 'a sheet, not a popup');
     expect(_plate, findsNothing);
   });

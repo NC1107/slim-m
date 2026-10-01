@@ -26,6 +26,7 @@ import '../../widgets/settings_section_header.dart';
 import '../settings_screen_scaffold.dart';
 import '../../widgets/confirm_dialog.dart';
 import 'invite_role_grant_picker.dart';
+import '../../action_labels.dart';
 
 const _expiryOptions = <(String, Duration?)>[
   ('Never', null),
@@ -210,7 +211,7 @@ class _CreateInviteCardState extends ConsumerState<_CreateInviteCard> {
         ],
         const SizedBox(height: AppSpacing.s12),
         AppButton(
-          label: _submitting ? 'Creating...' : 'Create invite',
+          label: _submitting ? 'Creating...' : ActionLabels.createInvite,
           icon: AppIcons.invite,
           variant: AppButtonVariant.primary,
           full: true,

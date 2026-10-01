@@ -25,6 +25,7 @@ import '../../widgets/settings_entity_row.dart';
 import '../../widgets/settings_notice.dart';
 import '../../widgets/settings_section_header.dart';
 import '../settings_screen_scaffold.dart';
+import '../../widgets/settings_empty.dart';
 
 class RemovedMembersScreen extends StatelessWidget {
   const RemovedMembersScreen({super.key});
@@ -52,12 +53,14 @@ class RemovedMembersPane extends ConsumerWidget {
       center: false,
       errorMessage: 'Could not load the removals.',
       onRetry: () => ref.invalidate(removedMembersProvider),
-      isEmpty: (list) => list.isEmpty,
-      emptyMessage: 'Nobody has been removed from this Space.',
       // One group, so a section header would only restate the app bar.
-      data: (context, list) => SettingsSectionCard(
-        children: [for (final removal in list) _RemovalRow(removal: removal)],
-      ),
+      data: (context, list) => list.isEmpty
+          ? const SettingsEmpty('Nobody has been removed from this Space.')
+          : SettingsSectionCard(
+              children: [
+                for (final removal in list) _RemovalRow(removal: removal),
+              ],
+            ),
     );
   }
 }

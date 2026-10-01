@@ -17,6 +17,7 @@ import 'animated_menu_portal.dart';
 import 'emoji_picker_panel.dart';
 import 'hover_reveal.dart';
 import 'message_context_menu_layout.dart';
+import '../action_labels.dart';
 
 export 'emoji_picker_panel.dart' show EmojiPickerPanel;
 export 'emoji_picker_sheets.dart'
@@ -122,7 +123,7 @@ class _EmojiPickerButtonState extends State<EmojiPickerButton> {
       ),
       child: AppIconButton(
         icon: AppIcons.smile,
-        semanticLabel: 'Add a reaction',
+        semanticLabel: ActionLabels.addReaction,
         iconSize: AppSizes.icon16,
         onPressed: () => _setOpen(!_controller.isShowing),
       ),

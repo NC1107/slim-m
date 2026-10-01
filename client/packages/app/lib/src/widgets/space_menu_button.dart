@@ -21,6 +21,7 @@ import 'create_category_sheet.dart';
 import 'create_channel_sheet.dart';
 import 'saved_messages_sheet.dart';
 import 'space_settings_section.dart';
+import '../action_labels.dart';
 
 /// Hidden entirely for a caller holding none of [spaceSettingsReachable]'s
 /// gating bits: its one item at minimum is Space settings, and a member who
@@ -74,7 +75,7 @@ class _SpaceMenuButtonState extends ConsumerState<SpaceMenuButton> {
                     children: [
                       if (canManageChannels) ...[
                         AppMenuItem(
-                          label: 'Add channel',
+                          label: ActionLabels.createChannel,
                           leading: AppIcons.add,
                           onTap: () {
                             _controller.hide();
@@ -85,7 +86,7 @@ class _SpaceMenuButtonState extends ConsumerState<SpaceMenuButton> {
                           },
                         ),
                         AppMenuItem(
-                          label: 'Add category',
+                          label: ActionLabels.createCategory,
                           leading: AppIcons.add,
                           onTap: () {
                             _controller.hide();

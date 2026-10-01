@@ -31,6 +31,7 @@ import 'member_profile_sections.dart';
 import 'clear_totp_sheet.dart';
 import 'reset_code_sheet.dart';
 import 'run_guarded.dart';
+import '../action_labels.dart';
 
 class MemberModerateView extends ConsumerStatefulWidget {
   const MemberModerateView({
@@ -189,7 +190,7 @@ class _MemberModerateViewState extends ConsumerState<MemberModerateView>
               AppSpacing.s12,
             ),
             child: AppButton(
-              label: 'Remove from Space...',
+              label: ActionLabels.removeFromSpace,
               variant: AppButtonVariant.danger,
               full: true,
               onPressed: widget.onRemove,

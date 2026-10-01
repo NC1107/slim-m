@@ -25,6 +25,7 @@ import '../../widgets/settings_notice.dart';
 import '../../widgets/settings_section_header.dart';
 import '../settings_screen_scaffold.dart';
 import 'overwrite_target_picker_sheets.dart';
+import '../../action_labels.dart';
 
 class WebhooksScreen extends StatelessWidget {
   const WebhooksScreen({super.key});
@@ -117,7 +118,7 @@ class _WebhooksPaneState extends ConsumerState<WebhooksPane>
           ),
           const SizedBox(height: AppSpacing.s16),
         ],
-        const SettingsSectionHeader('Add a webhook'),
+        const SettingsSectionHeader(ActionLabels.createWebhook),
         SettingsSectionCard(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
@@ -146,7 +147,7 @@ class _WebhooksPaneState extends ConsumerState<WebhooksPane>
             ),
             const SizedBox(height: AppSpacing.s12),
             AppButton(
-              label: 'Create webhook',
+              label: ActionLabels.createWebhook,
               variant: AppButtonVariant.primary,
               onPressed: _busy ? null : _create,
             ),

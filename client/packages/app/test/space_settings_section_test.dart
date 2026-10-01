@@ -27,6 +27,7 @@ import 'package:slimm_app/src/screens/space_settings_screen.dart';
 import 'package:slimm_app/src/widgets/settings_notice.dart';
 import 'package:slimm_design_system/design_system.dart';
 import 'package:slimm_platform/platform.dart';
+import 'package:slimm_app/src/action_labels.dart';
 
 const _tokens = api.TokenPair(
   userId: 'admin',
@@ -109,7 +110,7 @@ void main() {
     expect(find.text('Moderation'), findsOneWidget);
     expect(find.text('Access'), findsOneWidget);
     expect(find.text('Configuration'), findsOneWidget);
-    expect(find.text('Server'), findsOneWidget);
+    expect(find.text(ActionLabels.operationsGroup), findsOneWidget);
     for (final label in [
       'Reports',
       'Removed members',
@@ -117,7 +118,7 @@ void main() {
       'Roles',
       'Channel permissions',
       'Emoji',
-      'Performance',
+      ActionLabels.retentionAndLimits,
       'Analytics',
       'Storage',
       'Server metrics',
@@ -131,8 +132,12 @@ void main() {
 
     // Geometry, not just text: the four panes sit under SERVER, between CONFIGURATION and ADDONS.
     final configurationY = tester.getTopLeft(find.text('Configuration')).dy;
-    final serverY = tester.getTopLeft(find.text('Server')).dy;
-    final performanceY = tester.getTopLeft(find.text('Performance')).dy;
+    final serverY = tester
+        .getTopLeft(find.text(ActionLabels.operationsGroup))
+        .dy;
+    final performanceY = tester
+        .getTopLeft(find.text(ActionLabels.retentionAndLimits))
+        .dy;
     final addonsY = tester.getTopLeft(find.text('Addons')).dy;
     expect(configurationY, lessThan(serverY));
     expect(serverY, lessThan(performanceY));
@@ -146,9 +151,9 @@ void main() {
       // Emoji stays MANAGE_SERVER, same as before the split, so Configuration survives on that pane alone.
       await _pump(tester, permissions: Perm.manageServer);
 
-      expect(find.text('Server'), findsOneWidget);
+      expect(find.text(ActionLabels.operationsGroup), findsOneWidget);
       for (final label in [
-        'Performance',
+        ActionLabels.retentionAndLimits,
         'Analytics',
         'Storage',
         'Server metrics',
@@ -176,7 +181,7 @@ void main() {
 
     expect(find.byType(RolesPane), findsOneWidget);
     expect(find.byType(ReportsPane), findsNothing);
-    expect(find.byTooltip('New role'), findsOneWidget);
+    expect(find.byTooltip(ActionLabels.createRole), findsOneWidget);
   });
 
   testWidgets('compact: a pane naming a route pushes the standalone screen '
