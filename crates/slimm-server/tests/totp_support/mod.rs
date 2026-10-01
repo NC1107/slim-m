@@ -39,10 +39,14 @@ pub async fn new_store(prefix: &str) -> (Store, Auth, crate::support::TestDbGuar
 }
 
 pub fn app(store: Store, auth: Auth) -> Router {
+    app_with_hub(store, auth, Hub::new())
+}
+
+pub fn app_with_hub(store: Store, auth: Auth, hub: Hub) -> Router {
     http::router(AppState {
         store,
         auth,
-        hub: Hub::new(),
+        hub,
         limiter: RateLimiter::new(),
         push: PushSender::disabled(),
         voice: slimm_server::voice::VoiceService::disabled(),

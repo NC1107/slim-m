@@ -13,7 +13,8 @@ use slimm_server::auth::Auth;
 use slimm_server::config::Config;
 use slimm_server::db;
 use slimm_server::http::{self, AppState};
-use slimm_server::hub::Hub;
+use slimm_server::hub::{Event, Hub};
+use slimm_server::ids::{DeviceId, UserId};
 use slimm_server::push::PushSender;
 use slimm_server::ratelimit::RateLimiter;
 use slimm_server::store::Store;
@@ -59,8 +60,17 @@ async fn account(state: &AppState, name: &str) {
     state.store.create_account(name, name, &hash).await.unwrap();
 }
 
-/// Signs in over REST and returns the new device's ws ticket.
 async fn login(state: &AppState, name: &str, device: &str, kind: &str) -> String {
+    login_as_device(state, name, device, kind).await.0
+}
+
+/// Signs in over REST and returns the new device's ws ticket and id.
+async fn login_as_device(
+    state: &AppState,
+    name: &str,
+    device: &str,
+    kind: &str,
+) -> (String, UserId, DeviceId) {
     let response = http::router(state.clone())
         .oneshot(
             Request::builder()
@@ -91,7 +101,11 @@ async fn login(state: &AppState, name: &str, device: &str, kind: &str) -> String
         .await
         .unwrap()
         .unwrap();
-    state.store.mint_ws_ticket(&ctx).await.unwrap().0
+    (
+        state.store.mint_ws_ticket(&ctx).await.unwrap().0,
+        ctx.user_id,
+        ctx.device_id,
+    )
 }
 
 async fn serve(state: AppState) -> std::net::SocketAddr {
@@ -142,13 +156,36 @@ async fn an_unfamiliar_device_alerts_the_others_but_not_itself() {
     let mut phone = connect(addr, &first).await;
 
     let laptop_ticket = login(&state, "alice", "Laptop", "desktop").await;
-    let mut laptop = connect(addr, &laptop_ticket).await;
+    let _laptop = connect(addr, &laptop_ticket).await;
 
     let seen = alerts(&mut phone).await;
     assert_eq!(seen.len(), 1);
     assert_eq!(seen[0]["device_name"], "Laptop");
     assert_eq!(seen[0]["client_kind"], "desktop");
     assert!(seen[0]["signed_in_at"].as_i64().unwrap() > 0);
+}
+
+/// The sign-in's own socket cannot exist yet when the alert is published, so
+/// the alert is published by hand for a device whose socket is already open.
+#[tokio::test]
+async fn a_device_does_not_hear_an_alert_naming_itself() {
+    let (state, _guard) = setup().await;
+    account(&state, "alice").await;
+    let (first, ..) = login_as_device(&state, "alice", "Pixel", "android").await;
+    let (second, user_id, laptop_id) = login_as_device(&state, "alice", "Laptop", "desktop").await;
+    let addr = serve(state.clone()).await;
+    let mut phone = connect(addr, &first).await;
+    let mut laptop = connect(addr, &second).await;
+
+    state.hub.publish(Event::NewDeviceSignIn {
+        user_id,
+        device_id: laptop_id,
+        device_name: "Laptop".to_owned(),
+        client_kind: Some("desktop".to_owned()),
+        signed_in_at: 1,
+    });
+
+    assert_eq!(alerts(&mut phone).await.len(), 1, "sanity: others hear it");
     assert!(alerts(&mut laptop).await.is_empty());
 }
 
