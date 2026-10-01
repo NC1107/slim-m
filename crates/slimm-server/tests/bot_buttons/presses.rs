@@ -116,3 +116,31 @@ async fn a_held_down_button_is_rate_limited_per_clicker() {
         "another clicker has their own budget"
     );
 }
+
+#[tokio::test]
+async fn a_press_on_a_revoked_bots_button_is_refused_with_a_reason() {
+    let w = world().await;
+    let sent = posted(&w).await;
+    let (status, _, _) = press(&w, &w.alice.1, &sent, "hit").await;
+    assert_eq!(status, StatusCode::OK, "a live bot hears the press");
+
+    w.state
+        .store
+        .revoke_bot(w.bot.0, w.alice.0)
+        .await
+        .unwrap()
+        .expect("the bot exists");
+    let (status, body, id) = press(&w, &w.bob.1, &sent, "hit").await;
+    assert_eq!(status, StatusCode::NOT_FOUND, "{body}");
+    assert_eq!(
+        body["error"],
+        "that bot has been removed, so its buttons no longer work"
+    );
+    let stored = w
+        .state
+        .store
+        .interaction(slimm_server::ids::InteractionId(id.parse().unwrap()))
+        .await
+        .unwrap();
+    assert!(stored.is_none(), "a press nobody can answer stores nothing");
+}

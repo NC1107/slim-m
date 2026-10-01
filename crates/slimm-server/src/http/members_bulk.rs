@@ -144,18 +144,18 @@ async fn bulk_timeout(
     let until = now_ms() + duration_ms;
 
     let reason = validate_reason(req.reason.as_deref(), false)?;
-    state
+    let changed = state
         .store
         .bulk_timeout_members(&targets, until, reason.as_deref(), ctx.user_id)
         .await?;
 
-    for target in &targets {
+    for target in &changed {
         state.hub.publish(Event::MemberTimeoutChanged {
             user_id: *target,
             until: Some(until),
         });
     }
-    evict_all_from_voice(&state, &targets).await;
+    evict_all_from_voice(&state, &changed).await;
     Ok(StatusCode::NO_CONTENT)
 }
 

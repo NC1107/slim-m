@@ -252,7 +252,7 @@ async fn a_moderation_reason_is_still_optional() {
 #[tokio::test]
 async fn a_report_reason_is_capped_too() {
     let (store, _guard) = new_store("slimm-reason-report").await;
-    let (author, token) = admin(&store, "root").await;
+    let (author, _admin_token) = admin(&store, "root").await;
     let channel = store.list_channels().await.unwrap()[0].id;
     let message = store
         .send_message(NewMessage::plain(
@@ -266,6 +266,12 @@ async fn a_report_reason_is_capped_too() {
         .message
         .id;
     let app = app(store.clone(), None);
+    let reporter = store.create_user("reporter", "reporter").await.unwrap();
+    let token = store
+        .open_session(reporter.id, "cli")
+        .await
+        .unwrap()
+        .access_token;
 
     let file = |reason: String| {
         let app = app.clone();

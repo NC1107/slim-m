@@ -155,8 +155,8 @@ async fn a_report_filed_in_a_dm_reaches_the_moderators() {
     let (store, _guard) = new_store().await;
     let app = app(store.clone());
     let (admin_token, _admin_id) = register(&store, "alice").await;
-    let (bob_token, bob_id) = register(&store, "bob").await;
-    let (_carol_token, carol_id) = register(&store, "carol").await;
+    let (_bob_token, bob_id) = register(&store, "bob").await;
+    let (carol_token, carol_id) = register(&store, "carol").await;
 
     let bob = UserId(Uuid::parse_str(&bob_id).unwrap());
     let carol = UserId(Uuid::parse_str(&carol_id).unwrap());
@@ -172,7 +172,7 @@ async fn a_report_filed_in_a_dm_reaches_the_moderators() {
         .oneshot(request(
             "POST",
             "/reports",
-            Some(&bob_token),
+            Some(&carol_token),
             Some(json!({
                 "subject_kind": "message",
                 "subject_id": message_id.0.to_string(),
@@ -223,12 +223,13 @@ async fn a_report_survives_its_channel_being_deleted() {
     let app = app(store.clone());
     let (admin_token, _admin_id) = register(&store, "alice").await;
     let channel_id = general_channel_id(&store).await;
+    let (bob_token, _bob_id) = register(&store, "bob").await;
 
     let extra = store.create_channel("scratch", "text").await.unwrap();
     let report_id = file_a_report(
         &app,
         &extra.id.to_string(),
-        &admin_token,
+        &bob_token,
         &admin_token,
         "worth keeping across a delete",
     )

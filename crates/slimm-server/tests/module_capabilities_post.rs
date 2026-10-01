@@ -145,7 +145,7 @@ async fn a_module_cannot_post_into_a_channel_other_than_the_one_it_ran_in() {
 }
 
 #[tokio::test]
-async fn a_run_that_names_no_channel_is_offered_no_posting() {
+async fn a_run_that_names_no_channel_is_offered_no_poster() {
     let w = world("slimm-modcap-post-no-channel").await;
     let channel = w.store.create_channel("general", "text").await.unwrap();
     let post = post_request(&channel.id.to_string(), "hi");
@@ -158,7 +158,7 @@ async fn a_run_that_names_no_channel_is_offered_no_posting() {
     .await;
     assert_eq!(
         w.answer("announcer").await,
-        "{'error':'capability not approved: message.post','ok':false}"
+        "{'error':'message.post needs a channel','ok':false}"
     );
 }
 
@@ -196,10 +196,7 @@ async fn running_a_code_block_cannot_post() {
         .unwrap();
     let body = w.send(request).await;
     let output = body["output"].as_str().unwrap_or_default();
-    assert!(
-        output.contains("capability not approved: message.post"),
-        "{body}"
-    );
+    assert!(output.contains("message.post needs a channel"), "{body}");
     let landed = w.store.list_messages(channel.id, None, 10).await.unwrap();
     assert_eq!(landed.len(), 1, "only the block's own message exists");
 }
@@ -231,4 +228,21 @@ async fn a_failure_while_attributing_leaves_no_unattributed_message() {
     );
     let landed = w.store.list_messages(channel.id, None, 10).await.unwrap();
     assert!(landed.is_empty(), "the message rolled back with its stamp");
+}
+
+#[tokio::test]
+async fn an_approved_post_run_without_a_channel_says_it_needs_one() {
+    let w = world("slimm-modcap-post-nochannel").await;
+    let channel = w.store.create_channel("general", "text").await.unwrap();
+    let post = post_request(&channel.id.to_string(), "hello");
+    w.install(Install {
+        id: "announcer",
+        wasm: host_call_loop_wasm(&post, 1),
+        declared: &["message.post"],
+        approved_host: &["message.post"],
+    })
+    .await;
+    let answer = w.answer_in("announcer", None).await;
+    assert!(answer.contains("message.post needs a channel"), "{answer}");
+    assert!(!answer.contains("may not do"), "{answer}");
 }

@@ -24,7 +24,7 @@
 //! done to this person", and a single row naming thirty subjects could not.
 
 use super::removals::remove_one;
-use super::timeouts::timeout_one;
+use super::timeouts::{TimeoutError, timeout_one};
 use super::{RemoveMemberError, Store, now_ms};
 use crate::ids::{SessionId, UserId};
 
@@ -65,24 +65,29 @@ impl Store {
     /// member in one batch comes back at the same moment. Deriving it inside
     /// the loop would stagger a batch of thirty across however long the
     /// transaction took, which is a difference nobody asked for.
+    ///
+    /// Returns the members whose timeout actually changed.
     pub async fn bulk_timeout_members(
         &self,
         user_ids: &[UserId],
         until: i64,
         reason: Option<&str>,
         issued_by: UserId,
-    ) -> anyhow::Result<()> {
+    ) -> Result<Vec<UserId>, TimeoutError> {
         if user_ids.is_empty() {
-            return Ok(());
+            return Ok(Vec::new());
         }
         let now = now_ms();
         let mut tx = self.begin_write().await?;
 
+        let mut changed = Vec::new();
         for user_id in user_ids {
-            timeout_one(&mut tx, *user_id, until, reason, issued_by, now).await?;
+            if timeout_one(&mut tx, *user_id, until, reason, issued_by, now).await? {
+                changed.push(*user_id);
+            }
         }
 
         tx.commit().await?;
-        Ok(())
+        Ok(changed)
     }
 }

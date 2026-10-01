@@ -383,6 +383,18 @@ impl Store {
         Ok(row.map(|r| r.is_bot != 0).unwrap_or(false))
     }
 
+    /// Whether this bot holds a token that has not been revoked.
+    pub async fn bot_has_live_token(&self, bot_user_id: UserId) -> anyhow::Result<bool> {
+        let row = sqlx::query_scalar!(
+            r#"SELECT 1 AS "one!: i64" FROM bot_tokens
+               WHERE bot_user_id = ? AND revoked_at IS NULL LIMIT 1"#,
+            bot_user_id
+        )
+        .fetch_optional(&self.pool)
+        .await?;
+        Ok(row.is_some())
+    }
+
     /// Revokes a bot's token and session. The account and its roles stay, so
     /// a role shared with a human is unaffected.
     ///

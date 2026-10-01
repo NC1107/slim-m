@@ -32,15 +32,16 @@ pub(super) struct RoleContext {
 
 impl Store {
     /// Grants a role to a member. Idempotent.
-    pub async fn assign_role(&self, user_id: UserId, role_id: RoleId) -> anyhow::Result<()> {
-        sqlx::query!(
+    pub async fn assign_role(&self, user_id: UserId, role_id: RoleId) -> anyhow::Result<bool> {
+        let inserted = sqlx::query!(
             "INSERT OR IGNORE INTO member_roles (user_id, role_id) VALUES (?, ?)",
             user_id,
             role_id
         )
         .execute(&self.pool)
-        .await?;
-        Ok(())
+        .await?
+        .rows_affected();
+        Ok(inserted > 0)
     }
 
     /// Sets (or replaces) a channel overwrite for a role.

@@ -24,6 +24,10 @@ pub enum CreateChannelError {
     /// [`super::messages::SendError::IdConflict`] refuses to alias a foreign
     /// message rather than returning it.
     IdConflict,
+    /// This id named a channel that has since been deleted. Not a retry: the
+    /// channel is gone for every reader, so answering with it would report a
+    /// success that left nothing behind.
+    Deleted,
     /// `category_id` named a category that does not exist, or one that has
     /// been deleted - categories are soft-deleted, so the column's own
     /// `REFERENCES` still accepts a dead id. Refused rather than filed as
@@ -91,10 +95,9 @@ impl Store {
     /// does: this reads the id before it writes.
     ///
     /// The id probe matches a deleted row as well as a live one: the id
-    /// column is unique either way, so a retry of a create whose channel was
-    /// since removed must still match here and come back as the retry it is,
-    /// rather than fall through to an INSERT that hits the unique id and
-    /// maps to a 500.
+    /// column is unique either way, so falling through to an INSERT would hit
+    /// the unique id and map to a 500. A live match is a retry and comes back
+    /// as one; a deleted match is [`CreateChannelError::Deleted`].
     ///
     /// `channels` also holds DM channels and threads (a thread is a channel
     /// with `parent_message_id` set), neither of which this route can create
@@ -133,6 +136,9 @@ impl Store {
                 && existing.parent_message_id.is_none();
             if !creatable_kind {
                 return Err(CreateChannelError::IdConflict);
+            }
+            if channel_is_deleted(&self.pool, id).await? {
+                return Err(CreateChannelError::Deleted);
             }
             return Ok(CreatedChannel {
                 channel: existing,
@@ -246,6 +252,9 @@ impl Store {
             Err(CreateChannelError::IdConflict) => {
                 anyhow::bail!("a freshly generated channel id collided with an existing row")
             }
+            Err(CreateChannelError::Deleted) => {
+                anyhow::bail!("a freshly generated channel id named a deleted channel")
+            }
             Err(CreateChannelError::UnknownCategory) => {
                 anyhow::bail!("uncategorised create reported an unknown category")
             }
@@ -255,6 +264,13 @@ impl Store {
             Err(CreateChannelError::Internal(err)) => Err(err),
         }
     }
+}
+
+async fn channel_is_deleted(pool: &sqlx::SqlitePool, id: ChannelId) -> anyhow::Result<bool> {
+    let deleted_at = sqlx::query_scalar!("SELECT deleted_at FROM channels WHERE id = ?", id)
+        .fetch_one(pool)
+        .await?;
+    Ok(deleted_at.is_some())
 }
 
 /// Fetches a channel by id, live or deleted, over any executor - the pool for

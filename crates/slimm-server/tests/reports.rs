@@ -256,7 +256,7 @@ async fn the_queue_carries_the_snapshot_and_resolving_removes_it() {
         ))
         .await
         .unwrap();
-    assert_eq!(again.status(), StatusCode::NOT_FOUND);
+    assert_eq!(again.status(), StatusCode::CONFLICT);
 }
 
 #[tokio::test]

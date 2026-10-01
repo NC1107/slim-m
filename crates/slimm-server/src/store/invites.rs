@@ -214,6 +214,24 @@ impl Store {
         Ok(result.rows_affected() > 0)
     }
 
+    /// Whether `code` names an invite `required_creator` could have revoked,
+    /// revoked already or not.
+    pub async fn invite_exists(
+        &self,
+        code: &str,
+        required_creator: Option<UserId>,
+    ) -> anyhow::Result<bool> {
+        let row = sqlx::query_scalar!(
+            r#"SELECT 1 AS "one!: i64" FROM invites
+               WHERE code = ? AND (?2 IS NULL OR created_by = ?2)"#,
+            code,
+            required_creator
+        )
+        .fetch_optional(&self.pool)
+        .await?;
+        Ok(row.is_some())
+    }
+
     /// Whether a code could be redeemed, without spending it. A thin
     /// boolean view over [`Store::check_invite`] for callers (and existing
     /// tests) that only need the yes/no answer.

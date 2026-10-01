@@ -29,6 +29,7 @@ use super::error::ApiError;
 use super::extract::{AUTHED_READ, Authed, AuthedLimited, Json, Query, enforce};
 use super::messages::parse_uuid;
 use super::reports_cursor::parse_history_cursor;
+use super::reports_guards::{missing_or_closed, require_manage_messages};
 use super::reports_mine::my_report_status;
 use crate::hub::Event;
 use crate::ids::{ChannelId, UserId};
@@ -426,7 +427,7 @@ async fn resolve(
     };
 
     let Some(channel_id) = state.store.open_report_channel(report_id).await? else {
-        return Err(ApiError::NotFound("report not found"));
+        return Err(missing_or_closed(&state, report_id).await?);
     };
     if let Some(channel_id) = channel_id
         && !report_visible_in(&state, ctx.user_id, channel_id).await
@@ -439,23 +440,11 @@ async fn resolve(
         .resolve_report(report_id, ctx.user_id, resolution)
         .await?;
     if !closed {
-        return Err(ApiError::NotFound("report not found"));
+        return Err(missing_or_closed(&state, report_id).await?);
     }
     // No content rides along; see `Event::ReportsChanged`'s own doc.
     state.hub.publish(Event::ReportsChanged);
     Ok(StatusCode::NO_CONTENT)
-}
-
-async fn require_manage_messages(state: &AppState, user_id: UserId) -> Result<(), ApiError> {
-    if !state
-        .store
-        .base_permissions(user_id)
-        .await?
-        .contains(Permissions::MANAGE_MESSAGES)
-    {
-        return Err(ApiError::Forbidden);
-    }
-    Ok(())
 }
 
 /// The bar for [`history`]: either bit clears it.

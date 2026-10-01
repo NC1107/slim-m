@@ -122,6 +122,21 @@ pub(crate) async fn attach_polls(
     Ok(())
 }
 
+fn refuse_hidden_poll_text(question: &str, options: &[String]) -> Result<(), ApiError> {
+    use super::hidden_chars::is_hidden_char;
+    if question.chars().any(is_hidden_char) {
+        return Err(ApiError::BadRequest(
+            "poll question must not contain control or invisible characters",
+        ));
+    }
+    if options.iter().any(|o| o.chars().any(is_hidden_char)) {
+        return Err(ApiError::BadRequest(
+            "poll option must not contain control or invisible characters",
+        ));
+    }
+    Ok(())
+}
+
 #[derive(Deserialize)]
 struct CreatePollMessageRequest {
     /// Client-generated UUID (v7 preferred), exactly like an ordinary send;
@@ -167,6 +182,7 @@ async fn create(
     }
 
     let content = validate_caption(&req.content)?;
+    refuse_hidden_poll_text(&req.question, &req.options)?;
     let id = MessageId(parse_uuid(&req.id)?);
     let sent = match state
         .store

@@ -153,6 +153,20 @@ fn refuse_ungrantable(caller: Permissions, granted: Permissions) -> Result<(), A
     }
 }
 
+/// Refuses bits this server does not define, and a pair that both allows and
+/// denies one bit: the evaluator would have to pick a winner silently.
+fn check_bits(allow: Permissions, deny: Permissions) -> Result<(), ApiError> {
+    if !Permissions::ALL.contains(allow) || !Permissions::ALL.contains(deny) {
+        return Err(ApiError::BadRequest("unknown permission bits"));
+    }
+    if allow.bits() & deny.bits() != 0 {
+        return Err(ApiError::BadRequest(
+            "allow and deny cannot both name the same permission",
+        ));
+    }
+    Ok(())
+}
+
 /// Sets (or replaces) an overwrite. Rejects unknown permission bits outright,
 /// and rejects any `allow` bit the caller does not themselves currently hold
 /// in this channel.
@@ -176,9 +190,7 @@ async fn set(
 
     let allow = Permissions::from_bits(req.allow);
     let deny = Permissions::from_bits(req.deny);
-    if !Permissions::ALL.contains(allow) || !Permissions::ALL.contains(deny) {
-        return Err(ApiError::BadRequest("unknown permission bits"));
-    }
+    check_bits(allow, deny)?;
     // Compares against what the write really grants, cleared denies included;
     // see the note on this function.
     let (target_type, target_id) = match target {
@@ -264,20 +276,24 @@ async fn batch_set(
         return Err(ApiError::BadRequest("too many overwrites in one batch"));
     }
 
+    let mut named = std::collections::HashSet::new();
     let mut entries = Vec::with_capacity(req.overwrites.len());
     let mut targets = Vec::with_capacity(req.overwrites.len());
     for item in &req.overwrites {
         let target = parse_target(&item.kind, &item.id)?;
         let allow = Permissions::from_bits(item.allow);
         let deny = Permissions::from_bits(item.deny);
-        if !Permissions::ALL.contains(allow) || !Permissions::ALL.contains(deny) {
-            return Err(ApiError::BadRequest("unknown permission bits"));
-        }
+        check_bits(allow, deny)?;
 
         let (target_type, target_id): (&'static str, uuid::Uuid) = match target {
             Target::Role(role_id) => ("role", role_id.0),
             Target::Member(user_id) => ("member", user_id.0),
         };
+        if !named.insert((target_type, target_id)) {
+            return Err(ApiError::BadRequest(
+                "a batch cannot name the same role or member more than once",
+            ));
+        }
         match target {
             Target::Role(role_id) if state.store.role(role_id).await?.is_none() => {
                 return Err(ApiError::NotFound("role not found"));

@@ -14,6 +14,7 @@
 
 use crate::ids::{SessionId, UserId};
 
+use super::moderation_audit::{ModerationAudit, record_moderation_audit};
 use super::{Store, now_ms};
 
 /// Why deleting an account was refused.
@@ -22,6 +23,8 @@ pub enum DeleteAccountError {
     /// Doing it would leave other people in a deployment with no administrator
     /// and no way to appoint one.
     WouldStrandDeployment,
+    /// The account does not exist, or has already been deleted.
+    UserNotFound,
     Internal(anyhow::Error),
 }
 
@@ -79,10 +82,39 @@ impl Store {
         &self,
         user_id: UserId,
     ) -> Result<Vec<SessionId>, DeleteAccountError> {
+        self.purge_account(user_id, None).await
+    }
+
+    /// [`Store::delete_account`] as an administrator's act on somebody else's
+    /// account: the same purge, plus an `account_delete` row in the moderation
+    /// audit log written in the same transaction, since nothing undoes it.
+    pub async fn delete_account_by_admin(
+        &self,
+        user_id: UserId,
+        deleted_by: UserId,
+    ) -> Result<Vec<SessionId>, DeleteAccountError> {
+        self.purge_account(user_id, Some(deleted_by)).await
+    }
+
+    async fn purge_account(
+        &self,
+        user_id: UserId,
+        audited_by: Option<UserId>,
+    ) -> Result<Vec<SessionId>, DeleteAccountError> {
         let now = now_ms();
         let mut tx = self.begin_write().await?;
 
-        // Write-first: takes the lock up front; deleting devices cascades these.
+        let live = sqlx::query_scalar!(
+            r#"SELECT 1 AS "one!: i64" FROM users WHERE id = ? AND deleted_at IS NULL"#,
+            user_id
+        )
+        .fetch_optional(&mut *tx)
+        .await?;
+        if live.is_none() {
+            return Err(DeleteAccountError::UserNotFound);
+        }
+
+        // Deleting devices cascades these.
         let revoked: Vec<SessionId> = sqlx::query!(
             r#"UPDATE sessions SET revoked_at = ? WHERE user_id = ?
                RETURNING id AS "id!: SessionId""#,
@@ -406,6 +438,21 @@ impl Store {
             if others > 0 {
                 return Err(DeleteAccountError::WouldStrandDeployment);
             }
+        }
+
+        if let Some(actor_id) = audited_by {
+            record_moderation_audit(
+                &mut tx,
+                ModerationAudit {
+                    actor_id,
+                    subject_id: user_id,
+                    action: "account_delete",
+                    reason: None,
+                    until: None,
+                    created_at: now,
+                },
+            )
+            .await?;
         }
 
         tx.commit().await?;

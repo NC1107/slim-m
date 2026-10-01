@@ -25,6 +25,9 @@ use serde::{Deserialize, Serialize};
 
 use super::AppState;
 use super::channel_slow_mode::validate_slow_mode_seconds;
+use super::channel_validation::{
+    JOIN_MUTED_VOICE_ONLY, validate_channel_name, validate_channel_topic,
+};
 use super::error::ApiError;
 use super::extract::{AUTHED_READ, Authed, AuthedLimited, Json, enforce};
 use super::messages::parse_uuid;
@@ -36,10 +39,6 @@ use crate::store::{Channel, DM_CHANNEL_KIND, DeleteChannelError};
 use crate::voice::VoiceError;
 
 const CHANNEL_BODY_LIMIT: usize = 4 * 1024;
-/// A one-line header, not a description field: long enough for a real
-/// sentence, short enough that a client never needs to wrap or truncate it
-/// in the channel header it's designed for.
-const CHANNEL_TOPIC_MAX_CHARS: usize = 256;
 
 /// The channel routes, mounted by [`super::router`].
 pub fn routes() -> Router<AppState> {
@@ -130,6 +129,16 @@ impl From<Channel> for ChannelDto {
             slow_mode_seconds: channel.slow_mode_seconds,
             join_muted: channel.join_muted,
             restricted: None,
+        }
+    }
+}
+
+impl ChannelDto {
+    /// A channel row with the reader-independent `restricted` fact attached.
+    pub(crate) fn with_restricted(channel: Channel, restricted: bool) -> Self {
+        Self {
+            restricted: Some(restricted),
+            ..Self::from(channel)
         }
     }
 }
@@ -248,6 +257,9 @@ async fn create(
     if !matches!(kind, "text" | "voice") {
         return Err(ApiError::BadRequest("kind must be text or voice"));
     }
+    if req.join_muted == Some(true) && kind != "voice" {
+        return Err(ApiError::BadRequest(JOIN_MUTED_VOICE_ONLY));
+    }
     let id = req
         .id
         .as_deref()
@@ -279,13 +291,14 @@ async fn create(
         )
         .await?;
     let channel = created.channel;
+    let restricted = state.store.channel_restricted(channel.id).await?;
     // An idempotent retry must not fan out again; see the note on `CreatedChannel::fresh`.
     if created.fresh {
         state
             .hub
-            .publish(Event::ChannelCreated(Arc::new(channel.clone())));
+            .publish(Event::ChannelCreated(Arc::new(channel.clone()), restricted));
     }
-    Ok(Json(channel.into()))
+    Ok(Json(ChannelDto::with_restricted(channel, restricted)))
 }
 
 /// Renames a channel, replaces its topic, and/or sets its slow-mode interval.
@@ -325,6 +338,16 @@ async fn update(
     {
         return Err(ApiError::BadRequest("nothing to update"));
     }
+    if req.join_muted == Some(true) {
+        let current = state
+            .store
+            .channel(channel_id)
+            .await?
+            .ok_or(ApiError::NotFound("channel not found"))?;
+        if current.kind != "voice" {
+            return Err(ApiError::BadRequest(JOIN_MUTED_VOICE_ONLY));
+        }
+    }
 
     let mut channel = if name.is_some() || topic.is_some() {
         state
@@ -353,10 +376,11 @@ async fn update(
             .await?
             .ok_or(ApiError::NotFound("channel not found"))?;
     }
+    let restricted = state.store.channel_restricted(channel_id).await?;
     state
         .hub
-        .publish(Event::ChannelUpdated(Arc::new(channel.clone())));
-    Ok(Json(channel.into()))
+        .publish(Event::ChannelUpdated(Arc::new(channel.clone()), restricted));
+    Ok(Json(ChannelDto::with_restricted(channel, restricted)))
 }
 
 /// Soft-deletes a channel. Requires MANAGE_CHANNELS at the deployment level.
@@ -444,41 +468,4 @@ async fn end_voice_room(state: &AppState, channel_id: ChannelId) {
             tracing::warn!(%err, "could not end the deleted channel's voice room");
         }
     }
-}
-
-// --- Validation ---
-
-/// Normalizes a topic edit. A blank (or whitespace-only) value clears the
-/// topic back to `None` rather than being stored as an empty string: a topic
-/// with nothing visible in it is not meaningfully different from having
-/// none, and folding the two together means a single `Option<String>` field
-/// can carry "clear it" without a separate tri-state signal.
-fn validate_channel_topic(topic: &str) -> Result<Option<String>, ApiError> {
-    let trimmed = topic.trim();
-    if trimmed.chars().count() > CHANNEL_TOPIC_MAX_CHARS {
-        return Err(ApiError::BadRequest("topic must be at most 256 characters"));
-    }
-    if trimmed.chars().any(|c| c.is_control()) {
-        return Err(ApiError::BadRequest(
-            "topic must not contain control characters",
-        ));
-    }
-    Ok(if trimmed.is_empty() {
-        None
-    } else {
-        Some(trimmed.to_owned())
-    })
-}
-
-fn validate_channel_name(name: &str) -> Result<&str, ApiError> {
-    let trimmed = name.trim();
-    if trimmed.is_empty() || trimmed.chars().count() > 64 {
-        return Err(ApiError::BadRequest("name must be 1 to 64 characters"));
-    }
-    if trimmed.chars().any(|c| c.is_control()) {
-        return Err(ApiError::BadRequest(
-            "name must not contain control characters",
-        ));
-    }
-    Ok(trimmed)
 }

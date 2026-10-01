@@ -161,7 +161,7 @@ async fn a_moderator_sees_a_filed_report_live_and_a_non_moderator_sees_nothing()
     let channel = store.create_channel("general", "text").await.unwrap();
     let state = state_for(&store);
 
-    let (_alice_access, alice_ticket, alice) = user_ticket(&store, "alice").await;
+    let (alice_access, alice_ticket, alice) = user_ticket(&store, "alice").await;
     store.assign_role(alice, moderator_role).await.unwrap();
     let (bob_access, bob_ticket, _bob) = user_ticket(&store, "bob").await;
 
@@ -169,13 +169,13 @@ async fn a_moderator_sees_a_filed_report_live_and_a_non_moderator_sees_nothing()
     let mut alice_ws = connect(addr, &alice_ticket).await;
     let mut bob_ws = connect(addr, &bob_ticket).await;
 
-    // Bob authors and reports his own message; either way, the queue changed.
+    // Alice authors the message and bob reports it; either way, the queue changed.
     let sent = axum::body::to_bytes(
         http::router(state.clone())
             .oneshot(request(
                 "POST",
                 &format!("/channels/{}/messages", channel.id),
-                &bob_access,
+                &alice_access,
                 json!({ "id": Uuid::now_v7().to_string(), "content": "look at this" }),
             ))
             .await
@@ -240,7 +240,7 @@ async fn a_moderator_sees_a_resolved_report_live_and_a_non_moderator_sees_nothin
             .oneshot(request(
                 "POST",
                 &format!("/channels/{}/messages", channel.id),
-                &bob_access,
+                &alice_access,
                 json!({ "id": Uuid::now_v7().to_string(), "content": "look at this" }),
             ))
             .await

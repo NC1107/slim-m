@@ -45,6 +45,20 @@ pub(crate) const TIMEOUT_DENY: Permissions = Permissions::SEND_MESSAGES
     .union(Permissions::CONNECT)
     .union(Permissions::SPEAK);
 
+/// Why a timeout was refused.
+#[derive(Debug)]
+pub enum TimeoutError {
+    /// The account does not exist, or has been deleted.
+    UserNotFound,
+    Internal(anyhow::Error),
+}
+
+impl From<sqlx::Error> for TimeoutError {
+    fn from(err: sqlx::Error) -> Self {
+        TimeoutError::Internal(err.into())
+    }
+}
+
 /// A timeout in force, as a moderator sees it.
 #[derive(Debug, Clone)]
 pub struct MemberTimeout {
@@ -58,6 +72,8 @@ pub struct MemberTimeout {
 
 impl Store {
     /// Applies a timeout, replacing any timeout already on this member.
+    /// Answers whether anything changed: the same deadline and reason again
+    /// writes and audits nothing.
     ///
     /// Replacing rather than refusing is what lets a moderator shorten one
     /// they overdid, and re-issuing is the only thing "extend it" could mean.
@@ -71,12 +87,12 @@ impl Store {
         until: i64,
         reason: Option<&str>,
         issued_by: UserId,
-    ) -> anyhow::Result<()> {
+    ) -> Result<bool, TimeoutError> {
         let now = now_ms();
         let mut tx = self.begin_write().await?;
-        timeout_one(&mut tx, user_id, until, reason, issued_by, now).await?;
+        let changed = timeout_one(&mut tx, user_id, until, reason, issued_by, now).await?;
         tx.commit().await?;
-        Ok(())
+        Ok(changed)
     }
 
     /// Lifts a timeout. Idempotent: lifting one that already expired, or one
@@ -92,7 +108,7 @@ impl Store {
         &self,
         user_id: UserId,
         cleared_by: UserId,
-    ) -> anyhow::Result<()> {
+    ) -> anyhow::Result<bool> {
         let now = now_ms();
         let mut tx = self.begin_write().await?;
 
@@ -121,7 +137,7 @@ impl Store {
         }
 
         tx.commit().await?;
-        Ok(())
+        Ok(lifted.is_some())
     }
 
     /// The timeout in force on this member right now, if any. An elapsed row
@@ -214,7 +230,25 @@ pub(super) async fn timeout_one(
     reason: Option<&str>,
     issued_by: UserId,
     now: i64,
-) -> Result<(), sqlx::Error> {
+) -> Result<bool, TimeoutError> {
+    let exists = sqlx::query_scalar!(
+        r#"SELECT 1 AS "one!: i64" FROM users WHERE id = ? AND deleted_at IS NULL"#,
+        user_id
+    )
+    .fetch_optional(&mut *tx)
+    .await?;
+    if exists.is_none() {
+        return Err(TimeoutError::UserNotFound);
+    }
+    let current = sqlx::query!(
+        "SELECT until, reason FROM member_timeouts WHERE user_id = ?",
+        user_id
+    )
+    .fetch_optional(&mut *tx)
+    .await?;
+    if current.is_some_and(|row| row.until == until && row.reason.as_deref() == reason) {
+        return Ok(false);
+    }
     sqlx::query!(
         "INSERT INTO member_timeouts (user_id, until, reason, issued_by, issued_at)
          VALUES (?, ?, ?, ?, ?)
@@ -243,5 +277,6 @@ pub(super) async fn timeout_one(
             created_at: now,
         },
     )
-    .await
+    .await?;
+    Ok(true)
 }

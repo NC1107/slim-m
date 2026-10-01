@@ -15,6 +15,7 @@
 use crate::auth::{generate_secret, hash_secret};
 use crate::ids::{SessionId, UserId};
 
+use super::moderation_audit::{ModerationAudit, record_moderation_audit};
 use super::sessions::revoke_session_rows;
 use super::{Store, now_ms};
 
@@ -73,6 +74,7 @@ impl Store {
 
         // The existence check rides inside the INSERT (as `Store::open_session`
         // guards its device insert), leaving no gap for the account to vanish.
+        let mut tx = self.begin_write().await?;
         let inserted = sqlx::query!(
             "INSERT INTO password_reset_codes (code_hash, user_id, issued_by, issued_at, expires_at)
              SELECT ?, ?, ?, ?, ?
@@ -84,12 +86,25 @@ impl Store {
             expires_at,
             user_id
         )
-        .execute(&self.pool)
+        .execute(&mut *tx)
         .await?
         .rows_affected();
         if inserted == 0 {
             return Err(IssueResetError::NoSuchUser);
         }
+        record_moderation_audit(
+            &mut tx,
+            ModerationAudit {
+                actor_id: issued_by,
+                subject_id: user_id,
+                action: "reset_code_issue",
+                reason: None,
+                until: None,
+                created_at: now,
+            },
+        )
+        .await?;
+        tx.commit().await?;
         Ok((code, expires_at))
     }
 

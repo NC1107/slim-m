@@ -275,7 +275,7 @@ async fn a_restricted_moderator_still_sees_reports_with_no_channel_a_dm_or_a_del
     let (admin_id, admin_token) = register(&store, "alice").await;
     let channel = store.list_channels().await.unwrap()[0].id;
     let (carol_id, carol_token) = restricted_moderator(&store, channel).await;
-    let (bob_id, _bob_token) = register(&store, "bob").await;
+    let (bob_id, bob_token) = register(&store, "bob").await;
     let _ = carol_id;
 
     // A report about a user carries no channel at all.
@@ -304,7 +304,7 @@ async fn a_restricted_moderator_still_sees_reports_with_no_channel_a_dm_or_a_del
     let dm_message = store
         .send_message(NewMessage::plain(
             dm.id,
-            admin_id,
+            bob_id,
             slimm_server::ids::MessageId::generate(),
             "dm content",
         ))
@@ -315,7 +315,7 @@ async fn a_restricted_moderator_still_sees_reports_with_no_channel_a_dm_or_a_del
 
     // A report about a message in a channel that is later deleted.
     let extra = store.create_channel("scratch", "text").await.unwrap();
-    let extra_message = send(&app, extra.id, &admin_token, "worth keeping").await;
+    let extra_message = send(&app, extra.id, &bob_token, "worth keeping").await;
     let extra_report_id =
         file_report(&app, extra_message["id"].as_str().unwrap(), &admin_token).await;
     let deleted = app

@@ -52,18 +52,16 @@ pub(crate) fn effective_capabilities(module: &InstalledModule) -> Vec<String> {
 /// Must be called from inside the tokio runtime that will drive the run.
 ///
 /// `channel` is the channel the invoker ran the command from. Without one the
-/// run is untrusted (a code block's text, or a caller that named no channel)
-/// and `message.post` is not offered at all.
+/// run is untrusted (a code block's text, or a caller that named no channel):
+/// `message.post` stays approved but has no poster, so a call to it is refused
+/// by name instead of the module being refused its import.
 pub(crate) fn surface_for(
     state: &AppState,
     module: &InstalledModule,
     user_id: UserId,
     channel: Option<ChannelId>,
 ) -> CapabilitySurface {
-    let mut approved = effective_capabilities(module);
-    if channel.is_none() {
-        approved.retain(|c| c != "message.post");
-    }
+    let approved = effective_capabilities(module);
     if approved.is_empty() {
         return CapabilitySurface::Disabled;
     }
