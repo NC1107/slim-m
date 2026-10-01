@@ -149,10 +149,8 @@ class ReorderableChannelRows extends StatelessWidget {
       );
     }
     final touch = AppTouchTargets.of(context);
-    // Not a ReorderableListView: that owns an inner Scrollable, so a drag's
-    // edge auto-scroll would target a view that never moves. A bare viewport
-    // has no Scrollable, so the rail's own scroll view is the one that scrolls.
-    return ShrinkWrappingViewport(
+    // A bare viewport has no Scrollable, so a drag's edge auto-scroll moves the rail's own.
+    final list = ShrinkWrappingViewport(
       offset: _fixedOffset,
       axisDirection: AxisDirection.down,
       crossAxisDirection: Viewport.getDefaultCrossAxisDirection(
@@ -178,6 +176,13 @@ class ReorderableChannelRows extends StatelessWidget {
         ),
       ],
     );
+    // A host with no scroll view of its own still needs the one a drag looks up.
+    return Scrollable.maybeOf(context) == null
+        ? SingleChildScrollView(
+            physics: const NeverScrollableScrollPhysics(),
+            child: list,
+          )
+        : list;
   }
 
   void _reorder(List<RailItem> items, int oldIndex, int newIndex) {
