@@ -52,6 +52,7 @@ mod host;
 mod kv;
 mod limits;
 mod post;
+mod sliced;
 
 pub use capabilities::CapabilitySurface;
 pub use host::{ModuleHost, RunError};
@@ -61,3 +62,6 @@ pub use post::{MessagePoster, PostRefused};
 
 #[cfg(test)]
 mod tests;
+
+#[cfg(test)]
+mod tests_limits;

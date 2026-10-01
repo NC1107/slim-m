@@ -7,15 +7,15 @@ use std::fmt;
 use std::time::Instant;
 
 use sha2::{Digest, Sha256};
-use wasmi::core::TrapCode;
 use wasmi::{
     Caller, Extern, Instance, Linker, Memory, Module, Store as WasmiStore, StoreContext,
-    StoreLimits, StoreLimitsBuilder,
+    StoreLimits,
 };
 
 use super::capabilities::CapabilitySurface;
 use super::compiled::{compiled_module, shared_engine};
-use super::limits::RunLimits;
+use super::limits::{MAX_RESPONSE_BYTES, RunLimits, store_limits};
+use super::sliced::{FuelBudget, call_sliced};
 use crate::media::to_hex;
 
 /// Why a run did not produce the module's own response bytes. Every variant
@@ -66,14 +66,10 @@ pub struct ModuleHost;
 
 impl ModuleHost {
     /// Verifies `wasm`'s sha256 against `expected_sha256`, then instantiates
-    /// and calls it on a blocking task bounded by `limits.wall`: wasmi has no
-    /// way to preempt a running interpreter loop from outside, so a module
-    /// that somehow outruns its fuel budget (or one configured with an
-    /// unreasonably large one) is abandoned at the wall-clock deadline rather
-    /// than left to block the caller. The blocking task itself is not
-    /// killed - only fuel exhaustion or completion ends it - but the fuel
-    /// cap is sized so that in practice it always ends first; the timeout is
-    /// the backstop that keeps a caller from ever waiting past it.
+    /// and calls it on a blocking task bounded by `limits.wall`. The run
+    /// executes in fuel slices and checks the deadline between them, so a
+    /// timeout also stops the wasm; the outer timeout is only a backstop for
+    /// a task that never reaches a slice boundary.
     pub async fn run(
         wasm: Vec<u8>,
         expected_sha256: String,
@@ -151,20 +147,18 @@ fn run_sync(
         }
     }
 
-    let store_limits = StoreLimitsBuilder::new()
-        .memory_size(limits.memory_bytes)
-        .build();
     let mut store = WasmiStore::new(
         engine,
         HostState {
-            limits: store_limits,
+            limits: store_limits(limits.memory_bytes),
             surface,
             deadline,
         },
     );
     store.limiter(|state| &mut state.limits);
-    store
-        .set_fuel(limits.fuel)
+    let mut budget = FuelBudget::new(limits.fuel);
+    budget
+        .next_slice(&mut store)
         .map_err(|e| RunError::Instantiate(format!("failed to configure fuel: {e}")))?;
 
     let instance = if imports_host_call {
@@ -193,16 +187,22 @@ fn run_sync(
 
     let in_len = i32::try_from(input.len())
         .map_err(|_| RunError::Instantiate("request too large for a wasm module".to_owned()))?;
-    let in_ptr = alloc.call(&mut store, in_len).map_err(classify_trap)?;
+    let in_ptr = call_sliced(&mut store, &alloc, in_len, (&mut budget, deadline))?;
     memory
         .write(&mut store, in_ptr as usize, input)
         .map_err(|e| RunError::Instantiate(format!("module's alloc returned bad memory: {e}")))?;
 
-    let packed = run
-        .call(&mut store, (in_ptr, in_len))
-        .map_err(classify_trap)?;
+    let packed = call_sliced(&mut store, &run, (in_ptr, in_len), (&mut budget, deadline))?;
     let out_ptr = (packed >> 32) as u32 as usize;
     let out_len = (packed & 0xffff_ffff) as u32 as usize;
+    let inside_memory = out_ptr
+        .checked_add(out_len)
+        .is_some_and(|end| end <= memory.data_size(&store));
+    if inside_memory && out_len > MAX_RESPONSE_BYTES {
+        return Err(RunError::ResourceLimited(format!(
+            "its response is larger than the {MAX_RESPONSE_BYTES} byte limit"
+        )));
+    }
     read_guest(&memory, &store, out_ptr, out_len).ok_or_else(|| {
         RunError::Trap("run returned a response region outside the module's memory".to_owned())
     })
@@ -273,21 +273,4 @@ fn host_call(mut caller: Caller<'_, HostState>, req_ptr: i32, req_len: i32) -> i
         return 0;
     }
     ((out_ptr as i64) << 32) | (out_len as i64 & 0xffff_ffff)
-}
-
-/// Fuel exhaustion and a limiter-denied memory growth both surface as a
-/// [`TrapCode`], so both map to [`RunError::ResourceLimited`]; every other
-/// trap (an out-of-bounds access, an explicit unreachable, and so on) is the
-/// module's own bug, not a limit, and maps to [`RunError::Trap`].
-fn classify_trap(err: wasmi::Error) -> RunError {
-    match err.as_trap_code() {
-        Some(TrapCode::OutOfFuel) => {
-            RunError::ResourceLimited("exceeded its fuel (CPU) budget".to_owned())
-        }
-        Some(TrapCode::GrowthOperationLimited) => {
-            RunError::ResourceLimited("exceeded its memory budget".to_owned())
-        }
-        Some(code) => RunError::Trap(format!("{code:?}")),
-        None => RunError::Trap(err.to_string()),
-    }
 }
