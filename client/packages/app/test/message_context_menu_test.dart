@@ -336,6 +336,9 @@ void main() {
     await tester.longPressAt(pressPoint(tester));
     await tester.pumpAndSettle();
 
+    expect(find.text('Report message'), findsNothing);
+    await tester.tap(find.text('More'));
+    await tester.pumpAndSettle();
     expect(find.text('Report message'), findsOneWidget);
     expect(find.text('Block user'), findsOneWidget);
 
@@ -345,8 +348,59 @@ void main() {
 
     await tester.longPressAt(pressPoint(tester));
     await tester.pumpAndSettle();
+    await tester.tap(find.text('More'));
+    await tester.pumpAndSettle();
     await tester.tap(find.text('Block user'));
     expect(blocked, isTrue);
+  });
+
+  testWidgets('a fully permitted menu shows at most eight rows, rest in More', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      rowWith(
+        MessageActions(
+          canReply: true,
+          onReply: noop,
+          canEdit: true,
+          onEdit: noop,
+          canDelete: true,
+          onDelete: noop,
+          canManagePins: true,
+          pinned: false,
+          onTogglePin: noop,
+          canReport: true,
+          onReport: noop,
+          canBlockAuthor: true,
+          onBlockAuthor: noop,
+          canOpenThread: true,
+          onOpenThread: noop,
+          canCopyLink: true,
+          onCopyLink: noop,
+          canForward: true,
+          onForward: noop,
+          canSave: true,
+          onSave: noop,
+          onStartSelecting: noop,
+        ),
+      ),
+    );
+
+    await tester.longPressAt(pressPoint(tester));
+    await tester.pumpAndSettle();
+
+    expect(find.byType(AppMenuItem).evaluate().length, lessThanOrEqualTo(8));
+    expect(find.text('More'), findsOneWidget);
+    for (final hidden in ['Copy link', 'Forward message', 'Save message']) {
+      expect(find.text(hidden), findsNothing, reason: hidden);
+    }
+
+    await tester.tap(find.text('More'));
+    await tester.pumpAndSettle();
+    for (final shown in ['Copy link', 'Forward message', 'Select messages']) {
+      expect(find.text(shown), findsOneWidget, reason: shown);
+    }
+    expect(find.byType(AppMenuItem).evaluate().length, lessThanOrEqualTo(8));
   });
 
   // The bug: the only add-reaction control was revealed by a MouseRegion,

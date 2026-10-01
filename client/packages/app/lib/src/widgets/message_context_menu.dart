@@ -12,6 +12,7 @@ import 'package:slimm_design_system/design_system.dart';
 import 'bot_menu_sections.dart';
 import 'context_menu_region.dart';
 import 'hover_reveal.dart';
+import 'message_menu_steps.dart';
 import '../action_labels.dart';
 import 'message_row_roving.dart';
 
@@ -186,7 +187,7 @@ class _MessageContextMenuRegionState extends State<MessageContextMenuRegion> {
     // See MessageActions.hasExistingThread's own doc comment for why "Reply" stays offered here.
     final showThreadHint = actions.canReply && actions.hasExistingThread;
 
-    return [
+    final primary = <Widget>[
       AppMenuItem(
         label: ActionLabels.addReaction,
         leading: AppIcons.smile,
@@ -222,6 +223,30 @@ class _MessageContextMenuRegionState extends State<MessageContextMenuRegion> {
         onTap: () =>
             run(() => Clipboard.setData(ClipboardData(text: widget.content))),
       ),
+      if (actions.canEdit)
+        AppMenuItem(
+          label: 'Edit',
+          leading: AppIcons.edit,
+          onTap: () => run(actions.onEdit),
+        ),
+      if (actions.canManagePins)
+        AppMenuItem(
+          label: actions.pinned ? 'Unpin' : 'Pin',
+          leading: AppIcons.pin,
+          onTap: () => run(actions.onTogglePin),
+        ),
+      if (actions.canDelete) ...[
+        const AppMenuDivider(),
+        AppMenuItem(
+          label: 'Delete',
+          leading: AppIcons.delete,
+          tone: AppMenuItemTone.danger,
+          onTap: () => run(actions.onDelete),
+        ),
+      ],
+    ];
+
+    final more = <Widget>[
       if (actions.canCopyLink)
         AppMenuItem(
           label: 'Copy link',
@@ -240,51 +265,30 @@ class _MessageContextMenuRegionState extends State<MessageContextMenuRegion> {
           leading: AppIcons.bookmark,
           onTap: () => run(actions.onSave),
         ),
-      if (actions.canEdit)
-        AppMenuItem(
-          label: 'Edit',
-          leading: AppIcons.edit,
-          onTap: () => run(actions.onEdit),
-        ),
-      if (actions.canManagePins)
-        AppMenuItem(
-          label: actions.pinned ? 'Unpin' : 'Pin',
-          leading: AppIcons.pin,
-          onTap: () => run(actions.onTogglePin),
-        ),
-      if (actions.canReport || actions.canBlockAuthor) ...[
-        const AppMenuDivider(),
-        if (actions.canReport)
-          AppMenuItem(
-            label: 'Report message',
-            leading: AppIcons.report,
-            onTap: () => run(actions.onReport),
-          ),
-        if (actions.canBlockAuthor)
-          AppMenuItem(
-            label: 'Block user',
-            leading: AppIcons.revoke,
-            tone: AppMenuItemTone.danger,
-            onTap: () => run(actions.onBlockAuthor),
-          ),
-      ],
-      if (actions.canDelete) ...[
-        const AppMenuDivider(),
+      if (actions.canDelete)
         if (actions.onStartSelecting case final VoidCallback start)
           AppMenuItem(
             label: 'Select messages',
             leading: AppIcons.check,
             onTap: () => run(start),
           ),
+      if (actions.canReport)
         AppMenuItem(
-          label: 'Delete',
-          leading: AppIcons.delete,
-          tone: AppMenuItemTone.danger,
-          onTap: () => run(actions.onDelete),
+          label: 'Report message',
+          leading: AppIcons.report,
+          onTap: () => run(actions.onReport),
         ),
-      ],
+      if (actions.canBlockAuthor)
+        AppMenuItem(
+          label: 'Block user',
+          leading: AppIcons.revoke,
+          tone: AppMenuItemTone.danger,
+          onTap: () => run(actions.onBlockAuthor),
+        ),
       ...botMenuItems(actions.botSections, close),
     ];
+
+    return [MenuWithMore(primary: primary, more: more)];
   }
 
   @override
