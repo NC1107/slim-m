@@ -37,6 +37,8 @@ on:
       - "docker/server.Dockerfile"
       - "docker/web*"
       - ".github/workflows/web-image.yml"
+      - ".github/workflows/copr-publish.yml"
+      - ".github/actions/**"
       - ".sqlx/**"
       # Its own file, so a change to how these builds work is validated and
       # deployed by them rather than waiting on unrelated work to trigger it.
@@ -107,10 +109,12 @@ jobs:
               - 'client/**'
               - 'docker/web*'
               - '.github/workflows/web-image.yml'
+              - '.github/actions/**'
             server:
               - 'crates/**'
             packaging:
               - 'packaging/**'
+              - '.github/workflows/copr-publish.yml'
 
       # The filter above asks what this push touched; this asks what is still
       # undeployed, which is a different and more useful question. See the

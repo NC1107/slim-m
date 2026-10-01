@@ -943,7 +943,7 @@ A tagged release still supersedes all of this: it wins over any COPR snapshot of
 
 ### What triggers it, and the one filter step that replaces two workflows
 
-A single `on.push.paths` list cannot tell a client-only merge from a server-only one, so the trigger is deliberately wide (`client/**`, `crates/**` or `packaging/**`, minus a release commit's own `client/CHANGELOG.md` and `client/pubspec.yaml`) and a `changes` job built on `dorny/paths-filter` narrows that into the three booleans (`client`, `server`, `packaging`) every downstream job gates on.
+A single `on.push.paths` list cannot tell a client-only merge from a server-only one, so the trigger is deliberately wide (`client/**`, `crates/**` or `packaging/**`, minus a release commit's own `client/CHANGELOG.md` and `client/pubspec.yaml`, plus the root server files and every local action and reusable workflow the file calls) and a `changes` job built on `dorny/paths-filter` narrows that into the three booleans (`client`, `server`, `packaging`) every downstream job gates on.
 The brief allowed splitting this into two workflows with their own top-level `paths` instead; one workflow with one filter step was chosen because it keeps the concurrency group, the header, and this section in one place, and because the filter step is one checkout rather than two.
 
 The filter's own patterns are include-only, and that is load-bearing rather than tidy.
@@ -961,6 +961,12 @@ Without the exclusions, that commit would also match `client/**`, and this workf
 No equivalent exclusion exists for the server side: a server release-please commit touches `crates/slimm-server/Cargo.toml` and `crates/slimm-server/CHANGELOG.md`, both under `crates/**`, so it still re-triggers `server-image` here.
 That is accepted rather than worked around: excluding `Cargo.toml` from the trigger would also hide a real dependency-bump PR that happens to touch only that file, and there is no path-only way to tell the two apart.
 The redundant build pushes the same `latest` the release itself would have pushed moments earlier for the same commit, so nothing wrong reaches production; it is simply a build that did not need to happen.
+
+The trigger must also name everything the workflow calls.
+Commit f453f678 fixed `.github/actions/linux-tarball` and matched no path, so the run it started skipped every job and finished green with nothing built.
+`.github/actions/**` now triggers the run and feeds the `client` filter, and `copr-publish.yml` feeds `packaging`.
+`scripts/lib/test_main_builds_triggers_on_everything_it_uses.py` fails when a `uses: ./.github/...` target is missing from the trigger or the filter, or when a trigger path reaches no filter and is not on its short allowlist.
+A change to `main-builds.yml` itself still triggers a run that builds nothing; that is on the allowlist on purpose.
 
 ### What each side does
 
