@@ -22,6 +22,7 @@ import '../providers/admin_providers.dart';
 import '../providers/blocks_controller.dart';
 import '../providers/hold_music_controller.dart';
 import '../providers/channel_notification_overrides_controller.dart';
+import '../providers/channel_by_id_provider.dart';
 import '../providers/composer_focus.dart';
 import '../providers/database_key_store.dart';
 import '../providers/last_text_channel.dart';
@@ -31,6 +32,7 @@ import '../providers/notification_schedule_controller.dart';
 import '../providers/notification_sound_controller.dart';
 import '../providers/providers.dart';
 import '../providers/retention_sweep.dart';
+import '../providers/sync_controller.dart' show initialSyncCompleteProvider;
 import '../providers/threads.dart';
 import '../providers/voice_controller.dart';
 import '../providers/channel_search_controller.dart';
@@ -55,6 +57,7 @@ import '../widgets/whats_new_gate.dart';
 import '../widgets/channel_header.dart';
 import 'canvas/canvas_fullscreen.dart';
 import 'canvas/canvas_pane.dart';
+import 'channel_not_found.dart';
 import 'channel_screen.dart';
 import 'dm_call_pane.dart';
 import 'hang_up_recap_toast.dart';
@@ -118,8 +121,21 @@ class HomeShell extends ConsumerWidget {
     final openThread = ref.watch(openThreadProvider);
     final threadFits = layout.fitsThreadPane(width);
     final showThread = openThread != null && threadFits && !canvasFullscreen;
+    // Once synced, a channel the store lacks is one the viewer cannot see: ChannelNotFound owns the pane, with no roster or members control.
+    final channelRow = selected == null
+        ? null
+        : ref.watch(channelByIdProvider(selected));
+    final notFound =
+        channelRow is AsyncData<Channel?> &&
+        channelRow.value == null &&
+        ref.watch(initialSyncCompleteProvider);
+    final rosterPending =
+        channelRow != null &&
+        !channelRow.hasValue &&
+        ref.watch(initialSyncCompleteProvider);
     final showMembers =
         membersFit &&
+        !notFound &&
         !canvasFullscreen &&
         !showThread &&
         ref.watch(memberPaneVisibleProvider);
@@ -170,7 +186,11 @@ class HomeShell extends ConsumerWidget {
             // exactly that - so the exit is the gap closing over the panel
             // duration while the entrance gets the full slide.
             if (membersFit)
-              _MemberPaneSlot(channelId: selected, requested: showMembers),
+              // Once synced, unscoped until the row resolves, so no request names a channel not yet known to be visible.
+              _MemberPaneSlot(
+                channelId: rosterPending ? null : selected,
+                requested: showMembers,
+              ),
           ],
         ),
       );
@@ -209,7 +229,7 @@ class HomeShell extends ConsumerWidget {
           ],
         );
         return Scaffold(
-          appBar: replacesHeader
+          appBar: replacesHeader || notFound
               ? null
               : CompactChannelAppBar(
                   channelId: channelId,
@@ -224,7 +244,7 @@ class HomeShell extends ConsumerWidget {
           onEndDrawerChanged: (open) => endSelectionOnDrawerClose(ref, open),
           // The roster slides in from the right instead of docking beside the
           // conversation, which is the only pane there is at this width.
-          endDrawer: isDm
+          endDrawer: isDm || notFound
               ? null
               : Drawer(
                   width: AppMemberPane.width,
@@ -388,6 +408,10 @@ class ConversationPane extends ConsumerWidget {
               ?.where((c) => c.id == channelId)
               .cast<Channel?>()
               .firstOrNull;
+          // Before the first sync an unresolved id may just not have arrived yet.
+          if (channel == null && ref.watch(initialSyncCompleteProvider)) {
+            return const ChannelNotFound();
+          }
           final isVoice = channel?.kind == 'voice';
           final canvasOpen = ref.watch(canvasOpenProvider) == channelId;
           final dmCallOpen =

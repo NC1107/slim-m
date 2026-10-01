@@ -29,10 +29,12 @@ import 'create_category_sheet.dart';
 import 'create_channel_sheet.dart';
 
 /// The channel id in [path], or null when [path] is not a channel route.
+///
+/// Only the first segment: `/channels/<channel>/m/<message>` is that channel.
 String? channelIdInPath(String path) {
   const prefix = '${Routes.channels}/';
   if (!path.startsWith(prefix)) return null;
-  final id = path.substring(prefix.length);
+  final id = path.substring(prefix.length).split('/').first;
   return id.isEmpty ? null : id;
 }
 

@@ -7,6 +7,8 @@
 /// is the verb now, for a manager and a plain member alike.
 library;
 
+import 'dart:ui' show Tristate;
+
 import 'package:flutter/material.dart';
 import 'package:flutter/semantics.dart' show SemanticsNode;
 import 'package:flutter/services.dart' show LogicalKeyboardKey;
@@ -49,6 +51,7 @@ Future<ProviderContainer> _pump(
   String? selectedId,
   bool canManage = false,
   Set<String> collapsedAtStart = const {},
+  bool inLabelledGroup = false,
 }) async {
   SharedPreferences.setMockInitialValues({
     if (collapsedAtStart.isNotEmpty)
@@ -70,14 +73,17 @@ Future<ProviderContainer> _pump(
       child: MaterialApp(
         theme: buildTheme(Brightness.light, AppTokens.light),
         home: Scaffold(
-          body: ChannelCategorySections(
-            channels: channels,
-            categories: [
-              ChannelCategoryRow(id: 'cat1', name: 'Lounge', position: 0),
-            ],
-            selectedId: selectedId,
-            canManage: canManage,
-            onReorder: (_) {},
+          body: _maybeGrouped(
+            inLabelledGroup,
+            ChannelCategorySections(
+              channels: channels,
+              categories: [
+                ChannelCategoryRow(id: 'cat1', name: 'Lounge', position: 0),
+              ],
+              selectedId: selectedId,
+              canManage: canManage,
+              onReorder: (_) {},
+            ),
           ),
         ),
       ),
@@ -86,6 +92,11 @@ Future<ProviderContainer> _pump(
   await tester.pumpAndSettle();
   return container;
 }
+
+/// The rail's rows sit under an ancestor that is itself a semantics node, and
+/// a header that is not its own node is merged into that ancestor's label.
+Widget _maybeGrouped(bool grouped, Widget child) =>
+    grouped ? Semantics(container: true, label: 'rail', child: child) : child;
 
 Future<void> _pressHeader(WidgetTester tester) async {
   await tester.tap(find.text('Lounge'));
@@ -211,7 +222,12 @@ void main() {
         tester.getSemantics(find.bySemanticsLabel('Lounge'));
     expect(node().hint, 'Collapse');
     expect(node().flagsCollection.isButton, isTrue);
-    expect(node().flagsCollection.isHeader, isTrue);
+    expect(
+      node().flagsCollection.isHeader,
+      isFalse,
+      reason:
+          'the web engine turns a header into a plain h2, losing the button',
+    );
 
     await tester.sendKeyEvent(LogicalKeyboardKey.tab);
     await tester.sendKeyEvent(LogicalKeyboardKey.enter);
@@ -219,6 +235,24 @@ void main() {
 
     expect(_shown(tester, 'alpha'), isFalse);
     expect(node().hint, 'Expand');
+    semantics.dispose();
+  });
+
+  testWidgets('inside a labelled group the header is still its own named, '
+      'expandable node', (tester) async {
+    final semantics = tester.ensureSemantics();
+    await _pump(tester, channels: [_channel('alpha')], inLabelledGroup: true);
+
+    SemanticsNode node() =>
+        tester.getSemantics(find.bySemanticsLabel('Lounge'));
+    expect(node().label, 'Lounge');
+    expect(node().flagsCollection.isButton, isTrue);
+    expect(node().flagsCollection.isHeader, isFalse);
+    expect(node().flagsCollection.isExpanded, Tristate.isTrue);
+
+    await _pressHeader(tester);
+
+    expect(node().flagsCollection.isExpanded, Tristate.isFalse);
     semantics.dispose();
   });
 }
