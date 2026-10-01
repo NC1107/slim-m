@@ -426,16 +426,19 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
           // First of the three: the other two are about convenience,
           // this one is about whether you have any recourse here.
           if (_probed case final version?) ServerSafetyNotice(version: version),
-          // Only while creating an account: it is not a fact a
-          // returning member has any use for.
-          if (_creatingAccount && _probed?.inviteRequired == true)
+          // Only while creating an account, and not once a code is in hand.
+          if (_creatingAccount &&
+              _probed?.inviteRequired == true &&
+              ref.watch(pendingInviteProvider) == null)
             const ServerNotice(
               icon: AppIcons.invite,
               message:
-                  'This Space is invite only. Ask a member for a '
-                  'code, then use "Use a different Space" below '
-                  'to redeem it. An admin can open joining to '
-                  'anyone in Settings, under Space.',
+                  'Joining needs an invite code once a Space has members. '
+                  'If this one is brand new, the first account you create '
+                  'becomes its admin. Otherwise ask a member for a code, '
+                  'then use "Use a different Space" below to redeem it. '
+                  'An admin can open joining to anyone in Settings, under '
+                  'Space.',
             ),
           if (_probed?.pushEnabled == false)
             const ServerNotice(
