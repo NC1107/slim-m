@@ -20,7 +20,9 @@ import 'package:slimm_design_system/design_system.dart';
 import '../../api_failure.dart';
 import '../../providers/admin_providers.dart';
 import '../../providers/providers.dart';
+import '../../widgets/custom_emoji_image.dart';
 import '../../widgets/image_decode.dart';
+import '../../widgets/standard_emoji.dart';
 import '../../widgets/settings_section_header.dart';
 import 'emoji_name.dart';
 import '../../action_labels.dart';
@@ -68,6 +70,7 @@ class _EmojiUploadCardState extends ConsumerState<EmojiUploadCard> {
   List<int>? _bytes;
   bool _submitting = false;
   String? _refusal;
+  api.CustomEmoji? _sameImage;
 
   @override
   void dispose() {
@@ -98,12 +101,16 @@ class _EmojiUploadCardState extends ConsumerState<EmojiUploadCard> {
     setState(() {
       _submitting = true;
       _refusal = null;
+      _sameImage = null;
     });
     try {
-      await ref.read(apiProvider).uploadCustomEmoji(bytes, name: name);
+      final created = await ref
+          .read(apiProvider)
+          .uploadCustomEmoji(bytes, name: name);
       if (context.mounted) ref.invalidate(customEmojiProvider);
       if (!mounted) return;
       setState(() {
+        _sameImage = created.sameImageAs == null ? null : created;
         _submitting = false;
         _bytes = null;
         _name.clear();
@@ -115,6 +122,21 @@ class _EmojiUploadCardState extends ConsumerState<EmojiUploadCard> {
     } on api.ApiException catch (e) {
       // Not the bare shortcode: its own trailing colon collides with the one some failure sentences end in.
       _refuse(describeApiFailure('add the ${emojiShortcode(name)} emoji', e));
+    }
+  }
+
+  Future<void> _useExisting(api.CustomEmoji added) async {
+    setState(() => _submitting = true);
+    try {
+      await ref.read(apiProvider).deleteCustomEmoji(added.id);
+      if (context.mounted) ref.invalidate(customEmojiProvider);
+      if (!mounted) return;
+      setState(() {
+        _submitting = false;
+        _sameImage = null;
+      });
+    } on api.ApiException catch (e) {
+      _refuse(describeApiFailure('remove the ${added.shortcode} emoji', e));
     }
   }
 
@@ -134,9 +156,13 @@ class _EmojiUploadCardState extends ConsumerState<EmojiUploadCard> {
     // Refusing a name the loaded list already holds saves a round trip whose
     // only possible answer is 409; the catch below still covers the race.
     final existing = ref.watch(customEmojiProvider).valueOrNull;
-    final taken =
-        usable && (existing?.any((e) => e.name == normalized) ?? false);
+    final sameName = usable
+        ? existing?.where((e) => e.name == normalized).firstOrNull
+        : null;
+    final taken = sameName != null;
+    final standard = usable && !taken && isStandardEmojiName(normalized);
     final refusal = _refusal;
+    final sameImage = _sameImage;
 
     return SettingsSectionCard(
       title: 'New emoji',
@@ -145,15 +171,36 @@ class _EmojiUploadCardState extends ConsumerState<EmojiUploadCard> {
           AppCallout(tone: AppCalloutTone.warn, child: Text(refusal)),
           const SizedBox(height: AppSpacing.s12),
         ],
+        if (sameImage != null) ...[
+          _SameImageNotice(
+            added: sameImage,
+            existingName: sameImage.sameImageAs!,
+            busy: _submitting,
+            onUseExisting: () => _useExisting(sameImage),
+            onKeep: () => setState(() => _sameImage = null),
+          ),
+          const SizedBox(height: AppSpacing.s12),
+        ],
         AppInput(
           controller: _name,
           placeholder: 'Name',
           semanticLabel: 'Emoji name',
-          errorText: taken ? 'Already taken.' : null,
+          errorText: taken
+              ? 'Already taken.'
+              : standard
+              ? 'That is a standard emoji, pick another name.'
+              : null,
           onChanged: (_) => setState(() {}),
         ),
         const SizedBox(height: AppSpacing.s8),
-        _NamePreview(typed: _name.text, normalized: normalized, taken: taken),
+        if (sameName != null)
+          _ExistingEmoji(emoji: sameName)
+        else
+          _NamePreview(
+            typed: _name.text,
+            normalized: normalized,
+            taken: standard,
+          ),
         const SizedBox(height: AppSpacing.s12),
         if (_bytes case final bytes?) ...[
           _EmojiImagePreview(
@@ -180,7 +227,8 @@ class _EmojiUploadCardState extends ConsumerState<EmojiUploadCard> {
           icon: AppIcons.smile,
           variant: AppButtonVariant.primary,
           full: true,
-          disabled: _submitting || _bytes == null || !usable || taken,
+          disabled:
+              _submitting || _bytes == null || !usable || taken || standard,
           onPressed: _submit,
         ),
       ],
@@ -305,4 +353,86 @@ class _EmojiImagePreview extends StatelessWidget {
       cacheHeight: decodeEdge(context, size),
     ),
   );
+}
+
+/// The emoji that already owns the typed name, drawn as members see it.
+class _ExistingEmoji extends StatelessWidget {
+  const _ExistingEmoji({required this.emoji});
+
+  final api.CustomEmoji emoji;
+
+  @override
+  Widget build(BuildContext context) {
+    final tokens = Theme.of(context).extension<AppTokens>()!;
+    return Row(
+      children: [
+        CustomEmojiImage(
+          emojiId: emoji.id,
+          label: emoji.shortcode,
+          size: AppSizes.icon20,
+        ),
+        const SizedBox(width: AppSpacing.s8),
+        Flexible(
+          child: Text(
+            'Already used by ${emoji.shortcode}',
+            overflow: TextOverflow.ellipsis,
+            style: AppText.caption.copyWith(color: tokens.textSecondary),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+/// Said after an upload whose image is already in the list under another
+/// name. The emoji was added; this offers to take it back.
+class _SameImageNotice extends StatelessWidget {
+  const _SameImageNotice({
+    required this.added,
+    required this.existingName,
+    required this.busy,
+    required this.onUseExisting,
+    required this.onKeep,
+  });
+
+  final api.CustomEmoji added;
+  final String existingName;
+  final bool busy;
+  final VoidCallback onUseExisting;
+  final VoidCallback onKeep;
+
+  @override
+  Widget build(BuildContext context) {
+    final existing = emojiShortcode(existingName);
+    return AppCallout(
+      tone: AppCalloutTone.info,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            '${added.shortcode} was added, but it is the same image as '
+            '$existing.',
+          ),
+          const SizedBox(height: AppSpacing.s8),
+          Wrap(
+            spacing: AppSpacing.s8,
+            runSpacing: AppSpacing.s8,
+            children: [
+              AppButton(
+                label: 'Use $existing instead',
+                disabled: busy,
+                onPressed: onUseExisting,
+              ),
+              AppButton(
+                label: 'Keep both',
+                variant: AppButtonVariant.ghost,
+                disabled: busy,
+                onPressed: onKeep,
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
 }

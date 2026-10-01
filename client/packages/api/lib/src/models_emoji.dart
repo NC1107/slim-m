@@ -17,6 +17,7 @@ class CustomEmoji {
     required this.name,
     required this.uploaderId,
     required this.createdAt,
+    this.sameImageAs,
   });
 
   final String id;
@@ -32,6 +33,10 @@ class CustomEmoji {
   /// When it was added, unix milliseconds.
   final int createdAt;
 
+  /// Only on an upload response: the name of an older emoji with identical
+  /// image bytes. The new one was still added.
+  final String? sameImageAs;
+
   /// The Slack-convention shortcode a member types for this emoji.
   ///
   /// Kept here rather than at each render site so the one place that decides
@@ -43,6 +48,7 @@ class CustomEmoji {
         name: json['name'] as String,
         uploaderId: json['uploader_id'] as String?,
         createdAt: json['created_at'] as int,
+        sameImageAs: json['same_image_as'] as String?,
       );
 }
 
