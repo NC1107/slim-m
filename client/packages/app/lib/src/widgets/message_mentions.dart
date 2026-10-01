@@ -6,10 +6,12 @@
 /// review budget.
 library;
 
+import 'message_fences.dart';
 import 'message_inline.dart';
 
-/// Whether [content] mentions [username], case-insensitively - walked
-/// through the real [parseInline] tree rather than re-run as a bare regex,
+/// Whether [content] mentions [username], case-insensitively. A fenced block
+/// is code, so only the text between fences is read; inline code is skipped by
+/// [parseInline] itself. Walked through the real [parseInline] tree rather than re-run as a bare regex,
 /// so a mention nested inside bold, italic, strikethrough or a spoiler is
 /// still found the same way the transcript itself would render it.
 bool messageMentionsUsername(String content, String username) {
@@ -38,5 +40,7 @@ bool messageMentionsUsername(String content, String username) {
     return false;
   }
 
-  return walk(parseInline(content));
+  return splitMessageBlocks(
+    content,
+  ).whereType<TextBlock>().any((block) => walk(parseInline(block.text)));
 }

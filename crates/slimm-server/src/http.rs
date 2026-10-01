@@ -48,7 +48,7 @@ mod channel_permissions;
 mod channel_slow_mode;
 mod channel_validation;
 mod channels;
-mod code_fences;
+pub(crate) mod code_fences;
 mod code_runs;
 mod device_client_info;
 mod dms;
