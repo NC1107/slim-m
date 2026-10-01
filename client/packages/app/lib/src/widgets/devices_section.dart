@@ -15,6 +15,7 @@ import '../providers/providers.dart';
 import 'confirm_dialog.dart';
 import 'run_guarded.dart';
 import 'settings_section_header.dart';
+import 'settings_empty.dart';
 
 /// The account's devices, refetched when invalidated.
 final devicesProvider = FutureProvider.autoDispose<List<api.Device>>(
@@ -57,13 +58,7 @@ class _DevicesSectionState extends ConsumerState<DevicesSection> {
           ),
           // Named like Blocked's empty state below: an empty card reads as a loading glitch, not an intentional state.
           data: (list) => list.isEmpty
-              ? Padding(
-                  padding: const EdgeInsets.all(AppSpacing.s8),
-                  child: Text(
-                    'No devices signed in.',
-                    style: AppText.body.copyWith(color: tokens.textSecondary),
-                  ),
-                )
+              ? const SettingsEmptyLine('No devices signed in.')
               : _buildDeviceList(context, tokens, list),
         ),
       ],
@@ -81,15 +76,12 @@ class _DevicesSectionState extends ConsumerState<DevicesSection> {
         for (final device in list)
           _DeviceRow(key: ValueKey(device.id), device: device),
         if (others.isNotEmpty) ...[
-          Padding(
-            padding: const EdgeInsets.all(AppSpacing.s8),
-            child: AppButton(
-              label: 'Sign out all other devices',
-              variant: AppButtonVariant.danger,
-              full: true,
-              disabled: _signingOutAll,
-              onPressed: () => _confirmSignOutAllOthers(context, others),
-            ),
+          AppButton(
+            label: 'Sign out all other devices',
+            variant: AppButtonVariant.danger,
+            full: true,
+            disabled: _signingOutAll,
+            onPressed: () => _confirmSignOutAllOthers(context, others),
           ),
           if (_bulkError case final error?)
             Padding(
