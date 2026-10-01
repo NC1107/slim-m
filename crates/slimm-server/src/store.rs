@@ -44,6 +44,7 @@ mod channel_restricted;
 mod channel_slow_mode;
 mod channels;
 mod code_runs;
+mod credentials;
 mod dms;
 mod dock_sources;
 mod emoji;

@@ -74,6 +74,16 @@ struct LoginRequest {
     client_version: Option<String>,
 }
 
+/// A session token alone never deletes an account: it needs the password, and a
+/// current code while a second factor is on (decision 0048).
+#[derive(Deserialize)]
+struct DeleteAccountRequest {
+    #[serde(default)]
+    password: Option<String>,
+    #[serde(default)]
+    code: Option<String>,
+}
+
 #[derive(Deserialize)]
 struct RefreshRequest {
     refresh_token: String,
@@ -233,11 +243,14 @@ async fn login(
     State(state): State<AppState>,
     Json(req): Json<LoginRequest>,
 ) -> Result<LoginOutcome, ApiError> {
-    validate_username(&req.username)?;
-    validate_password(&req.password)?;
     validate_label(&req.device_name, "device_name must be 1 to 64 characters")?;
     let (client_kind, client_version) =
         parse_client_info(req.client_kind.as_deref(), req.client_version.as_deref())?;
+    // A credential that could never exist fails like a wrong one, so the error never teaches the policy.
+    if validate_username(&req.username).is_err() || validate_password(&req.password).is_err() {
+        state.auth.verify_decoy().await?;
+        return Err(ApiError::Unauthorized);
+    }
 
     let credentials = state.store.find_credentials(&req.username).await?;
     let verified = match &credentials {
@@ -329,9 +342,12 @@ async fn logout(
 /// Deletes the caller's own account: purge personal data, anonymize authored
 /// content, tombstone the user, and revoke every session (closing live sockets).
 async fn delete_account(
-    AuthedLimited(ctx): AuthedLimited<WRITE>,
+    AuthedLimited(ctx): AuthedLimited<PASSWORD>,
     State(state): State<AppState>,
+    Json(req): Json<DeleteAccountRequest>,
 ) -> Result<StatusCode, ApiError> {
+    super::reauth::require_password(&state, ctx.user_id, req.password.as_deref()).await?;
+    super::reauth::require_current_code(&state, ctx.user_id, req.code.as_deref()).await?;
     let revoked = match state.store.delete_account(ctx.user_id).await {
         Ok(revoked) => revoked,
         // A refusal is the caller's situation, not a server fault, so it must

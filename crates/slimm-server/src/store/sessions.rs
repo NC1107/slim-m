@@ -343,23 +343,6 @@ impl Store {
         }
     }
 
-    /// Looks up the user id and stored password hash for a live username, for the
-    /// login path. `None` covers both no-such-user and a passwordless account.
-    pub async fn find_credentials(
-        &self,
-        username: &str,
-    ) -> anyhow::Result<Option<(UserId, String)>> {
-        let row = sqlx::query!(
-            r#"SELECT id AS "id!: UserId", password_hash
-               FROM users
-               WHERE username = ? AND deleted_at IS NULL"#,
-            username
-        )
-        .fetch_optional(&self.pool)
-        .await?;
-        Ok(row.and_then(|r| r.password_hash.map(|hash| (r.id, hash))))
-    }
-
     /// [`Self::open_session_as`] with no client to report.
     pub async fn open_session(
         &self,

@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "DELETE FROM username_collision_renames WHERE user_id = ?",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": []
+  },
+  "hash": "b705e143d1938e8f539eafdaa47ba95c0e96c646919f04cc99da13e0e580935e"
+}

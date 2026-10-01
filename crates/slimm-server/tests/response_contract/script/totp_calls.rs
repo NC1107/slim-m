@@ -40,7 +40,13 @@ pub(crate) async fn totp_calls(c: &mut Contract, root: &str, invite: &str) {
     c.get("getTotpStatus", "/auth/totp", &token).await;
 
     let enrolment = c
-        .bare("beginTotpEnrolment", "POST", "/auth/totp/enrol", &token)
+        .json(
+            "beginTotpEnrolment",
+            "POST",
+            "/auth/totp/enrol",
+            &token,
+            json!({ "password": super::PASSWORD }),
+        )
         .await;
     let secret = text(&enrolment, "secret");
 
@@ -51,7 +57,7 @@ pub(crate) async fn totp_calls(c: &mut Contract, root: &str, invite: &str) {
             "POST",
             "/auth/totp/confirm",
             &token,
-            json!({ "code": code(&secret, -STEP_MS) }),
+            json!({ "code": code(&secret, -STEP_MS), "password": super::PASSWORD }),
         )
         .await;
     let first_set = recovery_codes(&confirmed);
@@ -104,14 +110,20 @@ pub(crate) async fn totp_calls(c: &mut Contract, root: &str, invite: &str) {
 
     // A fresh factor to clear: its own row, so the spent-step guard starts over and an earlier code works again.
     let again = c
-        .bare("beginTotpEnrolment", "POST", "/auth/totp/enrol", &token)
+        .json(
+            "beginTotpEnrolment",
+            "POST",
+            "/auth/totp/enrol",
+            &token,
+            json!({ "password": super::PASSWORD }),
+        )
         .await;
     c.json(
         "confirmTotpEnrolment",
         "POST",
         "/auth/totp/confirm",
         &token,
-        json!({ "code": code(&text(&again, "secret"), -STEP_MS) }),
+        json!({ "code": code(&text(&again, "secret"), -STEP_MS), "password": super::PASSWORD }),
     )
     .await;
     c.bare(

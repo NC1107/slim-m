@@ -148,8 +148,16 @@ extension SlimmApiAuth on SlimmApi {
   }
 
   /// Deletes the signed-in account. Irreversible.
-  Future<void> deleteAccount() async {
-    await _send('DELETE', '/account', expectNoContent: true);
+  ///
+  /// [password] is required, and [code] too while two-factor is on: a session
+  /// token alone cannot destroy an account (decision 0048).
+  Future<void> deleteAccount({required String password, String? code}) async {
+    await _send(
+      'DELETE',
+      '/account',
+      body: {'password': password, if (code != null) 'code': code},
+      expectNoContent: true,
+    );
     session.clear();
   }
 }

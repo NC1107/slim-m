@@ -17,8 +17,8 @@ mod support;
 mod totp_support;
 
 use totp_support::{
-    STEP_MS, app, begin_enrolment, enrol_and_confirm, json_body, login, login_for_challenge,
-    member, new_store, now_ms, request, verify,
+    PASSWORD, STEP_MS, app, begin_enrolment, enrol_and_confirm, json_body, login,
+    login_for_challenge, member, new_store, now_ms, request, verify,
 };
 
 // --- Enrolment ---
@@ -66,7 +66,7 @@ async fn confirming_with_a_wrong_code_leaves_the_factor_off() {
             "POST",
             "/auth/totp/confirm",
             Some(&token),
-            Some(json!({ "code": "000000" })),
+            Some(json!({ "code": "000000", "password": PASSWORD })),
         ))
         .await
         .unwrap();
@@ -113,7 +113,12 @@ async fn enrolling_again_over_a_live_factor_is_a_conflict() {
 
     let response = app
         .clone()
-        .oneshot(request("POST", "/auth/totp/enrol", Some(&token), None))
+        .oneshot(request(
+            "POST",
+            "/auth/totp/enrol",
+            Some(&token),
+            Some(json!({ "password": PASSWORD })),
+        ))
         .await
         .unwrap();
     assert_eq!(response.status(), StatusCode::CONFLICT);
@@ -236,7 +241,7 @@ async fn the_confirming_code_cannot_be_replayed_at_sign_in() {
             "POST",
             "/auth/totp/confirm",
             Some(&token),
-            Some(json!({ "code": code.clone() })),
+            Some(json!({ "code": code.clone(), "password": PASSWORD })),
         ))
         .await
         .unwrap();
@@ -249,6 +254,15 @@ async fn the_confirming_code_cannot_be_replayed_at_sign_in() {
     );
 }
 
+/// Sleeps until the clock is well inside a step, so a test that makes several requests does not straddle a step edge.
+async fn wait_for_mid_step() {
+    let into_step = now_ms().rem_euclid(STEP_MS);
+    if !(5_000..=15_000).contains(&into_step) {
+        let wait = (STEP_MS - into_step + 5_000).rem_euclid(STEP_MS);
+        tokio::time::sleep(std::time::Duration::from_millis(wait as u64)).await;
+    }
+}
+
 /// One step either side is accepted for clock skew; two is not. Asserted from
 /// the route rather than the primitive, so a store or handler that widened the
 /// window on its own would still be caught.
@@ -257,27 +271,41 @@ async fn a_code_just_outside_the_window_is_refused() {
     let (store, auth, _guard) = new_store("slimm-totp-window").await;
     let app = app(store.clone(), auth.clone());
     let (token, _id) = member(&store, &auth, "ada").await;
+    wait_for_mid_step().await;
     let (secret, _codes) = enrol_and_confirm(&app, &token).await;
 
-    let now = now_ms();
+    // The server reads its own clock, so a request that straddles a step edge sees a different step than the code was made for; retry such a run.
     for offset in [-2 * STEP_MS, 2 * STEP_MS] {
-        let code = totp::code_at(&secret, now + offset).unwrap();
-        let challenge = login_for_challenge(&app, "ada").await;
+        let mut status = StatusCode::OK;
+        for _ in 0..5 {
+            let started = now_ms();
+            let code = totp::code_at(&secret, started + offset).unwrap();
+            let challenge = login_for_challenge(&app, "ada").await;
+            status = verify(&app, &challenge, &code).await.status();
+            if now_ms() / STEP_MS == started / STEP_MS {
+                break;
+            }
+        }
         assert_eq!(
-            verify(&app, &challenge, &code).await.status(),
+            status,
             StatusCode::BAD_REQUEST,
             "a code {} steps out must be refused",
             offset / STEP_MS
         );
     }
 
-    // The current step, not a neighbour: confirmation spent the one before it, so the replay guard would refuse that anyway.
-    let code = totp::code_at(&secret, now).unwrap();
-    let challenge = login_for_challenge(&app, "ada").await;
-    assert_eq!(
-        verify(&app, &challenge, &code).await.status(),
-        StatusCode::OK
-    );
+    // The next step is inside the window and never spent: enrolment spent the current one, so the replay guard would refuse a code for it.
+    let mut status = StatusCode::BAD_REQUEST;
+    for _ in 0..5 {
+        let started = now_ms();
+        let code = totp::code_at(&secret, started + STEP_MS).unwrap();
+        let challenge = login_for_challenge(&app, "ada").await;
+        status = verify(&app, &challenge, &code).await.status();
+        if status == StatusCode::OK || now_ms() / STEP_MS == started / STEP_MS {
+            break;
+        }
+    }
+    assert_eq!(status, StatusCode::OK);
 }
 
 // --- Lockout ---

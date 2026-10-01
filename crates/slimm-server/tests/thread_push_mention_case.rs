@@ -114,74 +114,17 @@ async fn a_mention_wakes_its_target_regardless_of_letter_case() {
     }
 }
 
-/// `users_username_live` carries no `COLLATE NOCASE`, so `nick` and `Nick`
-/// can both be live accounts at once. A case-insensitive mention then
-/// resolves to both, which is correct rather than ambiguous: the client
-/// renders a mention chip off the same lowered comparison no matter which of
-/// the two it resolved `knownUsernames` against, so both are equally "the
-/// person mentioned" to a reader. This does not change the uniqueness index
-/// or registration's case handling; it only documents what a mention does
-/// when both already exist.
+/// `nick` and `Nick` cannot both exist (migration 0095), so a mention can
+/// never be ambiguous between two differently-cased accounts.
 #[tokio::test]
-async fn a_case_insensitive_mention_can_resolve_to_two_differently_cased_accounts() {
+async fn a_differently_cased_account_cannot_exist_beside_a_mentioned_one() {
     let (store, _guard) = new_store("slimm-thread-push-mention-both-cases").await;
-    let (alice, alice_device) = account(&store, "alice").await;
-    let (bob, bob_device) = account(&store, "bob").await;
-    let (lower_nick, lower_device) = account(&store, "nick").await;
-    let (upper_nick, upper_device) = account(&store, "Nick").await;
-    let channel = store.list_channels().await.unwrap()[0].id;
-
-    for (user, device, token) in [
-        (alice, alice_device, "alice-token"),
-        (bob, bob_device, "bob-token"),
-        (lower_nick, lower_device, "lower-nick-token"),
-        (upper_nick, upper_device, "upper-nick-token"),
-    ] {
-        store
-            .register_push(
-                user,
-                device,
-                PushRegistration {
-                    platform: "ios",
-                    push_token: token,
-                    voip_push_token: None,
-                    push_public_key: &KEY,
-                    include_content: false,
-                },
-            )
-            .await
-            .unwrap();
-    }
-
-    let parent = store
-        .send_message(NewMessage::plain(
-            channel,
-            alice,
-            MessageId::generate(),
-            "root",
-        ))
-        .await
-        .unwrap();
-    let thread = store
-        .open_thread(channel, parent.message.id)
-        .await
-        .unwrap()
-        .channel;
-    store
-        .send_message(NewMessage::plain(
-            thread.id,
-            bob,
-            MessageId::generate(),
-            "first reply",
-        ))
-        .await
-        .unwrap();
-
-    let recipients = wake_recipients(&store, thread.id, bob, "hey @nick take a look")
-        .await
-        .unwrap();
-    assert!(
-        recipients.contains(&lower_nick) && recipients.contains(&upper_nick),
-        "a case-insensitive mention must reach both differently-cased accounts, got {recipients:?}"
-    );
+    account(&store, "nick").await;
+    let second = store
+        .create_account("Nick", "Nick", "not-a-real-hash")
+        .await;
+    assert!(matches!(
+        second,
+        Err(slimm_server::store::RegisterError::UsernameTaken)
+    ));
 }

@@ -16,8 +16,9 @@ use serde::{Deserialize, Serialize};
 
 use super::AppState;
 use super::error::ApiError;
-use super::extract::{AuthedLimited, Json, RateLimited, TOTP, WRITE};
+use super::extract::{AuthedLimited, Json, PASSWORD, RateLimited, TOTP, WRITE};
 use super::messages::parse_uuid;
+use super::reauth::require_password;
 use crate::hub::Event;
 use crate::ids::UserId;
 use crate::permissions::Permissions;
@@ -67,6 +68,19 @@ struct EnrolmentResponse {
 }
 
 #[derive(Deserialize)]
+struct EnrolRequest {
+    #[serde(default)]
+    password: Option<String>,
+}
+
+#[derive(Deserialize)]
+struct ConfirmRequest {
+    code: String,
+    #[serde(default)]
+    password: Option<String>,
+}
+
+#[derive(Deserialize)]
 struct CodeRequest {
     code: String,
 }
@@ -108,9 +122,11 @@ async fn status(
 /// [`confirm`] verifies a code from it, which is what stops a mis-scanned QR or
 /// an unsynced clock from locking somebody out of their own account.
 async fn enrol(
-    AuthedLimited(ctx): AuthedLimited<WRITE>,
+    AuthedLimited(ctx): AuthedLimited<PASSWORD>,
     State(state): State<AppState>,
+    Json(body): Json<EnrolRequest>,
 ) -> Result<Json<EnrolmentResponse>, ApiError> {
+    require_password(&state, ctx.user_id, body.password.as_deref()).await?;
     let account = state
         .store
         .user_profile(ctx.user_id)
@@ -135,8 +151,9 @@ async fn enrol(
 async fn confirm(
     AuthedLimited(ctx): AuthedLimited<TOTP>,
     State(state): State<AppState>,
-    Json(body): Json<CodeRequest>,
+    Json(body): Json<ConfirmRequest>,
 ) -> Result<Json<RecoveryCodesResponse>, ApiError> {
+    require_password(&state, ctx.user_id, body.password.as_deref()).await?;
     let recovery_codes = state
         .store
         .confirm_totp_enrolment(ctx.user_id, body.code.trim())
@@ -248,7 +265,7 @@ async fn admin_clear(
     let user_id = UserId(parse_uuid(&user_id)?);
     let revoked = state
         .store
-        .clear_totp_factor(ctx.user_id, user_id)
+        .clear_totp_factor(Some(ctx.user_id), user_id)
         .await
         .map_err(|err| match err {
             TotpError::NotEnrolled => {
@@ -282,7 +299,7 @@ fn enrolment_error(err: TotpError) -> ApiError {
 /// attacker learns anyway by being locked out themselves. Hiding it instead
 /// means a member who mistyped five codes sees "that code is not valid" for a
 /// correct code and concludes their authenticator is broken.
-fn factor_error(err: TotpError) -> ApiError {
+pub(super) fn factor_error(err: TotpError) -> ApiError {
     match err {
         TotpError::NotEnrolled | TotpError::NotConfirmed => {
             ApiError::BadRequest("two-factor authentication is not set up on this account")

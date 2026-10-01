@@ -244,6 +244,9 @@ paths:
         An account with two-factor authentication on answers 202 with a
         challenge instead of 200 with a token pair: the password was accepted
         and the sign-in is not finished. Complete it at /auth/totp/verify.
+        Usernames match in any letter case. Every credential that cannot
+        sign in, including one too short or malformed to ever have been
+        registered, answers the same 401.
       responses:
         "200":
           $ref: "#/components/responses/Tokens"
@@ -333,11 +336,23 @@ paths:
       description: >
         Purges personal data, clears authorship from content left in shared
         channels, frees the username, and revokes every session. Irreversible.
+        A session token alone is refused: the body carries the account
+        password, and a current code while two-factor is on.
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/DeleteAccountRequest"
       responses:
         "204":
           description: The account was deleted.
+        "400":
+          $ref: "#/components/responses/BadRequest"
         "401":
           $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
         "429":
           $ref: "#/components/responses/TooManyRequests"
 
@@ -396,7 +411,14 @@ paths:
         goes live only once /auth/totp/confirm verifies a code from it, so a
         mis-scanned code or an unsynchronised clock cannot lock anybody out.
         Calling this again replaces an unconfirmed enrolment; an already-enabled
-        factor is a 409 and has to be disabled first.
+        factor is a 409 and has to be disabled first. Needs the account
+        password, so a session token alone cannot turn the factor on.
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TotpEnrolRequest"
       responses:
         "200":
           description: The new secret and its provisioning URI.
@@ -404,6 +426,8 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/TotpEnrolment"
+        "400":
+          $ref: "#/components/responses/BadRequest"
         "401":
           $ref: "#/components/responses/Unauthorized"
         "403":
@@ -420,13 +444,14 @@ paths:
       summary: Switch the factor on with a code from the authenticator.
       description: >
         Returns the recovery codes for this factor, once. They are stored
-        hashed and are not retrievable later; each is usable once.
+        hashed and are not retrievable later; each is usable once. Needs the
+        account password as well as the code.
       requestBody:
         required: true
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/TotpCodeRequest"
+              $ref: "#/components/schemas/TotpConfirmRequest"
       responses:
         "200":
           description: The factor is on, and these are its recovery codes.
@@ -438,6 +463,8 @@ paths:
           $ref: "#/components/responses/BadRequest"
         "401":
           $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
         "409":
           $ref: "#/components/responses/Conflict"
         "429":
@@ -8417,6 +8444,42 @@ components:
             digit count or period, because those are the otpauth defaults this
             server uses (HMAC-SHA1, 6 digits, 30 seconds) and several
             authenticator apps mis-handle them when stated explicitly.
+    TotpEnrolRequest:
+      type: object
+      properties:
+        password:
+          type: string
+          description: >
+            The account's current password. Optional only so the schema stays
+            additive; a well-formed request without it is refused with 400, and the
+            server behaviour is the same as if it were required.
+    TotpConfirmRequest:
+      type: object
+      required: [code]
+      properties:
+        code:
+          type: string
+          description: A six-digit authenticator code from the new secret.
+        password:
+          type: string
+          description: >
+            The account's current password. Optional only so the schema stays
+            additive; a well-formed request without it is refused with 400, and the
+            server behaviour is the same as if it were required.
+    DeleteAccountRequest:
+      type: object
+      properties:
+        password:
+          type: string
+          description: >
+            The account's current password. Optional only so the schema stays
+            additive; a well-formed request without it is refused with 400, and the
+            server behaviour is the same as if it were required.
+        code:
+          type: string
+          description: >
+            A current authenticator code or an unused recovery code. Required
+            while two-factor is on, ignored otherwise.
     TotpCodeRequest:
       type: object
       required: [code]

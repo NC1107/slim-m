@@ -66,8 +66,14 @@ pub(crate) async fn farewell_calls(
         json!({ "id": Uuid::now_v7().to_string(), "content": "written before leaving" }),
     )
     .await;
-    c.bare("deleteAccount", "DELETE", "/account", &dave_token)
-        .await;
+    c.json(
+        "deleteAccount",
+        "DELETE",
+        "/account",
+        &dave_token,
+        json!({ "password": super::PASSWORD }),
+    )
+    .await;
     c.get("listMessages", &format!("{messages}?limit=50"), root)
         .await;
 

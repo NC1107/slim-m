@@ -262,7 +262,10 @@ async fn http_delete_account_rejects_the_token_afterward() {
                 .method("DELETE")
                 .uri("/account")
                 .header("authorization", format!("Bearer {access}"))
-                .body(Body::empty())
+                .header("content-type", "application/json")
+                .body(Body::from(
+                    json!({ "password": "hunter2hunter2" }).to_string(),
+                ))
                 .unwrap(),
         )
         .await
@@ -370,7 +373,10 @@ async fn the_last_administrator_cannot_strand_a_populated_deployment() {
                 .method("DELETE")
                 .uri("/account")
                 .header("authorization", format!("Bearer {admin}"))
-                .body(Body::empty())
+                .header("content-type", "application/json")
+                .body(Body::from(
+                    json!({ "password": "hunter2hunter2" }).to_string(),
+                ))
                 .unwrap(),
         )
         .await

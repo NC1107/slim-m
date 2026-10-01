@@ -25,52 +25,65 @@ import 'package:slimm_design_system/design_system.dart';
 
 import '../providers/providers.dart';
 import '../providers/toasts.dart';
-import 'run_guarded.dart';
+import 'reauth_sheet.dart';
 import 'totp_recovery_codes.dart';
 
-/// Opens the enrolment sheet. Resolves true once the factor is on, so the
-/// caller can refresh whatever showed it as off.
-Future<bool?> showTotpEnrolSheet(BuildContext context) =>
-    showAppSheet<bool>(context, builder: (context) => const _TotpEnrolSheet());
+/// Opens the enrolment flow: the password first, since a session token alone
+/// cannot turn the factor on (decision 0048), then the setup sheet. Resolves
+/// true once the factor is on, so the caller can refresh whatever showed it as
+/// off, and null if it was abandoned at either step.
+Future<bool?> showTotpEnrolSheet(BuildContext context, WidgetRef ref) async {
+  api.TotpEnrolment? enrolment;
+  String? confirmedPassword;
+  final proved = await showReauthSheet(
+    context,
+    title: 'Confirm it is you',
+    description:
+        'Enter your password to start setting up two-factor authentication.',
+    submitLabel: 'Continue',
+    onSubmit: (password, _) async {
+      try {
+        enrolment = await ref
+            .read(apiProvider)
+            .beginTotpEnrolment(password: password);
+        confirmedPassword = password;
+        return null;
+      } on api.ApiException catch (e) {
+        return reauthFailure(e);
+      }
+    },
+  );
+  final started = enrolment;
+  final password = confirmedPassword;
+  if (proved != true || started == null || password == null) return null;
+  if (!context.mounted) return null;
+  return showAppSheet<bool>(
+    context,
+    builder: (context) =>
+        _TotpEnrolSheet(enrolment: started, password: password),
+  );
+}
 
 class _TotpEnrolSheet extends ConsumerStatefulWidget {
-  const _TotpEnrolSheet();
+  const _TotpEnrolSheet({required this.enrolment, required this.password});
+
+  final api.TotpEnrolment enrolment;
+  final String password;
 
   @override
   ConsumerState<_TotpEnrolSheet> createState() => _TotpEnrolSheetState();
 }
 
-class _TotpEnrolSheetState extends ConsumerState<_TotpEnrolSheet>
-    with GuardedActionState<_TotpEnrolSheet> {
+class _TotpEnrolSheetState extends ConsumerState<_TotpEnrolSheet> {
   final _controller = TextEditingController();
-  api.TotpEnrolment? _enrolment;
   List<String>? _recoveryCodes;
   bool _busy = false;
   String? _codeError;
 
   @override
-  void initState() {
-    super.initState();
-    // On open, unlike `reset_code_sheet`: an abandoned enrolment is never enforced and the next attempt replaces it.
-    Future.microtask(_begin);
-  }
-
-  @override
   void dispose() {
     _controller.dispose();
     super.dispose();
-  }
-
-  Future<void> _begin() async {
-    setState(() => _busy = true);
-    await guard(
-      whatFailed: 'start setting up two-factor authentication',
-      action: () async {
-        final enrolment = await ref.read(apiProvider).beginTotpEnrolment();
-        if (mounted) setState(() => _enrolment = enrolment);
-      },
-    );
-    if (mounted) setState(() => _busy = false);
   }
 
   String get _code => _controller.text.replaceAll(RegExp(r'\s'), '');
@@ -82,7 +95,9 @@ class _TotpEnrolSheetState extends ConsumerState<_TotpEnrolSheet>
       _codeError = null;
     });
     try {
-      final codes = await ref.read(apiProvider).confirmTotpEnrolment(_code);
+      final codes = await ref
+          .read(apiProvider)
+          .confirmTotpEnrolment(_code, password: widget.password);
       if (!mounted) return;
       setState(() => _recoveryCodes = codes);
     } on api.ApiException catch (e) {
@@ -102,6 +117,7 @@ class _TotpEnrolSheetState extends ConsumerState<_TotpEnrolSheet>
     api.BadRequestException() =>
       'That code was not accepted. Codes change every 30 seconds, so check '
           'your phone is showing the current one.',
+    api.ForbiddenException() => reauthFailure(e),
     api.RateLimitedException() =>
       'Too many incorrect codes. Wait a few minutes and try again.',
     _ => e.message,
@@ -137,7 +153,7 @@ class _TotpEnrolSheetState extends ConsumerState<_TotpEnrolSheet>
 
   Widget _setup(BuildContext context) {
     final tokens = Theme.of(context).extension<AppTokens>()!;
-    final enrolment = _enrolment;
+    final enrolment = widget.enrolment;
     return Column(
       mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -157,37 +173,25 @@ class _TotpEnrolSheetState extends ConsumerState<_TotpEnrolSheet>
           style: AppText.caption.copyWith(color: tokens.textSecondary),
         ),
         const SizedBox(height: AppSpacing.s12),
-        if (enrolment == null)
-          Padding(
-            padding: const EdgeInsets.symmetric(vertical: AppSpacing.s16),
-            child: Center(
-              child: Text(
-                'Preparing...',
-                style: AppText.caption.copyWith(color: tokens.textSecondary),
-              ),
-            ),
-          )
-        else ...[
-          _Qr(uri: enrolment.provisioningUri),
-          const SizedBox(height: AppSpacing.s12),
-          _SecretBlock(
-            secret: enrolment.secret,
-            onCopy: () => _copySecret(enrolment.secret),
-          ),
-          const SizedBox(height: AppSpacing.s12),
-          AppInput(
-            controller: _controller,
-            placeholder: '000000',
-            mono: true,
-            enabled: !_busy,
-            keyboardType: TextInputType.number,
-            textInputAction: TextInputAction.done,
-            autocorrect: false,
-            semanticLabel: 'Code from your authenticator app',
-            onChanged: (_) => setState(() {}),
-            onSubmitted: (_) => _confirm(),
-          ),
-        ],
+        _Qr(uri: enrolment.provisioningUri),
+        const SizedBox(height: AppSpacing.s12),
+        _SecretBlock(
+          secret: enrolment.secret,
+          onCopy: () => _copySecret(enrolment.secret),
+        ),
+        const SizedBox(height: AppSpacing.s12),
+        AppInput(
+          controller: _controller,
+          placeholder: '000000',
+          mono: true,
+          enabled: !_busy,
+          keyboardType: TextInputType.number,
+          textInputAction: TextInputAction.done,
+          autocorrect: false,
+          semanticLabel: 'Code from your authenticator app',
+          onChanged: (_) => setState(() {}),
+          onSubmitted: (_) => _confirm(),
+        ),
         if (_codeError != null) ...[
           const SizedBox(height: AppSpacing.s8),
           AppErrorState(
@@ -195,16 +199,12 @@ class _TotpEnrolSheetState extends ConsumerState<_TotpEnrolSheet>
             onDismiss: () => setState(() => _codeError = null),
           ),
         ],
-        if (actionError != null) ...[
-          const SizedBox(height: AppSpacing.s8),
-          AppErrorState(message: actionError!, onRetry: _begin),
-        ],
         const SizedBox(height: AppSpacing.s12),
         AppButton(
           label: _busy ? 'Checking...' : 'Turn on',
           variant: AppButtonVariant.primary,
           full: true,
-          disabled: _busy || enrolment == null || _code.isEmpty,
+          disabled: _busy || _code.isEmpty,
           onPressed: _confirm,
         ),
       ],

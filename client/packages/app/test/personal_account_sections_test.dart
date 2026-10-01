@@ -51,6 +51,18 @@ class _CountingSyncController extends SyncController {
   }
 }
 
+http.Response _totpStatus({bool enabled = false}) => http.Response(
+  jsonEncode({
+    'enabled': enabled,
+    'pending': false,
+    'recovery_codes_remaining': 0,
+    'policy': 'optional',
+    'confirmed_at': null,
+  }),
+  200,
+  headers: {'content-type': 'application/json'},
+);
+
 const _tokens = TokenPair(
   userId: 'user-1',
   accessToken: 'access',
@@ -327,6 +339,7 @@ void main() {
                       request.url.path.contains('/push')) {
                     return http.Response('', 204);
                   }
+                  if (request.url.path == '/auth/totp') return _totpStatus();
                   return http.Response('{}', 404);
                 }),
               );
@@ -364,6 +377,10 @@ void main() {
         await tester.tap(find.text('Delete account...'));
         await tester.pumpAndSettle();
         await tester.tap(find.text('Delete permanently'));
+        await tester.pumpAndSettle();
+        await tester.enterText(find.byType(TextField), 'correct horse');
+        await tester.pumpAndSettle();
+        await tester.tap(find.widgetWithText(AppButton, 'Delete permanently'));
         await tester.pumpAndSettle();
 
         expect(find.byType(AppErrorState), findsOneWidget);

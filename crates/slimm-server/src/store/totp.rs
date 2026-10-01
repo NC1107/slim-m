@@ -329,10 +329,13 @@ impl Store {
     /// [`Store::consume_reset_code`] gives for the same move, and the audit
     /// entry the caller writes is the other half.
     ///
+    /// `actor_id` is `None` for the operator's `clear-totp` command, which acts
+    /// on the database directly and has no signed-in administrator to name.
+    ///
     /// Returns the revoked sessions so the caller can close their sockets.
     pub async fn clear_totp_factor(
         &self,
-        actor_id: UserId,
+        actor_id: Option<UserId>,
         user_id: UserId,
     ) -> Result<Vec<SessionId>, TotpError> {
         let now = now_ms();

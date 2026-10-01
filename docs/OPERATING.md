@@ -94,20 +94,39 @@ So a member who forgot both their password and lost their authenticator needs tw
 ### When the only administrator loses both
 
 Read this before you turn the factor on for the account that owns the deployment.
-The clear needs a signed-in session with ADMINISTRATOR, and the sign-in itself asks for a code.
-The server binary's only commands are no arguments (run the server), `--healthcheck`, and `import-emoji <directory>` (`crates/slimm-server/src/main.rs`).
-None of them touches accounts, and there is no command that clears a factor or issues a reset code.
+The administrator's clear needs a signed-in session with ADMINISTRATOR, and the sign-in itself asks for a code, so a sole administrator who has lost both the authenticator and the recovery codes cannot use it.
+For that case the server binary has a command that works on the database directly:
 
-What that means in practice:
+    slimm-server clear-totp <username>
 
-- If another member holds ADMINISTRATOR, they can clear yours from your card.
-- If you are still signed in on another device, that session can call the clear against your own account.
-  The code does not exclude clearing your own factor, and I have not exercised that path against a running server.
-- If you are the only administrator and are signed out everywhere, no supported route exists.
-  Editing the SQLite database directly is the only thing left, and the product does not document or support it.
+Run it where the server runs, with the same `SLIMM_DATABASE_PATH` the server uses.
+With the compose file that is:
 
-So keep the recovery codes somewhere other than the phone, and give a second person ADMINISTRATOR before you enrol on the owner account.
+    docker compose exec server /usr/local/bin/slimm-server clear-totp <username>
+
+(`docker compose run --rm server clear-totp <username>` works too, since the image's entrypoint is the binary.)
+It removes the factor and its recovery codes, signs the member out everywhere, and writes a `totp_cleared` row to the moderation audit log with no actor, because nobody was signed in.
+It prints how many sessions it signed out, and exits non-zero if no account has that name or the account has no factor.
+The username is matched without regard to letter case.
+It is safe to run beside the server, but a device that is already connected can stay connected until it next reconnects.
+The member then signs in with their password alone and can enrol again.
+
+What else is true here:
+
+- If another member holds ADMINISTRATOR, they can clear yours from your card without the command.
+- Turning the factor on, and deleting an account, both ask for the account password, so a stolen session token cannot do either (decision 0048).
+
+Keep the recovery codes somewhere other than the phone, and give a second person ADMINISTRATOR before you enrol on the owner account.
 [deploy/README.md](../deploy/README.md) covers backups, and a restore from before you enrolled also removes the factor, along with everything else since.
+
+## Usernames
+
+Usernames are unique without regard to letter case, so `Alice` cannot register beside `alice`, and sign-in ignores case.
+Migration 0095 added the index.
+A deployment that already held a colliding pair kept the name for the account that was active most recently: one with a live session first, then by latest session use, else latest device activity, else latest message, with ties going to the earliest account.
+Every other account in the group was renamed to its own name plus `_` and the last eight hex digits of its id.
+`username_collision_renames` records the old and new name of each, so you can tell those members what to sign in with.
+Display names were not touched.
 
 ## Modules and module sources
 

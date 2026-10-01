@@ -344,7 +344,7 @@ async fn the_off_policy_refuses_new_enrolments_without_weakening_existing_ones()
             "POST",
             "/auth/totp/enrol",
             Some(&admin_token),
-            None,
+            Some(json!({ "password": PASSWORD })),
         ))
         .await
         .unwrap();

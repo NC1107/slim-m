@@ -15,20 +15,29 @@ extension SlimmApiTotp on SlimmApi {
 
   /// Starts an enrolment. The secret comes back once and is not retrievable
   /// again; calling this a second time replaces an unconfirmed enrolment and is
-  /// refused (409) once one is live.
-  Future<TotpEnrolment> beginTotpEnrolment() async {
-    final json = await _send('POST', '/auth/totp/enrol');
+  /// refused (409) once one is live. [password] is the account password: a
+  /// session token alone cannot turn the factor on (decision 0048).
+  Future<TotpEnrolment> beginTotpEnrolment({required String password}) async {
+    final json = await _send(
+      'POST',
+      '/auth/totp/enrol',
+      body: {'password': password},
+    );
     return TotpEnrolment.fromJson(json as Map<String, dynamic>);
   }
 
   /// Switches the factor on against a code from the authenticator, and returns
   /// the recovery codes. They are shown once and stored only as hashes, so a
-  /// caller that drops them cannot ask for them again, only reissue.
-  Future<List<String>> confirmTotpEnrolment(String code) async {
+  /// caller that drops them cannot ask for them again, only reissue. Needs the
+  /// account [password] again, for the same reason enrolling does.
+  Future<List<String>> confirmTotpEnrolment(
+    String code, {
+    required String password,
+  }) async {
     final json = await _send(
       'POST',
       '/auth/totp/confirm',
-      body: {'code': code},
+      body: {'code': code, 'password': password},
     );
     return _recoveryCodes(json);
   }

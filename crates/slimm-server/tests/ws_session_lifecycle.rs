@@ -56,9 +56,16 @@ fn state_for(store: &Store) -> AppState {
     }
 }
 
+const PASSWORD: &str = "correct-horse-battery";
+
 /// Creates a user and returns (rest access token, ws connect ticket, user id).
 async fn user_ticket(store: &Store, name: &str) -> (String, String, slimm_server::ids::UserId) {
-    let user = store.create_user(name, name).await.unwrap();
+    let hash = Auth::new(2)
+        .unwrap()
+        .hash_password(PASSWORD.to_owned())
+        .await
+        .unwrap();
+    let user = store.create_account(name, name, &hash).await.unwrap();
     let tokens = store.open_session(user.id, "device").await.unwrap();
     let ctx = store
         .authenticate(&tokens.access_token)
@@ -308,7 +315,8 @@ async fn deleting_the_account_closes_its_live_socket() {
                 .method("DELETE")
                 .uri("/account")
                 .header("authorization", format!("Bearer {alice_access}"))
-                .body(Body::empty())
+                .header("content-type", "application/json")
+                .body(Body::from(format!(r#"{{"password":"{PASSWORD}"}}"#)))
                 .unwrap(),
         )
         .await

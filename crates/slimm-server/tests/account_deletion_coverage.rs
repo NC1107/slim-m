@@ -148,6 +148,7 @@ const DECISIONS: &[(&str, &str, OnDelete)] = &[
     ("user_blocks", "blocked_id", OnDelete::Purge),
     ("user_blocks", "blocker_id", OnDelete::Purge),
     ("user_totp_factors", "user_id", OnDelete::Purge),
+    ("username_collision_renames", "user_id", OnDelete::Purge),
     ("user_notes", "author_id", OnDelete::Purge),
     (
         "user_notes",
