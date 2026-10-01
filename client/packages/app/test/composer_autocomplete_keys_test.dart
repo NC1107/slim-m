@@ -10,9 +10,16 @@ library;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:slimm_app/src/widgets/composer_autocomplete.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'composer_harness.dart';
+
+/// The suggestion row, not the same shortcode in the field's own preview.
+Finder _listed(String text) => find.descendant(
+  of: find.byType(ComposerAutocomplete),
+  matching: find.text(text),
+);
 
 void main() {
   late TextEditingController controller;
@@ -38,7 +45,7 @@ void main() {
     await tester.tap(find.byType(TextField));
     await tester.enterText(find.byType(TextField), ':party');
     await tester.pump();
-    expect(find.text(':party_parrot:'), findsOneWidget);
+    expect(_listed(':party_parrot:'), findsOneWidget);
   }
 
   testWidgets('a plain Tab accepts the highlighted suggestion', (tester) async {
@@ -48,7 +55,7 @@ void main() {
     await tester.pump();
 
     expect(controller.text, ':party_parrot: ');
-    expect(find.text(':party_parrot:'), findsNothing);
+    expect(_listed(':party_parrot:'), findsNothing);
   });
 
   testWidgets('Ctrl+Tab leaves the suggestion open for the shell to cycle '
@@ -61,7 +68,7 @@ void main() {
     await tester.pump();
 
     expect(controller.text, ':party');
-    expect(find.text(':party_parrot:'), findsOneWidget);
+    expect(_listed(':party_parrot:'), findsOneWidget);
   });
 
   testWidgets('Ctrl+Shift+Tab leaves the suggestion open too', (tester) async {
@@ -75,6 +82,6 @@ void main() {
     await tester.pump();
 
     expect(controller.text, ':party');
-    expect(find.text(':party_parrot:'), findsOneWidget);
+    expect(_listed(':party_parrot:'), findsOneWidget);
   });
 }

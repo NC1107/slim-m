@@ -176,7 +176,7 @@ void main() {
     final server = _Server();
     await _pump(tester, server);
 
-    await tester.enterText(find.byType(AppInput), 'Party Parrot');
+    await tester.enterText(find.byType(AppInput).first, 'Party Parrot');
     await tester.pumpAndSettle();
 
     expect(find.text(':party_parrot:'), findsOneWidget);
@@ -193,7 +193,7 @@ void main() {
     final server = _Server();
     await _pump(tester, server, picked: _png);
 
-    await tester.enterText(find.byType(AppInput), '!!!');
+    await tester.enterText(find.byType(AppInput).first, '!!!');
     await tester.pumpAndSettle();
     await tester.tap(find.text('Choose image'));
     await tester.pumpAndSettle();
@@ -214,7 +214,7 @@ void main() {
     final server = _Server();
     await _pump(tester, server, picked: _png);
 
-    await tester.enterText(find.byType(AppInput), 'Party Parrot');
+    await tester.enterText(find.byType(AppInput).first, 'Party Parrot');
     await tester.pumpAndSettle();
     await tester.tap(find.text('Choose image'));
     await tester.pumpAndSettle();
@@ -241,7 +241,7 @@ void main() {
     );
     await _pump(tester, server, picked: _png);
 
-    await tester.enterText(find.byType(AppInput), 'party_parrot');
+    await tester.enterText(find.byType(AppInput).first, 'party_parrot');
     await tester.pumpAndSettle();
     await tester.tap(find.text('Choose image'));
     await tester.pumpAndSettle();
@@ -263,7 +263,7 @@ void main() {
     final server = _Server(emoji: [_emojiJson('emoji-1', 'party_parrot')]);
     await _pump(tester, server, picked: _png);
 
-    await tester.enterText(find.byType(AppInput), 'Party Parrot');
+    await tester.enterText(find.byType(AppInput).first, 'Party Parrot');
     await tester.pumpAndSettle();
     await tester.tap(find.text('Choose image'));
     await tester.pumpAndSettle();
