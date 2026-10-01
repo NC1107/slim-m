@@ -8,7 +8,8 @@ A lightweight, cross-platform, open source messaging platform with optional self
 
 Phases 0 through 4 (foundations, server and protocol core, client shell, push notifications, voice and screen share) are complete, and later phases are substantially underway: a first Voice Canvas write slice, the admin and moderation screens, the client capability handshake, and part of the motion, accessibility and audio-design polish pass have all shipped.
 Both components ship signed release artifacts and run on a live self-hosted instance; the `.release-please-manifest.*.json` files carry the current versions rather than this paragraph, which went stale by forty releases the last time it named them.
-See [CLAUDE.md](CLAUDE.md) for what has shipped most recently and the [roadmap](docs/ROADMAP.md) for phases and exit criteria.
+Later work includes bots, incoming webhooks, modules and the Dock, two-factor authentication and signed self-update for the desktop apps.
+See `client/CHANGELOG.md` and `crates/slimm-server/CHANGELOG.md` for what has shipped, the [decision records](docs/decisions/README.md) for why, and the [roadmap](docs/ROADMAP.md) for phases and exit criteria.
 
 ## Layout
 
@@ -16,7 +17,12 @@ See [CLAUDE.md](CLAUDE.md) for what has shipped most recently and the [roadmap](
 crates/slimm-server   Rust home server (Axum + embedded SQLite via sqlx)
 schema/               OpenAPI (openapi.yaml), the single source of record for the wire protocol - hand-written types on both sides, not generated from it
 client/               Flutter client (Dart pub workspace of small packages)
-docker/               Production container image for the server
+docker/               Container images for the server and the web client
+docker-compose.yml    Self-host example (voice is the docker-compose.voice.yml overlay)
+deploy/               Caddy config and the self-hosting walkthrough
+packaging/            Linux, Windows, flatpak and rpm packaging
+scripts/              Hygiene gates, backup and restore, release helpers
+perf/                 Performance model
 docs/                 Brief, strategy, roadmap, decisions, and research
 ```
 
@@ -32,6 +38,7 @@ If the space offers a web client, opening that address in a browser needs no ins
 ## Self-hosting a server
 
 The full walkthrough is [deploy/README.md](deploy/README.md).
+[docs/OPERATING.md](docs/OPERATING.md) lists every setting and covers two-factor, modules, webhooks, bots and updating, and [docs/TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md) is organised by symptom.
 Text chat needs one DNS record and two values in a `.env`; voice and screen share are an overlay you add when you want them.
 
 ## Running the server
@@ -58,3 +65,9 @@ curl localhost:8080/version     # -> {"name":"slim-m",...}
 Free for noncommercial use: personal, hobby, educational, research, nonprofit, and all that.
 You can fork it, change it and redistribute it, you just can't sell it or use it commercially without asking first.
 If you want to use it commercially, open an issue and ask.
+
+## For contributors
+
+[CONTRIBUTING.md](CONTRIBUTING.md) has the definition of done.
+[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) is a ten minute tour of the code.
+[docs/RELEASING.md](docs/RELEASING.md) is the release runbook, and [docs/CHANGING-CI.md](docs/CHANGING-CI.md) is what to know before editing a workflow.

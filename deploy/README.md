@@ -4,6 +4,8 @@ A minimal production stack for a friend group.
 It wires up the slim-m server, Caddy for automatic TLS, and an optional Litestream sidecar that streams the SQLite database to S3-compatible storage.
 Voice and screen share are a second compose file you add when you want them.
 
+Once it is running, [docs/OPERATING.md](../docs/OPERATING.md) lists every setting and covers two-factor, modules, webhooks and bots, and [docs/TROUBLESHOOTING.md](../docs/TROUBLESHOOTING.md) is organised by symptom.
+
 **Text chat on its own is a complete deployment, not a degraded one.**
 The server treats a missing SFU as a normal configuration and answers 501 for every voice request, so a group who only want to type need no LiveKit keys and no second DNS record.
 Start there; adding voice later is one line in `.env` and does not disturb anything already running.
