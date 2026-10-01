@@ -68,152 +68,57 @@ void main() {
   setUp(() => SharedPreferences.setMockInitialValues({}));
 
   group('push content preview', () {
-    test('registration sends include_content: false by default', () async {
-      Map<String, dynamic>? sentBody;
-      _mock(
-        (call) async => switch (call.method) {
-          'getToken' => 'abcd1234',
-          _ => null,
-        },
-      );
-      addTearDown(() => _mock(null));
-
-      final session = SessionStore(tokens: _tokens);
-      final container = _container(
-        session: session,
-        httpClient: MockClient((request) async {
-          if (request.method == 'PUT' && request.url.path == '/push') {
-            sentBody = jsonDecode(request.body) as Map<String, dynamic>;
-          }
-          return http.Response('', 204);
-        }),
-        channel: ApnsTokenChannel(isIOS: true),
-      );
-      addTearDown(container.dispose);
-
-      await container.read(pushControllerProvider.notifier).register();
-
-      expect(sentBody, isNotNull);
-      expect(sentBody!['include_content'], isFalse);
-    });
-
-    test('turning the preview setting on before registering sends '
-        'include_content: true', () async {
-      Map<String, dynamic>? sentBody;
-      _mock(
-        (call) async => switch (call.method) {
-          'getToken' => 'abcd1234',
-          _ => null,
-        },
-      );
-      addTearDown(() => _mock(null));
-
-      final session = SessionStore(tokens: _tokens);
-      final container = _container(
-        session: session,
-        httpClient: MockClient((request) async {
-          if (request.method == 'PUT' && request.url.path == '/push') {
-            sentBody = jsonDecode(request.body) as Map<String, dynamic>;
-          }
-          return http.Response('', 204);
-        }),
-        channel: ApnsTokenChannel(isIOS: true),
-      );
-      addTearDown(container.dispose);
-
-      await container
-          .read(pushContentPreviewSettingsProvider.notifier)
-          .setEnabled(true);
-      await container.read(pushControllerProvider.notifier).register();
-
-      expect(sentBody, isNotNull);
-      expect(sentBody!['include_content'], isTrue);
-    });
-
-    test('flipping the setting after an initial registration reaches the '
-        'server on the next register() call, not the value it started '
-        'with', () async {
-      final requests = <Map<String, dynamic>>[];
-      _mock(
-        (call) async => switch (call.method) {
-          'getToken' => 'abcd1234',
-          _ => null,
-        },
-      );
-      addTearDown(() => _mock(null));
-
-      final session = SessionStore(tokens: _tokens);
-      final container = _container(
-        session: session,
-        httpClient: MockClient((request) async {
-          if (request.method == 'PUT' && request.url.path == '/push') {
-            requests.add(jsonDecode(request.body) as Map<String, dynamic>);
-          }
-          return http.Response('', 204);
-        }),
-        channel: ApnsTokenChannel(isIOS: true),
-      );
-      addTearDown(container.dispose);
-
-      await container.read(pushControllerProvider.notifier).register();
-      expect(requests, hasLength(1));
-      expect(requests[0]['include_content'], isFalse);
-
-      await container
-          .read(pushContentPreviewSettingsProvider.notifier)
-          .setEnabled(true);
-      await container.read(pushControllerProvider.notifier).register();
-
-      expect(requests, hasLength(2));
-      expect(requests[1]['include_content'], isTrue);
-    });
-
-    test('a persisted opt-in survives a cold start and the sign-in that '
-        'follows it', () async {
-      SharedPreferences.setMockInitialValues({pushIncludeContentKey: true});
+    Future<List<Map<String, dynamic>>> registerOnce({
+      Map<String, Object> prefs = const {},
+      List<Override> extra = const [],
+    }) async {
+      SharedPreferences.setMockInitialValues(prefs);
       final requests = <Map<String, dynamic>>[];
       _mock((call) async => call.method == 'getToken' ? 'abcd1234' : null);
       addTearDown(() => _mock(null));
-
-      final session = SessionStore();
-      final container = _container(
-        session: session,
-        httpClient: MockClient((request) async {
-          if (request.method == 'PUT' && request.url.path == '/push') {
-            requests.add(jsonDecode(request.body) as Map<String, dynamic>);
-          }
-          return http.Response('', 204);
-        }),
-        channel: ApnsTokenChannel(isIOS: true),
-      );
-      addTearDown(container.dispose);
-
-      container.read(pushControllerProvider);
-      session.set(_tokens);
-      await Future<void>.delayed(const Duration(milliseconds: 50));
-
-      expect(requests, isNotEmpty);
-      expect(requests.every((r) => r['include_content'] == true), isTrue);
-      expect(container.read(pushContentPreviewSettingsProvider), isTrue);
-    });
-
-    test('a preferences read that fails once does not pin the opt-in off '
-        'for the rest of the process', () async {
-      SharedPreferences.setMockInitialValues({pushIncludeContentKey: true});
-      var reads = 0;
-      final requests = <Map<String, dynamic>>[];
-      _mock((call) async => call.method == 'getToken' ? 'abcd1234' : null);
-      addTearDown(() => _mock(null));
-
       final container = _container(
         session: SessionStore(tokens: _tokens),
         httpClient: MockClient((request) async {
           if (request.method == 'PUT' && request.url.path == '/push') {
             requests.add(jsonDecode(request.body) as Map<String, dynamic>);
           }
+          if (request.url.path == '/push/preview') {
+            return http.Response('{"include_content":true}', 200);
+          }
           return http.Response('', 204);
         }),
         channel: ApnsTokenChannel(isIOS: true),
+        extra: extra,
+      );
+      addTearDown(container.dispose);
+      await container.read(pushControllerProvider.notifier).register();
+      await container.read(pushControllerProvider.notifier).register();
+      return requests;
+    }
+
+    test('a device that never toggled sends no include_content, so a '
+        'reinstall cannot reset the account choice', () async {
+      final requests = await registerOnce();
+
+      expect(requests, hasLength(2));
+      expect(requests.every((r) => !r.containsKey('include_content')), isTrue);
+    });
+
+    test('an explicit choice not yet accepted is sent once, then not '
+        'again', () async {
+      final requests = await registerOnce(
+        prefs: {pushIncludeContentKey: false},
+      );
+
+      expect(requests[0]['include_content'], isFalse);
+      expect(requests[1].containsKey('include_content'), isFalse);
+    });
+
+    test('a preferences read that fails once still sends the pending '
+        'choice on a later registration', () async {
+      var reads = 0;
+      final requests = await registerOnce(
+        prefs: {pushIncludeContentKey: true},
         extra: [
           preferencesProvider.overrideWith((ref) async {
             if (reads++ == 0) throw StateError('storage not readable yet');
@@ -221,13 +126,9 @@ void main() {
           }),
         ],
       );
-      addTearDown(container.dispose);
 
-      await container.read(pushControllerProvider.notifier).register();
-      await container.read(pushControllerProvider.notifier).register();
-
-      expect(requests.last['include_content'], isTrue);
-      expect(container.read(pushContentPreviewSettingsProvider), isTrue);
+      expect(requests[0].containsKey('include_content'), isFalse);
+      expect(requests[1]['include_content'], isTrue);
     });
   });
 }

@@ -350,9 +350,8 @@ class PushController extends StateNotifier<PushStatus>
         _ref.read(pushKeyStoreProvider),
         legacy: _ref.read(legacyPushKeyStoreProvider),
       ).publicKeyBase64();
-      final includeContent = await _ref
-          .read(pushContentPreviewSettingsProvider.notifier)
-          .currentValue();
+      final preview = _ref.read(pushContentPreviewSettingsProvider.notifier);
+      final includeContent = await preview.pendingChoice();
 
       await _ref
           .read(apiProvider)
@@ -362,6 +361,7 @@ class PushController extends StateNotifier<PushStatus>
             pushPublicKey: publicKey,
             includeContent: includeContent,
           );
+      if (includeContent != null) unawaited(preview.markSent());
       state = PushStatus.registered;
       final current =
           WidgetsBinding.instance.lifecycleState ?? AppLifecycleState.resumed;

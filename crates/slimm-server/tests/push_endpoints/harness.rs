@@ -138,6 +138,7 @@ pub(crate) async fn register_push(app: &Router, token: &str, push_token: &str) -
                 "platform": "ios",
                 "push_token": push_token,
                 "push_public_key": BASE64.encode(public.as_bytes()),
+                "include_content": false,
             })),
         ))
         .await

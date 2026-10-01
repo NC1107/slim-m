@@ -6,11 +6,11 @@
 /// holding whatever this device last registered with.
 library;
 
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
@@ -18,7 +18,6 @@ import 'package:http/testing.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:slimm_api/api.dart';
 import 'package:slimm_app/src/providers/providers.dart';
-import 'package:slimm_app/src/providers/push_content_preview_settings.dart';
 import 'package:slimm_app/src/providers/push_controller.dart';
 import 'package:slimm_app/src/widgets/personal_status_sections.dart';
 import 'package:slimm_design_system/design_system.dart';
@@ -32,21 +31,6 @@ const _tokens = TokenPair(
 );
 
 const _label = 'Show message text on your lock screen';
-
-/// The native push channel mocked here so a real `_registerWithServer` call
-/// can actually complete, the same channel `push_controller_test.dart` mocks
-/// for the same reason.
-const _pushChannel = MethodChannel('top.npcserver.slimm/push');
-
-void _mockToken() {
-  TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
-      .setMockMethodCallHandler(_pushChannel, (call) async {
-        return switch (call.method) {
-          'getToken' => 'abcd1234',
-          _ => null,
-        };
-      });
-}
 
 ProviderContainer _container({
   http.Client? httpClient,
@@ -113,10 +97,6 @@ void _disposeBeforeReturning(ProviderContainer container) =>
 
 void main() {
   setUp(() => SharedPreferences.setMockInitialValues({}));
-  tearDown(() {
-    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
-        .setMockMethodCallHandler(_pushChannel, null);
-  });
 
   testWidgets('absent on a non-iOS platform', (tester) async {
     await _withPlatform(TargetPlatform.android, () async {
@@ -127,23 +107,82 @@ void main() {
     });
   });
 
-  testWidgets('present, and off by default, on iOS', (tester) async {
+  MockClient server(List<bool> saved, {bool value = true}) => MockClient((
+    request,
+  ) async {
+    if (request.url.path == '/push/preview') {
+      if (request.method == 'PUT') {
+        saved.add((jsonDecode(request.body) as Map)['include_content'] as bool);
+        return http.Response(request.body, 200);
+      }
+      return http.Response(jsonEncode({'include_content': value}), 200);
+    }
+    return http.Response('', 204);
+  });
+
+  AppToggle toggleIn(WidgetTester tester) => tester.widget<AppToggle>(
+    find.byWidgetPredicate((w) => w is AppToggle && w.semanticLabel == _label),
+  );
+
+  testWidgets('shows what the account holds on iOS, on when the server says '
+      'on', (tester) async {
     await _withPlatform(TargetPlatform.iOS, () async {
-      await tester.pumpWidget(_shell(_container()));
+      final container = _container(
+        session: SessionStore(tokens: _tokens),
+        httpClient: server([]),
+      );
+      await tester.pumpWidget(_shell(container));
       await tester.pumpAndSettle();
 
-      final toggle = tester.widget<AppToggle>(
-        find.byWidgetPredicate(
-          (w) => w is AppToggle && w.semanticLabel == _label,
-        ),
-      );
-      expect(toggle.value, isFalse);
+      expect(toggleIn(tester).value, isTrue);
+      _disposeBeforeReturning(container);
     });
   });
 
-  testWidgets('turning it on persists the preference', (tester) async {
+  testWidgets('shows off when the account says off', (tester) async {
     await _withPlatform(TargetPlatform.iOS, () async {
-      await tester.pumpWidget(_shell(_container()));
+      final container = _container(
+        session: SessionStore(tokens: _tokens),
+        httpClient: server([], value: false),
+      );
+      await tester.pumpWidget(_shell(container));
+      await tester.pumpAndSettle();
+
+      expect(toggleIn(tester).value, isFalse);
+      _disposeBeforeReturning(container);
+    });
+  });
+
+  testWidgets('cannot be flipped while the server has not answered', (
+    tester,
+  ) async {
+    await _withPlatform(TargetPlatform.iOS, () async {
+      final answer = Completer<http.Response>();
+      final container = _container(
+        session: SessionStore(tokens: _tokens),
+        httpClient: MockClient((request) => answer.future),
+      );
+      await tester.pumpWidget(_shell(container));
+      await tester.pump();
+
+      expect(toggleIn(tester).onChanged, isNull);
+      answer.complete(http.Response('{"include_content":true}', 200));
+      await tester.pumpAndSettle();
+      expect(toggleIn(tester).onChanged, isNotNull);
+      _disposeBeforeReturning(container);
+    });
+  });
+
+  testWidgets('turning it off saves the explicit choice to the account', (
+    tester,
+  ) async {
+    await _withPlatform(TargetPlatform.iOS, () async {
+      final saved = <bool>[];
+      final container = _container(
+        session: SessionStore(tokens: _tokens),
+        httpClient: server(saved),
+      );
+      await tester.pumpWidget(_shell(container));
       await tester.pumpAndSettle();
 
       await tester.tap(
@@ -153,44 +192,11 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      final prefs = await SharedPreferences.getInstance();
-      expect(prefs.getBool(pushIncludeContentKey), isTrue);
+      expect(saved, [false]);
+      expect(toggleIn(tester).value, isFalse);
+      _disposeBeforeReturning(container);
     });
   });
-
-  testWidgets(
-    'turning it on re-registers with the server, carrying the new answer',
-    (tester) async {
-      await _withPlatform(TargetPlatform.iOS, () async {
-        _mockToken();
-        Map<String, dynamic>? sentBody;
-        final container = _container(
-          session: SessionStore(tokens: _tokens),
-          withApnsChannel: true,
-          httpClient: MockClient((request) async {
-            if (request.method == 'PUT' && request.url.path == '/push') {
-              sentBody = jsonDecode(request.body) as Map<String, dynamic>;
-            }
-            return http.Response('', 204);
-          }),
-        );
-        await tester.pumpWidget(_shell(container));
-        await tester.pumpAndSettle();
-
-        await tester.tap(
-          find.byWidgetPredicate(
-            (w) => w is AppToggle && w.semanticLabel == _label,
-          ),
-        );
-        await tester.pumpAndSettle();
-
-        expect(sentBody, isNotNull);
-        expect(sentBody!['include_content'], isTrue);
-
-        _disposeBeforeReturning(container);
-      });
-    },
-  );
 
   testWidgets('carries its own accessible name, verified against the real '
       'semantics tree rather than assumed from the widget', (tester) async {

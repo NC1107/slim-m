@@ -49,7 +49,7 @@ async fn register(store: &Store, user: UserId, device: DeviceId, token: &str) {
                 push_token: token,
                 voip_push_token: None,
                 push_public_key: &KEY,
-                include_content: false,
+                include_content: Some(false),
             },
         )
         .await

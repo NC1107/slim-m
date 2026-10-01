@@ -107,6 +107,12 @@ pub fn minute_of_day_utc(now_ms: i64) -> u16 {
     ((now_ms / 60_000) % i64::from(MINUTES_PER_DAY)) as u16
 }
 
+/// What an account that never chose gets for push previews. The preview is
+/// sealed to the device's own key, and the OS lock-screen setting still
+/// applies on top; flip this one constant to make previews opt-in again
+/// (`docs/decisions/0053-push-preview-default-on.md`).
+pub const DEFAULT_PUSH_PREVIEW: bool = true;
+
 #[cfg(test)]
 mod tests {
     use super::*;

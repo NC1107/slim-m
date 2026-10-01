@@ -18,17 +18,15 @@ extension SlimmApiPush on SlimmApi {
   /// a content-free envelope to [pushPublicKey]; only this device holds the
   /// matching private key, so a device that never registers one gets no push.
   ///
-  /// [includeContent] asks the server to seal a short preview (sender,
-  /// channel, up to 160 characters of body) inside that same envelope, for a
-  /// device that can decrypt it and show it in a notification. Defaults to
-  /// false, matching the server's own default: a device that never asks gets
-  /// exactly the content-free envelope it always got.
+  /// [includeContent] is the member's explicit choice about a sealed preview,
+  /// saved to the account. Null (the default) leaves the account's own choice
+  /// alone, so a device that never toggled cannot reset one made elsewhere.
   Future<void> registerPush({
     required String platform,
     required String pushToken,
     String? voipPushToken,
     required String pushPublicKey,
-    bool includeContent = false,
+    bool? includeContent,
   }) =>
       _send(
         'PUT',
@@ -38,10 +36,21 @@ extension SlimmApiPush on SlimmApi {
           'push_token': pushToken,
           'voip_push_token': voipPushToken,
           'push_public_key': pushPublicKey,
-          'include_content': includeContent,
+          if (includeContent != null) 'include_content': includeContent,
         },
         expectNoContent: true,
       );
+
+  /// Whether push envelopes carry a message preview: the account's choice,
+  /// else the server default.
+  Future<bool> pushPreview() async {
+    final json = await _send('GET', '/push/preview');
+    return (json as Map<String, dynamic>)['include_content'] as bool;
+  }
+
+  /// Saves the member's explicit preview choice to the account.
+  Future<void> setPushPreview(bool includeContent) =>
+      _send('PUT', '/push/preview', body: {'include_content': includeContent});
 
   /// Clears this device's push registration.
   Future<void> unregisterPush() =>

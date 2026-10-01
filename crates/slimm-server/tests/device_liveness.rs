@@ -57,7 +57,7 @@ async fn a_device_is_listed_exactly_when_it_is_pushable() {
             push_token: "token",
             voip_push_token: None,
             push_public_key: &KEY,
-            include_content: false,
+            include_content: Some(false),
         },
     )
     .await
@@ -97,7 +97,7 @@ async fn revoking_a_session_agrees_across_both_reads() {
             push_token: "token",
             voip_push_token: None,
             push_public_key: &KEY,
-            include_content: false,
+            include_content: Some(false),
         },
     )
     .await
@@ -129,7 +129,7 @@ async fn a_user_whose_only_device_is_dead_is_not_a_push_candidate() {
             push_token: "token",
             voip_push_token: None,
             push_public_key: &KEY,
-            include_content: false,
+            include_content: Some(false),
         },
     )
     .await
