@@ -80,7 +80,7 @@ impl Store {
         user_id: UserId,
     ) -> Result<Vec<SessionId>, DeleteAccountError> {
         let now = now_ms();
-        let mut tx = self.pool.begin().await?;
+        let mut tx = self.begin_write().await?;
 
         // Write-first: takes the lock up front; deleting devices cascades these.
         let revoked: Vec<SessionId> = sqlx::query!(
@@ -369,6 +369,16 @@ impl Store {
         )
         .execute(&mut *tx)
         .await?;
+        // The factor row holds its secret in the clear; a tombstone fires no cascade.
+        sqlx::query!("DELETE FROM totp_challenges WHERE user_id = ?", user_id)
+            .execute(&mut *tx)
+            .await?;
+        sqlx::query!("DELETE FROM totp_recovery_codes WHERE user_id = ?", user_id)
+            .execute(&mut *tx)
+            .await?;
+        sqlx::query!("DELETE FROM user_totp_factors WHERE user_id = ?", user_id)
+            .execute(&mut *tx)
+            .await?;
 
         // The live-username index excludes tombstones, so the name frees up.
         let tombstone = format!("deleted-{user_id}");

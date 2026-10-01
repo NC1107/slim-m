@@ -113,7 +113,7 @@ fn the_viewport_snapshot_reads_only_through_one_transaction() {
         "a direct pool read here would race the transaction the snapshot depends on: {body}"
     );
     assert_eq!(
-        body.matches("self.pool.begin()").count(),
+        body.matches("self.begin_read()").count(),
         1,
         "viewport_snapshot must open exactly one transaction for both reads"
     );

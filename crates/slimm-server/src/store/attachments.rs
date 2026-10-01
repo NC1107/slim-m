@@ -104,7 +104,7 @@ impl Store {
         uploader: Option<UserId>,
     ) -> anyhow::Result<()> {
         let now = now_ms();
-        let mut tx = self.pool.begin().await?;
+        let mut tx = self.begin_write().await?;
         sqlx::query!(
             "INSERT INTO attachments (sha256, size, content_type, key_version, is_encrypted, filename, created_at)
              VALUES (?, ?, ?, 0, 0, ?, ?)

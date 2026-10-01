@@ -292,7 +292,7 @@ impl Store {
         permissions: Option<Permissions>,
         mentionable: Option<bool>,
     ) -> Result<Option<Role>, RoleGuardError> {
-        let mut tx = self.pool.begin().await?;
+        let mut tx = self.begin_write().await?;
 
         let affected: u64 = if name.is_none() && permissions.is_none() && mentionable.is_none() {
             let exists = sqlx::query_scalar!(
@@ -449,7 +449,7 @@ impl Store {
         user_id: UserId,
         role_id: RoleId,
     ) -> Result<(), RoleGuardError> {
-        let mut tx = self.pool.begin().await?;
+        let mut tx = self.begin_write().await?;
         sqlx::query!(
             "DELETE FROM member_roles WHERE user_id = ? AND role_id = ?",
             user_id,

@@ -142,7 +142,7 @@ impl Store {
     ) -> Result<Vec<SessionId>, ConsumeResetError> {
         let hash = hash_secret(code);
         let now = now_ms();
-        let mut tx = self.pool.begin().await?;
+        let mut tx = self.begin_write().await?;
 
         let claimed = sqlx::query!(
             r#"UPDATE password_reset_codes SET used_at = ?

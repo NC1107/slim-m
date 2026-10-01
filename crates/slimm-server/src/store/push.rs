@@ -105,7 +105,7 @@ impl Store {
             push_public_key,
             include_content,
         } = registration;
-        let mut tx = self.pool.begin().await?;
+        let mut tx = self.begin_write().await?;
 
         sqlx::query!(
             "UPDATE devices

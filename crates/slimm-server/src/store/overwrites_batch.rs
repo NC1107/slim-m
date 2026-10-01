@@ -33,7 +33,7 @@ impl Store {
         channel_id: ChannelId,
         entries: &[OverwriteBatchEntry],
     ) -> anyhow::Result<()> {
-        let mut tx = self.pool.begin().await?;
+        let mut tx = self.begin_write().await?;
         for entry in entries {
             set_overwrite(
                 &mut *tx,

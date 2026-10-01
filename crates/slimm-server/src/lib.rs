@@ -15,6 +15,7 @@ pub mod emoji;
 pub mod ephemeral;
 mod forward_backfill;
 mod forward_events;
+pub(crate) mod hidden_chars;
 pub mod http;
 pub mod hub;
 pub mod identity;

@@ -101,7 +101,7 @@ impl Store {
         now: i64,
         owner_in_call: impl Fn(UserId) -> bool,
     ) -> anyhow::Result<WatchWriteOutcome> {
-        let mut tx = self.pool.begin().await?;
+        let mut tx = self.begin_write().await?;
         let existing = sqlx::query("SELECT * FROM watch_sessions WHERE channel_id = ?")
             .bind(channel)
             .fetch_optional(&mut *tx)

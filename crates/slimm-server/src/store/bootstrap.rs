@@ -43,7 +43,7 @@ impl Store {
     /// second set of roles.
     pub async fn bootstrap_deployment(&self, user_id: UserId) -> anyhow::Result<Bootstrap> {
         let now = now_ms();
-        let mut tx = self.pool.begin().await?;
+        let mut tx = self.begin_write().await?;
 
         let everyone_id = RoleId::generate();
         let everyone_bits = EVERYONE_DEFAULTS.bits();

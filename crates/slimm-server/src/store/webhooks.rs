@@ -83,7 +83,7 @@ impl Store {
         let now = now_ms();
         let username = format!("webhook-{user_id}");
 
-        let mut tx = self.pool.begin().await?;
+        let mut tx = self.begin_write().await?;
         sqlx::query!(
             "INSERT INTO users (id, username, display_name, created_at, is_webhook)
              VALUES (?, ?, ?, ?, 1)",
@@ -180,7 +180,7 @@ impl Store {
         webhook_id: WebhookId,
         label: &str,
     ) -> anyhow::Result<Option<Webhook>> {
-        let mut tx = self.pool.begin().await?;
+        let mut tx = self.begin_write().await?;
         let user_id = sqlx::query_scalar!(
             r#"SELECT user_id AS "user_id!: UserId" FROM webhooks WHERE id = ?"#,
             webhook_id
@@ -349,7 +349,7 @@ impl Store {
     ) -> anyhow::Result<Option<(Webhook, String)>> {
         let token = generate_secret();
         let token_hash = hash_secret(&token);
-        let mut tx = self.pool.begin().await?;
+        let mut tx = self.begin_write().await?;
         let user_id = sqlx::query_scalar!(
             r#"UPDATE webhooks SET token_hash = ? WHERE id = ?
                RETURNING user_id AS "user_id!: UserId""#,
@@ -387,7 +387,7 @@ impl Store {
         webhook_id: WebhookId,
         revoked_by: UserId,
     ) -> anyhow::Result<bool> {
-        let mut tx = self.pool.begin().await?;
+        let mut tx = self.begin_write().await?;
         let user_id = sqlx::query_scalar!(
             r#"SELECT user_id AS "user_id!: UserId" FROM webhooks WHERE id = ?"#,
             webhook_id

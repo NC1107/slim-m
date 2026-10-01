@@ -21,7 +21,7 @@ impl Store {
         message_id: MessageId,
         mentioned: &[UserId],
     ) -> anyhow::Result<()> {
-        let mut tx = self.pool.begin().await?;
+        let mut tx = self.begin_write().await?;
         sqlx::query!(
             "DELETE FROM message_mentions WHERE message_id = ?",
             message_id

@@ -23,7 +23,7 @@ pub struct VisibleBotUi {
 impl Store {
     /// Replaces a bot's whole registration in one transaction.
     pub async fn set_bot_ui(&self, bot: UserId, reg: &UiRegistration) -> anyhow::Result<()> {
-        let mut tx = self.pool.begin().await?;
+        let mut tx = self.begin_write().await?;
         sqlx::query("DELETE FROM bot_ui_entries WHERE bot_user_id = ?")
             .bind(bot)
             .execute(&mut *tx)

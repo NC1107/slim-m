@@ -280,7 +280,7 @@ fn the_ops_feed_reads_only_through_one_transaction() {
         "a direct pool read here would race the transaction the feed's snapshot depends on"
     );
     assert_eq!(
-        source.matches("self.pool.begin()").count(),
+        source.matches("self.begin_read()").count(),
         1,
         "the feed must open exactly one transaction for its floor, latest_seq and page reads"
     );
