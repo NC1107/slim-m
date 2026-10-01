@@ -1,5 +1,26 @@
 # Changelog
 
+## [0.79.0](https://github.com/Slim-m-org/slim-m/compare/server-v0.78.0...server-v0.79.0) (2026-10-01)
+
+
+### Features
+
+* /version reports claimed, and an unclaimed Space opens on create-account ([#1562](https://github.com/Slim-m-org/slim-m/issues/1562)) ([067d0cc](https://github.com/Slim-m-org/slim-m/commit/067d0cc593f0eb08fa46837ecfc76c4c3e0912d2))
+* an administrator can rename a member or bot, and a refused app launch stops spinning ([#1582](https://github.com/Slim-m-org/slim-m/issues/1582)) ([3512da2](https://github.com/Slim-m-org/slim-m/commit/3512da2acbdee23a75d4909f4aad8881c1121188))
+* search the emoji list, refuse standard shortcode names, report identical images, and turn typed :shortcodes: into emoji ([#1581](https://github.com/Slim-m-org/slim-m/issues/1581)) ([de9ed81](https://github.com/Slim-m-org/slim-m/commit/de9ed81e5f9e9264439e695d7bd7c49d0d1460c7))
+
+
+### Bug Fixes
+
+* backslash escapes, forward and empty-chat glyphs, long role chips, moderator gating, and a signed-out notice ([#1568](https://github.com/Slim-m-org/slim-m/issues/1568)) ([e58013e](https://github.com/Slim-m-org/slim-m/commit/e58013eb3e8cce135590c5aabceded33a577ee86))
+* cross-device sync for unread and overrides, last seen, attachment names, mentions in code, hidden characters ([#1567](https://github.com/Slim-m-org/slim-m/issues/1567)) ([a323133](https://github.com/Slim-m-org/slim-m/commit/a323133f4b9f991654b54da04c3142637c5d0d2b))
+* **server:** a push for a message with no text previews what it carries ([#1557](https://github.com/Slim-m-org/slim-m/issues/1557)) ([e65cef7](https://github.com/Slim-m-org/slim-m/commit/e65cef73aea9194e38d5c65eafc5b16935b30a5a))
+* **server:** bound module tables, memories and instances, stop timed-out wasm, and word traps as sentences ([#1559](https://github.com/Slim-m-org/slim-m/issues/1559)) ([32e2b29](https://github.com/Slim-m-org/slim-m/commit/32e2b299a38ceb71bdcb307eb86876b2a4dd1d44))
+* **server:** enforce the two-factor policy for administrators, and five smaller correctness fixes ([#1571](https://github.com/Slim-m-org/slim-m/issues/1571)) ([c1b581d](https://github.com/Slim-m-org/slim-m/commit/c1b581dbc0c957ed65a44f5376c7a565be3a4f7a))
+* the call timer reads the call's age from the server, and five more call ui bugs ([#1566](https://github.com/Slim-m-org/slim-m/issues/1566)) ([44f3c8d](https://github.com/Slim-m-org/slim-m/commit/44f3c8d81f8d9c8df06ab6181efc5aa44a6000a1))
+* the message preview in a push is an account choice, on by default, so a reinstall or a new device no longer turns it off ([#1583](https://github.com/Slim-m-org/slim-m/issues/1583)) ([8ab0b75](https://github.com/Slim-m-org/slim-m/commit/8ab0b758fb010a50b7595018477068da1c31b238))
+* two-factor and account deletion need the password, usernames ignore case, and a clear-totp command ([#1561](https://github.com/Slim-m-org/slim-m/issues/1561)) ([7263973](https://github.com/Slim-m-org/slim-m/commit/7263973d9e3a83f983003b3059ff41117006c90a))
+
 ## [0.78.0](https://github.com/Slim-m-org/slim-m/compare/server-v0.77.0...server-v0.78.0) (2026-10-01)
 
 
