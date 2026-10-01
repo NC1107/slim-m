@@ -107,8 +107,9 @@ Future<void> _pump(
       installed = '0.3.1';
       return _json(_installed('0.3.1'));
     }
-    if (path == '/space/dock/modules/dice/enable')
+    if (path == '/space/dock/modules/dice/enable') {
       return _json(_installed('0.3.1'));
+    }
     if (path == '/roles' || path.contains('module-permissions')) {
       return _json(<Map<String, dynamic>>[]);
     }
