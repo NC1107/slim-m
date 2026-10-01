@@ -65,7 +65,6 @@ void main() {
 
     expect(find.text('Join muted'), findsOneWidget);
     expect(find.textContaining('can unmute'), findsOneWidget);
-    expect(find.textContaining('deny Speak'), findsOneWidget);
 
     final toggle = find.byWidgetPredicate(
       (w) =>

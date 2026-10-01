@@ -36,6 +36,9 @@ import '../settings_screen_scaffold.dart';
 import 'overwrite_target_picker_sheets.dart';
 import '../../action_labels.dart';
 
+const resetCodesDescription =
+    'Locked-out members get back in with an administrator\'s one-time code.';
+
 class AccountRecoveryScreen extends StatelessWidget {
   const AccountRecoveryScreen({super.key});
 
@@ -74,8 +77,7 @@ class AccountRecoveryPane extends ConsumerWidget {
         // Titled because a description only renders under a title.
         SettingsSectionCard(
           title: 'Reset codes',
-          description:
-              'Locked-out members get back in with an administrator\'s one-time code.',
+          description: resetCodesDescription,
           children: [
             AppListRow(
               label: ActionLabels.createResetCode,

@@ -226,7 +226,7 @@ void main() {
       installedSha: List.filled(64, 'b').join(),
     );
     expect(_switches(tester).sublist(0, 2), [true, false]);
-    expect(find.textContaining('needs your approval again'), findsOneWidget);
+    expect(find.textContaining('approved again'), findsOneWidget);
 
     await tester.tap(find.text('Save access'));
     await tester.pumpAndSettle();

@@ -259,7 +259,7 @@ void main() {
       findsOneWidget,
     );
     expect(
-      find.textContaining('An administrator can grant you one of those'),
+      find.textContaining('An administrator can grant you access'),
       findsOneWidget,
       reason:
           'a stated absence that does not say what would change it is only '

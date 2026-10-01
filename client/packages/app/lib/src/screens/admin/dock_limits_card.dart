@@ -14,6 +14,8 @@ import 'package:slimm_design_system/design_system.dart';
 import '../../widgets/settings_section_header.dart';
 import 'dock_host_access_card.dart';
 
+const dockNoAccessNote = 'Needs no access to your space.';
+
 class DockLimitsCard extends StatelessWidget {
   const DockLimitsCard({super.key, required this.manifest});
 
@@ -38,7 +40,7 @@ class DockLimitsCard extends StatelessWidget {
               AppSpacing.s8,
             ),
             child: Text(
-              'Needs no access to your space.',
+              dockNoAccessNote,
               style: AppText.caption.copyWith(color: tokens.textSecondary),
             ),
           ),

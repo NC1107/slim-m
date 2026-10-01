@@ -12,6 +12,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:slimm_app/src/providers/providers.dart';
 import 'package:slimm_app/src/providers/voice_controller.dart';
 import 'package:slimm_app/src/screens/voice_settings_screen.dart';
+import 'package:slimm_app/src/widgets/settings_toggle_row.dart';
 import 'package:slimm_design_system/design_system.dart';
 import 'package:slimm_platform/platform.dart';
 
@@ -58,7 +59,11 @@ void main() {
         );
         await tester.pumpAndSettle();
         expect(
-          find.text('Play soft music while you are alone in a call'),
+          find.byWidgetPredicate(
+            (w) =>
+                w is SettingsToggleRow &&
+                w.semanticLabel == 'Play hold music while alone in a call',
+          ),
           findsOneWidget,
         );
         await writeSnapshot(tester, 'hold-music-${entry.key}-$theme');

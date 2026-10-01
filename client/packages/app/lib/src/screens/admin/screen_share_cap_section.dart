@@ -39,7 +39,8 @@ String screenShareCapConsequence(int maxHeight) {
     orElse: () => null,
   );
   if (tier != null) {
-    return 'Shares are capped at ${tier.width}x${tier.height}.';
+    final mbps = (tier.maxBitrate / 1000000).toStringAsFixed(1);
+    return 'Shares are capped at ${tier.width}x${tier.height}, up to $mbps Mbps.';
   }
   final maxTierHeight = ScreenShareQuality.values
       .map((q) => q.height)

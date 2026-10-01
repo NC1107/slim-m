@@ -34,6 +34,9 @@ export 'devices_section.dart' show DevicesSection, devicesProvider;
 /// Says what blocking really does rather than the old blanket promise: messages,
 /// reactions and typing are hidden and no notification arrives, and the person
 /// is still in the member list, which is where the row that offers this lives.
+const accountDeletionDescription =
+    'Permanently removes you and signs out every device.';
+
 class BlockedSection extends ConsumerWidget {
   const BlockedSection({super.key});
 
@@ -152,7 +155,7 @@ class _AccountSectionState extends ConsumerState<AccountSection> {
   Widget build(BuildContext context) {
     return SettingsSectionCard(
       title: 'Account',
-      description: 'Permanently removes you and signs out every device.',
+      description: accountDeletionDescription,
       children: [
         // Matches channel_settings_danger_zone.dart's own "Delete channel":
         // an irreversible action reads as a button, not a navigation row.
