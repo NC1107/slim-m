@@ -29,7 +29,7 @@ jobs:
   #
   # RELEASE_PLEASE_TOKEN decides whether the release PR's own checks ever run; without it they cannot. See docs/ci.md.
   release-please:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     permissions:
       contents: write
       pull-requests: write
@@ -99,7 +99,7 @@ jobs:
       matrix:
         include:
           - arch: amd64
-            runner: ubuntu-latest
+            runner: ubuntu-24.04
           - arch: arm64
             runner: ubuntu-24.04-arm
     runs-on: ${{ matrix.runner }}
@@ -146,7 +146,7 @@ jobs:
     needs: [release-please, server-image, verify-server-ci]
     # Both results: any `if:` drops the implicit needs gate, and a failed arch used to ship single-arch. See docs/ci.md.
     if: needs.verify-server-ci.result == 'success' && needs.server-image.result == 'success'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     environment: release
     permissions:
       contents: read
@@ -230,7 +230,7 @@ jobs:
     needs: [release-please, server-binaries, verify-server-ci]
     # Same as server-image-merge: without the second clause a failed arch still published a partial release.
     if: needs.verify-server-ci.result == 'success' && needs.server-binaries.result == 'success'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     environment: release
     permissions:
       contents: write
@@ -281,7 +281,7 @@ jobs:
   linux-client:
     needs: [release-please, verify-client-ci]
     if: needs.verify-client-ci.result == 'success'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     environment: release
     permissions:
       contents: write
@@ -454,7 +454,7 @@ jobs:
   copr:
     needs: [release-please, linux-client, verify-client-ci]
     if: needs.verify-client-ci.result == 'success' && needs.linux-client.result == 'success'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     container: fedora:44
     environment: release
     permissions:
@@ -534,7 +534,7 @@ jobs:
   android-client:
     needs: [release-please, verify-client-ci]
     if: needs.verify-client-ci.result == 'success'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     environment: release
     permissions:
       contents: write
