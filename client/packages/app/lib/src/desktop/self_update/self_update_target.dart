@@ -6,7 +6,7 @@ library;
 
 import 'dart:io';
 
-import 'package:slimm_platform/platform.dart' show InstallFormat;
+import 'package:slimm_platform/platform.dart' show InstallFormat, isDesktopHost;
 
 import 'linux_install.dart' as linux;
 import 'linux_layout.dart';
@@ -176,4 +176,14 @@ class _MacosTarget implements SelfUpdateTarget {
 
   @override
   bool rollBackIfStuck() => macos.rollBackMacosIfStuck(layout);
+}
+
+/// The failed-version record of the install this process runs from, or null
+/// when it is not a per-user install the updater manages.
+String? recordedFailedVersion() {
+  if (!isDesktopHost) return null;
+  return installTargetFor(
+    Platform.resolvedExecutable,
+    Platform.operatingSystem,
+  )?.failedVersion();
 }
