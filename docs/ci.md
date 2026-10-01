@@ -934,9 +934,10 @@ The job sets `CL` to a value that begins with a slash, Git Bash rewrites slash-l
 The same tag built under pwsh on the same runner image, with nothing else changed, which is what the fix is.
 The failed run took the manifest job with it, because `manifest` needs both desktop builds and a failed need skips it without a word.
 
-Two things made it expensive, and both still hold.
+Two things made it expensive.
 This workflow runs on a tag and nowhere else, so the pull request that broke it could not have failed: the first run of a change here is the release.
-And nothing compares a published release against the assets it should have, so the release page looked finished.
+That still holds.
+And nothing compared a published release against the assets it should have, so the release page looked finished; `release-asset-watchdog` does that now.
 
 `scripts/lib/test_windows_builds_do_not_run_under_bash.py` refuses `flutter build` under `shell: bash` in any Windows job.
 That closes this exact door and no other.
