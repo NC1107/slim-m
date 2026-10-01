@@ -11,8 +11,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:slimm_api/api.dart' as api;
 import 'package:slimm_design_system/design_system.dart';
 
-import '../providers/member_presence.dart' show presenceOf;
-import '../providers/presence_controller.dart';
+import '../providers/presence_view.dart';
 import '../providers/reaction_users.dart';
 import '../providers/user_profiles.dart';
 import 'author_label.dart';
@@ -213,9 +212,7 @@ class ReactionUserRow extends ConsumerWidget {
         (m) => authorResolution(m, userId),
       ),
     );
-    final status = presenceOf(
-      ref.watch(presenceControllerProvider.select((m) => m[userId])),
-    );
+    final status = ref.watch(presenceForProvider(userId));
     final name = authorLabelResolved(
       authorId: userId,
       cachedDisplayName: null,
@@ -223,11 +220,11 @@ class ReactionUserRow extends ConsumerWidget {
     );
     return AppListRow(
       label: name,
-      leading: AuthorAvatar(
+      leading: UserAvatar(
         userId: userId,
         name: name,
-        size: AppSizes.icon28,
-        status: status,
+        size: AppAvatarSize.s28,
+        presence: true,
       ),
       muted: status == AppPresence.offline,
       trailing: (resolution.profile?.isBot ?? false)
