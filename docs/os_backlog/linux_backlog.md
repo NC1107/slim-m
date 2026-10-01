@@ -3,13 +3,13 @@
 
 See [README.md](README.md) for what "confirmed" and "suspected" mean here and how this differs from `docs/BACKLOG.md` and `docs/OPEN-QUESTIONS.md`.
 
-Unlike Windows and macOS, Linux has a real, scaffolded, built, and CI-tested target: `client/packages/app/linux/` exists, `main-builds.yml`'s `linux-client` job builds a release tarball and an rpm on every merge touching `client/**`, and the owner's own development machine (Fedora 44, KDE Plasma, Wayland) is where most client work in this project is actually exercised day to day (`CLAUDE.md`, "Local development": "Fedora KDE Plasma Wayland is the Linux development and test target (owner decision, 2026-07-26)").
+Unlike Windows and macOS, Linux has a real, scaffolded, built, and CI-tested target: `client/packages/app/linux/` exists, `main-builds.yml`'s `linux-client` job builds a release tarball and an rpm on every merge touching `client/**`, and the owner's own development machine (Fedora 44, KDE Plasma, Wayland) is where most client work in this project is actually exercised day to day (`CLAUDE.md`, "Local development" (that section is no longer in `CLAUDE.md`; `git log -S` on its heading finds the commit that removed it): "Fedora KDE Plasma Wayland is the Linux development and test target (owner decision, 2026-07-26)").
 So this file has by far the most confirmed content of the six, and several entries are fixes-that-must-not-regress rather than open problems.
 
 ## Confirmed
 
 **A Wayland screen-share window enumeration segfaults the whole process, and the fix is a rule, not just a patch.**
-`CLAUDE.md`, "Running the Fedora build, and what it found": `flutter_webrtc`'s `getSources(types: [SourceType.Window])` segfaults on Wayland (SIGSEGV, exit code 139), and a native crash of this kind cannot be caught from Dart at all.
+`CLAUDE.md`, "Running the Fedora build, and what it found" (that section is no longer in `CLAUDE.md`; `git log -S` on its heading finds the commit that removed it): `flutter_webrtc`'s `getSources(types: [SourceType.Window])` segfaults on Wayland (SIGSEGV, exit code 139), and a native crash of this kind cannot be caught from Dart at all.
 Proved on this project's own hardware, not inferred.
 `client/packages/rtc/lib/src/desktop_sources.dart` and `media_capabilities.dart` both carry one-line comments recording this and never request `SourceType.Window`, only `SourceType.Screen` (confirmed by reading both files).
 *The rule to keep*: never enumerate windows on Linux from any call site, on any platform-detection branch; only ever request `SourceType.Screen`.
@@ -47,7 +47,7 @@ The spike's own recommendation applies here as much as to Windows: gate the came
 See [windows_backlog.md](windows_backlog.md) and [macos_backlog.md](macos_backlog.md) for the same finding on those platforms.
 
 **Fontconfig resolves an emoji font ambiguity to the wrong face by default, and the fix is a one-line rule.**
-`CLAUDE.md`, "Running the Fedora build, and what it found": Fedora ships both `Noto Emoji` (monochrome) and `Noto Color Emoji`, and fontconfig's default resolution handed back the monochrome one, so every reaction chip rendered as a hollow outline instead of a colour glyph.
+`CLAUDE.md`, "Running the Fedora build, and what it found" (that section is no longer in `CLAUDE.md`; `git log -S` on its heading finds the commit that removed it): Fedora ships both `Noto Emoji` (monochrome) and `Noto Color Emoji`, and fontconfig's default resolution handed back the monochrome one, so every reaction chip rendered as a hollow outline instead of a colour glyph.
 Fixed by adding `AppFonts.emoji` to `fontFamilyFallback` on the theme and on `AppText.code`.
 Verified by rendering the same string through the real engine three ways, not by reasoning about it.
 *The rule to keep*: any place that renders untrusted or user-supplied emoji text needs the emoji font in its fallback chain explicitly; do not assume the system default resolves to the colour face.
@@ -85,7 +85,7 @@ Its own apt list is the current authoritative one and has grown past the entry a
 `packaging/flatpak/top.npcserver.slimm.yaml` exists now (2026-08-05) and has been built and installed for real, but only as far as `readelf`/`ldd` on the installed files; the app itself has never been launched from that bundle, on any display, so GPU-accelerated video decode specifically remains exactly as untested as before, only for a narrower reason now - see `packaging/flatpak/README.md` for precisely what was and was not checked.
 
 **Behaviour on non-KDE, non-Wayland Linux desktops (GNOME, X11, other window managers) is unverified.**
-Every confirmed Linux finding in this project - the screen-share segfault, the emoji font, the keyring dependency, the rpm build itself - was found and fixed on the owner's specific Fedora 44 KDE Plasma Wayland machine, the project's stated single Linux development and test target (`CLAUDE.md`, "Local development").
+Every confirmed Linux finding in this project - the screen-share segfault, the emoji font, the keyring dependency, the rpm build itself - was found and fixed on the owner's specific Fedora 44 KDE Plasma Wayland machine, the project's stated single Linux development and test target (`CLAUDE.md`, "Local development" (that section is no longer in `CLAUDE.md`; `git log -S` on its heading finds the commit that removed it)).
 `docs/BACKLOG.md`'s frameless-title-bar entry notes in passing that Linux chrome expectations vary "depending on the desktop environment," and the X11 branch of `desktop_sources.dart`'s own doc comment notes, read from source, that "on X11 this branch was never reachable anyway: enumerating has only ever returned the one merged screen" - a claim about behaviour, not a tested one, since this project's target is Wayland.
 This does not mean other desktop environments are known broken; it means nothing here confirms they are known working, and any bug report from a GNOME or X11 user should not be assumed to also reproduce on the tested KDE Wayland target, or vice versa.
 
