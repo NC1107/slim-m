@@ -25,6 +25,7 @@ import 'confirm_dialog.dart';
 import 'reauth_sheet.dart';
 import 'run_guarded.dart';
 import 'settings_section_header.dart';
+import 'settings_empty.dart';
 
 export 'devices_section.dart' show DevicesSection, devicesProvider;
 
@@ -39,10 +40,9 @@ class BlockedSection extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final blocks = ref.watch(blocksProvider);
-    final tokens = Theme.of(context).extension<AppTokens>()!;
 
     return SettingsSectionCard(
-      title: 'Blocked',
+      title: 'People you blocked',
       description:
           'They are not told. You stop seeing their messages, reactions '
           'and typing, and stop being notified about them. They stay in '
@@ -63,16 +63,7 @@ class BlockedSection extends ConsumerWidget {
             ),
           )
         else if (blocks.ids.isEmpty)
-          Padding(
-            padding: const EdgeInsets.symmetric(
-              horizontal: AppSpacing.s8,
-              vertical: AppSpacing.s8,
-            ),
-            child: Text(
-              'Nobody is blocked.',
-              style: AppText.body.copyWith(color: tokens.textSecondary),
-            ),
-          )
+          const SettingsEmptyLine('Nobody is blocked.')
         else
           Column(
             children: [

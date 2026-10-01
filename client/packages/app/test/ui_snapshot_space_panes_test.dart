@@ -7,6 +7,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:slimm_design_system/design_system.dart';
 
 import 'ui_snapshot_support.dart';
+import 'package:slimm_app/src/action_labels.dart';
 
 const _panes = <String>[
   'Reports',
@@ -16,7 +17,7 @@ const _panes = <String>[
   'Roles',
   'Channel permissions',
   'Emoji',
-  'Performance',
+  ActionLabels.retentionAndLimits,
   'Analytics',
   'Storage',
   'Server metrics',

@@ -29,6 +29,7 @@ import '../../widgets/run_guarded.dart';
 import '../settings_screen_scaffold.dart';
 import 'role_create_sheet.dart';
 import 'role_detail.dart';
+import '../../action_labels.dart';
 
 class RolesScreen extends StatelessWidget {
   const RolesScreen({super.key});
@@ -48,7 +49,7 @@ class RolesScreen extends StatelessWidget {
 /// bar so both mountings of [RolesPane] keep creation reachable.
 Widget rolesPaneCreateAction(BuildContext context) => IconButton(
   icon: const Icon(AppIcons.add),
-  tooltip: 'New role',
+  tooltip: ActionLabels.createRole,
   onPressed: () => showCreateRoleSheet(context),
 );
 
@@ -207,11 +208,6 @@ class _RoleNavState extends ConsumerState<_RoleNav>
                   'ROLES',
                   style: AppText.label.copyWith(color: tokens.textSecondary),
                 ),
-              ),
-              IconButton(
-                icon: const Icon(AppIcons.add, size: AppSizes.icon16),
-                tooltip: 'New role',
-                onPressed: () => showCreateRoleSheet(context),
               ),
             ],
           ),

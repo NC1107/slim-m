@@ -143,7 +143,7 @@ Future<String?> _latestClientTag(http.Client client) async {
     final tag = entry['tag_name'];
     if (tag is! String || !tag.startsWith('client-v')) continue;
     final version = tag.substring('client-v'.length);
-    if (parseVersion(version) == null) continue;
+    if (!isPlainVersion(version)) continue;
     if (best == null || isNewer(version, best.substring('client-v'.length))) {
       best = tag;
     }

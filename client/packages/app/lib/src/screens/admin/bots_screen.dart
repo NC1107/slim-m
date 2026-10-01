@@ -23,6 +23,7 @@ import '../../widgets/settings_entity_row.dart';
 import '../../widgets/settings_notice.dart';
 import '../../widgets/settings_section_header.dart';
 import '../settings_screen_scaffold.dart';
+import '../../action_labels.dart';
 
 class BotsScreen extends StatelessWidget {
   const BotsScreen({super.key});
@@ -102,7 +103,7 @@ class _BotsPaneState extends ConsumerState<BotsPane>
           ),
           const SizedBox(height: AppSpacing.s16),
         ],
-        const SettingsSectionHeader('Add a bot'),
+        const SettingsSectionHeader(ActionLabels.createBot),
         SettingsSectionCard(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
@@ -148,7 +149,7 @@ class _BotsPaneState extends ConsumerState<BotsPane>
               ),
             const SizedBox(height: AppSpacing.s12),
             AppButton(
-              label: 'Create bot',
+              label: ActionLabels.createBot,
               variant: AppButtonVariant.primary,
               onPressed: _busy ? null : _create,
             ),

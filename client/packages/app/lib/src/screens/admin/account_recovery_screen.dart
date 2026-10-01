@@ -34,6 +34,7 @@ import '../../widgets/settings_notice.dart';
 import '../../widgets/settings_section_header.dart';
 import '../settings_screen_scaffold.dart';
 import 'overwrite_target_picker_sheets.dart';
+import '../../action_labels.dart';
 
 class AccountRecoveryScreen extends StatelessWidget {
   const AccountRecoveryScreen({super.key});
@@ -83,9 +84,9 @@ class AccountRecoveryPane extends ConsumerWidget {
               'sign-in screen.',
           children: [
             AppListRow(
-              label: 'Issue a reset code',
+              label: ActionLabels.createResetCode,
               leading: const Icon(AppIcons.resetCode),
-              semanticLabel: 'Issue a reset code, choose a member',
+              semanticLabel: '${ActionLabels.createResetCode}, choose a member',
               trailing: Icon(
                 AppIcons.chevronRight,
                 size: AppSizes.icon16,

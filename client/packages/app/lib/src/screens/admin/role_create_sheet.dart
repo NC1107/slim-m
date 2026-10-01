@@ -15,6 +15,7 @@ import 'package:slimm_design_system/design_system.dart';
 import '../../api_failure.dart';
 import '../../providers/admin_providers.dart';
 import '../../providers/providers.dart';
+import '../../action_labels.dart';
 
 Future<void> showCreateRoleSheet(BuildContext context) {
   return showAppSheet<void>(
@@ -78,7 +79,7 @@ class _CreateRoleSheetState extends ConsumerState<_CreateRoleSheet> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            'New role',
+            ActionLabels.createRole,
             style: AppText.heading.copyWith(
               color: tokens.textPrimary,
               fontWeight: AppWeights.semi,

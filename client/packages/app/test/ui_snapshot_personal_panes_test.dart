@@ -15,12 +15,13 @@ import 'package:slimm_app/src/providers/voice_controller.dart';
 
 import 'ui_snapshot_support.dart';
 import 'voice_snapshot_fixtures.dart' show SnapshotVoiceController;
+import 'package:slimm_app/src/action_labels.dart';
 
 const _panes = <String, String>{
   'profile': 'Profile',
   'account-devices': 'Account & devices',
   'appearance': 'Appearance',
-  'performance': 'Performance',
+  'performance': ActionLabels.mediaAndCache,
   'notifications': 'Notifications',
   'voice': 'Voice & screen share',
   'blocked': 'Blocked',

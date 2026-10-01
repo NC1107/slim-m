@@ -13,6 +13,7 @@ import 'package:flutter/widgets.dart';
 import 'package:slimm_design_system/design_system.dart';
 
 import '../../widgets/member_profile_sections.dart' show TimeoutDurationChips;
+import '../../action_labels.dart';
 
 class ReportQuickActions extends StatelessWidget {
   const ReportQuickActions({
@@ -69,7 +70,7 @@ class ReportQuickActions extends StatelessWidget {
               ),
             if (onRemove case final onRemove?)
               AppButton(
-                label: 'Remove from Space...',
+                label: ActionLabels.removeFromSpace,
                 icon: AppIcons.signOut,
                 variant: AppButtonVariant.danger,
                 disabled: busy,
