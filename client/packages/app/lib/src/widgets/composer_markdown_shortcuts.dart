@@ -9,16 +9,16 @@ library;
 
 import 'package:flutter/material.dart';
 
-final RegExp _bulletLine = RegExp(r'^( {0,2})([-*])[ \t]+(.*)$');
-final RegExp _orderedLine = RegExp(r'^( {0,2})(\d+)\.[ \t]+(.*)$');
+import 'composer_list_indent.dart';
 
 /// What continuing a list looks like after Enter at [value]'s caret, or null
 /// when the current line is not a list item at all (an ordinary newline
 /// applies instead).
 ///
-/// An empty item (just a marker, nothing typed after it) ends the list
-/// rather than continuing it: without this, pressing Enter twice to finish a
-/// list would instead type the marker forever.
+/// An empty item (just a marker, nothing typed after it) leaves the list
+/// rather than continuing it: a nested one steps out a level and a top-level
+/// one loses its marker, so pressing Enter twice finishes a list instead of
+/// typing the marker forever.
 TextEditingValue? continueList(TextEditingValue value) {
   if (!value.selection.isCollapsed) return null;
   final caret = value.selection.baseOffset;
@@ -27,25 +27,18 @@ TextEditingValue? continueList(TextEditingValue value) {
   final lineStart = text.lastIndexOf('\n', caret - 1) + 1;
   final line = text.substring(lineStart, caret);
 
-  final ordered = _orderedLine.firstMatch(line);
-  final bullet = ordered == null ? _bulletLine.firstMatch(line) : null;
-  final match = ordered ?? bullet;
-  if (match == null) return null;
-
-  final indent = match.group(1)!;
-  final content = match.group(3)!;
-
-  if (content.trim().isEmpty) {
-    return TextEditingValue(
-      text: text.replaceRange(lineStart, caret, ''),
-      selection: TextSelection.collapsed(offset: lineStart),
-    );
+  final item = ListLine.parse(line);
+  if (item == null) return null;
+  if (item.isEmpty) {
+    return leaveEmptyItem(value) ??
+        TextEditingValue(
+          text: text.replaceRange(lineStart, caret, ''),
+          selection: TextSelection.collapsed(offset: lineStart),
+        );
   }
 
-  final nextMarker = ordered != null
-      ? '${int.parse(ordered.group(2)!) + 1}.'
-      : match.group(2)!;
-  final insertion = '\n$indent$nextMarker ';
+  final nextMarker = item.ordered ? '${item.number! + 1}.' : item.bullet!;
+  final insertion = '\n${item.indent}$nextMarker ';
   return TextEditingValue(
     text: text.replaceRange(caret, caret, insertion),
     selection: TextSelection.collapsed(offset: caret + insertion.length),

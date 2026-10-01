@@ -271,4 +271,48 @@ void main() {
     );
     expect(find.text('@nick'), findsOneWidget);
   });
+
+  testWidgets('a three-level numbered list indents each level and restarts '
+      'its numbers', (tester) async {
+    await tester.pumpWidget(
+      _harness(
+        const MessageBody(
+          content: '1. a\n  1. b\n    1. c\n    2. d\n  2. e\n2. f',
+          knownUsernames: {},
+        ),
+      ),
+    );
+    expect(find.byType(MarkdownList), findsOneWidget);
+    double left(String text) => tester.getTopLeft(find.text(text)).dx;
+    expect(left('b'), greaterThan(left('a')));
+    expect(left('c'), greaterThan(left('b')));
+    expect(left('d'), left('c'));
+    expect(left('e'), left('b'));
+    expect(left('f'), left('a'));
+    final markers = find.descendant(
+      of: find.byType(MarkdownList),
+      matching: find.textContaining(RegExp(r'^\d\.$')),
+    );
+    expect(tester.widgetList<Text>(markers).map((t) => t.data), [
+      '1.',
+      '1.',
+      '1.',
+      '2.',
+      '2.',
+      '2.',
+    ]);
+  });
+
+  testWidgets('bullets take a distinct glyph at each of three levels', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      _harness(
+        const MessageBody(content: '- a\n  - b\n    - c', knownUsernames: {}),
+      ),
+    );
+    for (final glyph in ['•', '–', '◦']) {
+      expect(find.text(glyph), findsOneWidget);
+    }
+  });
 }

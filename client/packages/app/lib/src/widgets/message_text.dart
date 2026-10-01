@@ -210,9 +210,8 @@ Widget _buildMarkdownBlock(
           color: color,
         ),
       );
-    case ListBlock(:final ordered, :final items):
+    case ListBlock(:final items):
       return MarkdownList(
-        ordered: ordered,
         items: items,
         children: [
           for (final item in items)
