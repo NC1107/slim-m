@@ -157,6 +157,16 @@ class _ChannelScreenState extends ConsumerState<ChannelScreen> {
     unawaited(_hydrateExtras());
     // Fresh or reused (see [ReadMarker]), this must open on this channel's own draft.
     _composer.text = _drafts.draftFor(widget.channelId);
+    unawaited(_fillFromRestore());
+  }
+
+  /// A reload opens on this channel before the disk read has finished, so the first draft lookup is empty.
+  Future<void> _fillFromRestore() async {
+    final channelId = widget.channelId;
+    await _drafts.restored;
+    if (!mounted || widget.channelId != channelId) return;
+    if (_composer.text.isNotEmpty) return;
+    _composer.text = _drafts.draftFor(channelId);
   }
 
   @override

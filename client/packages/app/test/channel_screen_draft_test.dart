@@ -76,7 +76,11 @@ class _Harness {
   final List<String> posted;
 }
 
-Future<_Harness> _mount(WidgetTester tester, {required String initial}) async {
+Future<_Harness> _mount(
+  WidgetTester tester, {
+  required String initial,
+  String? savedDraft,
+}) async {
   tester.view.physicalSize = const Size(500, 800);
   tester.view.devicePixelRatio = 1;
   addTearDown(tester.view.reset);
@@ -88,6 +92,10 @@ Future<_Harness> _mount(WidgetTester tester, {required String initial}) async {
     const api.Channel(id: 'c1', name: 'general', kind: 'text', createdAt: 0),
     const api.Channel(id: 'c2', name: 'random', kind: 'text', createdAt: 0),
   ]);
+
+  if (savedDraft != null) {
+    await tester.runAsync(() => store.saveDraft('c1', savedDraft, now: 1));
+  }
 
   final posted = <String>[];
   final container = ProviderContainer(
@@ -191,6 +199,25 @@ Future<void> _unmount(WidgetTester tester) async {
 }
 
 void main() {
+  testWidgets('a draft saved before a restart fills the composer the screen '
+      'opened on, once the restore lands', (tester) async {
+    final h = await _mount(tester, initial: 'c1', savedDraft: 'before reload');
+
+    await tester.runAsync(
+      () => h.container.read(channelDraftsProvider).restored,
+    );
+    await _flush(tester);
+
+    expect(
+      tester.widget<TextField>(_composerField).controller!.text,
+      'before reload',
+      reason:
+          'a reload opens straight on the channel, before the disk read '
+          'that restores drafts has finished',
+    );
+    await _unmount(tester);
+  });
+
   testWidgets('typed but unsent text survives switching to another channel '
       'and back', (tester) async {
     final h = await _mount(tester, initial: 'c1');

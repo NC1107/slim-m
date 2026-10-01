@@ -166,6 +166,27 @@ void main() {
       expect(after.draftFor('c1'), 'half a thought');
     });
 
+    test('a draft restored before the session loads survives the sign-in '
+        'that loading reports', () async {
+      final db = SlimmDatabase(NativeDatabase.memory());
+      addTearDown(db.close);
+      await MessageStore(db).saveDraft('c1', 'half a thought', now: 1);
+
+      final coldSession = api.SessionStore();
+      final drafts = containerOn(db, coldSession).read(channelDraftsProvider);
+      await drafts.restored;
+      coldSession.set(_alice);
+      await pumpEventQueue();
+
+      expect(
+        drafts.draftFor('c1'),
+        'half a thought',
+        reason:
+            'a cold start reads the key store after the controller is '
+            'built; no account to this account is not an account change',
+      );
+    });
+
     test('a draft sent before the restart does not come back', () async {
       final db = SlimmDatabase(NativeDatabase.memory());
       addTearDown(db.close);

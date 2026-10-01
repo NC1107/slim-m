@@ -16,7 +16,6 @@ library;
 
 import 'dart:async';
 
-import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:slimm_api/api.dart' as api;
 
@@ -58,9 +57,8 @@ class ChannelDraftsController {
   late final StreamSubscription<api.TokenPair?> _sub;
   String? _account;
 
-  /// Completes once the on-disk drafts have been merged in, for a test that
-  /// needs to act after the restore rather than racing it.
-  @visibleForTesting
+  /// Completes once the on-disk drafts have been merged in; a composer that
+  /// opened first fills itself from this.
   Future<void> get restored => _restoreDone.future;
   final _restoreDone = Completer<void>();
 
@@ -132,8 +130,10 @@ class ChannelDraftsController {
       return;
     }
     if (tokens.userId == _account) return;
+    // No account to an account is a cold start reading the key store, not a switch.
+    final coldStart = _account == null;
     _account = tokens.userId;
-    _drafts.clear();
+    if (!coldStart) _drafts.clear();
   }
 
   void dispose() => unawaited(_sub.cancel());
