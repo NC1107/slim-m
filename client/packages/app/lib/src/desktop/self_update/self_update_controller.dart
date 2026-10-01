@@ -37,12 +37,14 @@ SelfUpdateTarget? selfApplyTarget({
   String? resolvedExecutable,
   String? os,
   String? home,
+  String? arch,
 }) {
   if ((format ?? currentInstallFormat()) != InstallFormat.tarball) return null;
   final target = installTargetFor(
     resolvedExecutable ?? Platform.resolvedExecutable,
     os ?? Platform.operatingSystem,
     home: home,
+    arch: arch,
   );
   return target != null && target.isWritable ? target : null;
 }

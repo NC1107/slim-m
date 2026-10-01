@@ -29,7 +29,11 @@ Future<void> _fakeUnpack(File archive, Directory into) async =>
 VerifiedUpdate _update(Directory root, String version) {
   final file = File('${root.path}/.staging/pkg-$version.zip')
     ..createSync(recursive: true);
-  return VerifiedUpdate(version: version, tag: 'client-v$version', file: file);
+  return VerifiedUpdate.forTest(
+    version: version,
+    tag: 'client-v$version',
+    file: file,
+  );
 }
 
 void main() {
