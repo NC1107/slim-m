@@ -23,7 +23,8 @@ use super::AppState;
 use super::error::ApiError;
 use super::extract::{AUTHED_READ, Authed, AuthedLimited, Json, enforce};
 use super::messages::parse_uuid;
-use crate::ids::ChannelId;
+use crate::hub::Event;
+use crate::ids::{ChannelId, UserId};
 use crate::notifications::NotificationPreference;
 use crate::permissions::Permissions;
 use crate::ratelimit::Class;
@@ -104,10 +105,17 @@ async fn set(
         return Err(ApiError::Forbidden);
     }
 
+    let before = state
+        .store
+        .channel_notification_preference(ctx.user_id, channel_id)
+        .await?;
     state
         .store
         .set_channel_notification_preference(ctx.user_id, channel_id, preference)
         .await?;
+    if before != Some(preference) {
+        announce(&state, ctx.user_id, channel_id, Some(preference));
+    }
     Ok(Json(ChannelPreferenceDto {
         channel_id: channel_id.to_string(),
         preference: preference.as_str().to_owned(),
@@ -126,9 +134,31 @@ async fn clear(
 ) -> Result<StatusCode, ApiError> {
     enforce(&state, &parts, Some(&ctx), Class::Write)?;
     let channel_id = ChannelId(parse_uuid(&channel_id)?);
+    let before = state
+        .store
+        .channel_notification_preference(ctx.user_id, channel_id)
+        .await?;
     state
         .store
         .clear_channel_notification_preference(ctx.user_id, channel_id)
         .await?;
+    if before.is_some() {
+        announce(&state, ctx.user_id, channel_id, None);
+    }
     Ok(StatusCode::NO_CONTENT)
+}
+
+/// Tells the account's own sockets; a write that changed nothing is not
+/// announced, since the frame wakes every socket on the shared channel.
+fn announce(
+    state: &AppState,
+    user_id: UserId,
+    channel_id: ChannelId,
+    preference: Option<NotificationPreference>,
+) {
+    state.hub.publish(Event::NotificationOverrideChanged {
+        user_id,
+        channel_id,
+        preference,
+    });
 }

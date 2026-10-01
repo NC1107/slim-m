@@ -47,12 +47,15 @@ extension SyncControllerEvents on SyncController {
         if (!await _placeLiveOp(channelId, opSeq, store, isCurrent)) return;
         if (!isCurrent()) return;
         await store.discard(messageId);
-      case ReadStateChanged(:final channelId, :final lastReadSeq):
-        // The server clears a manual unread mark on every advance, so mirror that too.
+      case ReadStateChanged(
+        :final channelId,
+        :final lastReadSeq,
+        :final manuallyUnread,
+      ):
         await store.setReadMarker(
           channelId,
           lastReadSeq,
-          manuallyUnread: false,
+          manuallyUnread: manuallyUnread,
         );
       case ChannelCreated(:final channel):
       case ChannelUpdated(:final channel):

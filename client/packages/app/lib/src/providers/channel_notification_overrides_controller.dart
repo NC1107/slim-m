@@ -21,6 +21,7 @@ import 'dart:async';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:slimm_api/api.dart' as api;
 
+import 'live_events.dart';
 import 'providers.dart';
 
 class ChannelNotificationOverridesState {
@@ -61,11 +62,30 @@ class ChannelNotificationOverridesController
     : super(const ChannelNotificationOverridesState()) {
     _account = _ref.read(sessionProvider).tokens?.userId;
     _sub = _ref.read(sessionProvider).changes.listen(_onSessionChanged);
+    _events = _ref.read(liveEventsProvider).listen(_onEvent);
     unawaited(refresh());
   }
 
   final Ref _ref;
   late final StreamSubscription<api.TokenPair?> _sub;
+  late final StreamSubscription<api.ServerEvent> _events;
+
+  /// Another device of this account set or cleared an override.
+  void _onEvent(api.ServerEvent event) {
+    if (event is! api.NotificationOverrideChanged) return;
+    final preference = event.preference;
+    final byChannel = {...state.byChannel};
+    if (preference == null) {
+      byChannel.remove(event.channelId);
+    } else {
+      byChannel[event.channelId] = preference;
+    }
+    _generation++;
+    state = ChannelNotificationOverridesState(
+      byChannel: byChannel,
+      settled: state.settled,
+    );
+  }
 
   /// Whose overrides are held, so a session change that is only a token
   /// rotation is told apart from a different account signing in - the same
@@ -177,6 +197,7 @@ class ChannelNotificationOverridesController
   @override
   void dispose() {
     unawaited(_sub.cancel());
+    unawaited(_events.cancel());
     super.dispose();
   }
 }

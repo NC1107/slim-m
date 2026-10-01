@@ -633,6 +633,16 @@ pub enum Event {
         user_id: UserId,
         channel_id: ChannelId,
         last_read_seq: i64,
+        manually_unread: bool,
+    },
+    /// One account's per-channel notification override was set or cleared.
+    ///
+    /// Private to `user_id`, delivered like [`Event::ReadStateChanged`]. `None`
+    /// means the channel follows the account default again.
+    NotificationOverrideChanged {
+        user_id: UserId,
+        channel_id: ChannelId,
+        preference: Option<crate::notifications::NotificationPreference>,
     },
     /// A bot answered a member privately.
     ///
