@@ -285,10 +285,15 @@ class _MessageContextMenuRegionState extends State<MessageContextMenuRegion> {
           tone: AppMenuItemTone.danger,
           onTap: () => run(actions.onBlockAuthor),
         ),
-      ...botMenuItems(actions.botSections, close),
     ];
 
-    return [MenuWithMore(primary: primary, more: more)];
+    return [
+      MenuWithMore(
+        primary: primary,
+        more: more,
+        trailing: botMenuItems(actions.botSections, close),
+      ),
+    ];
   }
 
   @override

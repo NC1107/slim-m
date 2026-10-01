@@ -347,14 +347,13 @@ void main() {
   ) async {
     await _pump(tester, const ReportsScreen());
 
-    // The Center fills the body, so its box reports the inset; the text
-    // inside it is centred and would pass either way.
+    // The list fills the body, so its box reports the inset.
     _expectClearOfIndicator(
       tester,
       find
           .ancestor(
             of: find.text('The queue is empty.'),
-            matching: find.byType(Center),
+            matching: find.byType(ListView),
           )
           .first,
       "the reports queue's empty state",
