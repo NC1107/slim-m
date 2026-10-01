@@ -27,6 +27,7 @@ use super::extract::{AUTHED_READ, Authed, AuthedLimited, Json, Query, enforce};
 use super::message_components;
 use super::message_get::get_message;
 use super::message_history::history;
+use super::post_commit::after_commit;
 use crate::hub::Event;
 use crate::ids::{ChannelId, MessageId};
 use crate::permissions::Permissions;
@@ -219,20 +220,28 @@ async fn send(
         .next()
         .map(|(_, summary)| summary);
 
-    let stored_embeds = embeds::store_and_reload(&state, id, sent.fresh, &embeds).await?;
-    let stored_components =
-        message_components::store_and_reload(&state, id, sent.fresh, &components).await?;
+    let stored_embeds = after_commit(
+        "its embeds",
+        embeds::store_and_reload(&state, id, sent.fresh, &embeds).await,
+    );
+    let stored_components = after_commit(
+        "its components",
+        message_components::store_and_reload(&state, id, sent.fresh, &components).await,
+    );
 
     // An idempotent retry must not fan out or push again; see this function's note.
     if sent.fresh {
-        super::message_mentions::resolve_and_store(
-            &state,
-            channel_id,
-            ctx.user_id,
-            sent.message.id,
-            &sent.message.content,
-        )
-        .await?;
+        after_commit(
+            "its mentions",
+            super::message_mentions::resolve_and_store(
+                &state,
+                channel_id,
+                ctx.user_id,
+                sent.message.id,
+                &sent.message.content,
+            )
+            .await,
+        );
         super::read_sync::advance_for_author(&state, ctx.user_id, &sent.message).await;
 
         state.hub.publish(Event::MessageCreated {

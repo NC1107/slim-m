@@ -301,8 +301,7 @@ fn validate_artifact(raw: RawArtifact) -> Result<ManifestArtifact, ManifestError
     let kind = bounded(&raw.kind, MAX_SLUG, "artifact.kind")?;
     if raw.path.is_empty()
         || raw.path.len() > MAX_LONG_FIELD
-        || raw.path.contains("..")
-        || raw.path.starts_with('/')
+        || !artifact_path::is_plain_relative_path(&raw.path)
     {
         return Err(malformed("artifact.path is not a safe relative path"));
     }
@@ -483,6 +482,7 @@ fn is_sha256_hex(value: &str) -> bool {
     value.len() == 64 && value.bytes().all(|b| b.is_ascii_hexdigit())
 }
 
+mod artifact_path;
 mod names;
 
 #[cfg(test)]

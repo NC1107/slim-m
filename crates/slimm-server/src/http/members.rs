@@ -357,11 +357,9 @@ pub(super) async fn require(
     caller: UserId,
     needed: Permissions,
 ) -> Result<(), ApiError> {
-    if state.store.base_permissions(caller).await?.contains(needed) {
-        Ok(())
-    } else {
-        Err(ApiError::Forbidden)
-    }
+    super::extract::require_base_permission(state, caller, needed)
+        .await
+        .map(drop)
 }
 
 /// [`require`], plus the two rules that apply when the act has a target: it
