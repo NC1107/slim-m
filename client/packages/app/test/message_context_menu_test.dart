@@ -20,7 +20,6 @@ import 'package:slimm_app/src/widgets/message_row.dart';
 import 'package:slimm_design_system/design_system.dart';
 
 import 'message_row_harness.dart';
-import 'package:slimm_app/src/action_labels.dart';
 
 /// The glyph in the picker's first cell, read off the grid rather than
 /// hardcoded: the catalog comes from the third-party `emojis` package, so a
@@ -298,6 +297,57 @@ void main() {
     expect(deleted, isTrue);
   });
 
+  // SlimmApi.report once had no call site at all, despite the endpoint and a
+  // full admin triage screen existing. Nothing gated that regressing.
+  testWidgets('a message not authored by the caller offers Report and Block', (
+    tester,
+  ) async {
+    var reported = false;
+    var blocked = false;
+    await tester.pumpWidget(
+      rowWith(
+        MessageActions(
+          canReply: false,
+          onReply: noop,
+          canEdit: false,
+          onEdit: noop,
+          canDelete: false,
+          onDelete: noop,
+          canManagePins: false,
+          pinned: false,
+          onTogglePin: noop,
+          canReport: true,
+          onReport: () => reported = true,
+          canBlockAuthor: true,
+          onBlockAuthor: () => blocked = true,
+          canOpenThread: false,
+          onOpenThread: noop,
+          canCopyLink: false,
+          onCopyLink: noop,
+          canForward: false,
+          onForward: noop,
+          canSave: false,
+          onSave: noop,
+        ),
+      ),
+    );
+
+    await tester.longPressAt(pressPoint(tester));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Report message'), findsOneWidget);
+    expect(find.text('Block user'), findsOneWidget);
+
+    await tester.tap(find.text('Report message'));
+    await tester.pumpAndSettle();
+    expect(reported, isTrue);
+
+    await tester.longPressAt(pressPoint(tester));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Block user'));
+    expect(blocked, isTrue);
+  });
+
   // The bug: the only add-reaction control was revealed by a MouseRegion,
   // so touch could not reach it. No mouse pointer here is the assertion.
   testWidgets('a long-press reaches the reaction picker with no pointer', (
@@ -310,9 +360,9 @@ void main() {
 
     await tester.longPressAt(pressPoint(tester));
     await tester.pumpAndSettle();
-    expect(find.text(ActionLabels.addReaction), findsOneWidget);
+    expect(find.text('Add reaction'), findsOneWidget);
 
-    await tester.tap(find.text(ActionLabels.addReaction));
+    await tester.tap(find.text('Add reaction'));
     await tester.pumpAndSettle();
     expect(
       find.byType(EmojiPickerPanel),
