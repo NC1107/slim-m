@@ -309,6 +309,56 @@ const List<WhatsNewEntry> whatsNewEntries = [
       ),
     ],
   ),
+  WhatsNewEntry(
+    version: '0.91.0',
+    headline:
+        'A shorter message menu, threads that take focus, and dialogs that '
+        'stay in the window',
+    points: [
+      WhatsNewPoint(
+        'The message menu opens with five quick reactions, then the actions '
+        'you use most, with the rest under More. A thread shows as a small '
+        'chip under its message, "edited" reads inline, and editing a '
+        'message now says where you are and which keys do what.',
+      ),
+      WhatsNewPoint(
+        'On Linux, dialogs, settings pickers and What\'s New were opening as '
+        'separate windows. They stay inside the app again. Release notes for '
+        'every version are under About.',
+      ),
+      WhatsNewPoint(
+        'Opening a thread on desktop puts your cursor straight in its reply '
+        'box. The thread pane has its own surface and an edge you can see, '
+        'and starts at the top instead of the bottom.',
+      ),
+      WhatsNewPoint(
+        'Tab indents a list in the message box, Shift+Tab takes it back, and '
+        'lists show up to three levels. Escape then Tab still leaves the '
+        'box.',
+      ),
+      WhatsNewPoint(
+        'Moving channels on a phone uses a handle you hold, so scrolling '
+        'never picks a channel up, and the list scrolls when you drag near '
+        'the edge. Move up and Move down are in the channel menu too.',
+      ),
+      WhatsNewPoint(
+        'Emoji lists have a search box. A custom emoji cannot take the name '
+        'of a standard one, and typing :bug: turns into the emoji. '
+        'Administrators can give a member or a bot a name just for this '
+        'space.',
+      ),
+      WhatsNewPoint(
+        'A module\'s scene stays a sensible size in a message, and Escape '
+        'leaves full screen.',
+      ),
+      WhatsNewPoint(
+        'Usernames no longer care about capital letters, so a phone that '
+        'capitalises the first letter signs you into your own account. '
+        'Turning on two-factor or deleting your account now asks for your '
+        'password.',
+      ),
+    ],
+  ),
 ];
 
 /// Parses a dot-separated version like `0.17.2` into its numeric segments,
