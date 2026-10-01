@@ -28,6 +28,7 @@ import 'package:slimm_data/data.dart' show Channel;
 import 'package:slimm_design_system/design_system.dart';
 
 import '../../providers/admin_providers.dart';
+import '../../providers/dms.dart' show dmChannelKind;
 import '../../providers/member_presence.dart' show membersProvider;
 
 /// The ceiling a resolved list may grow to before it scrolls internally
@@ -61,7 +62,8 @@ class ChannelPickerSheet extends StatelessWidget {
           ),
           _PickerList(
             children: [
-              for (final c in channels)
+              // A DM carries no overwrites or webhooks; it is a person, not a channel.
+              for (final c in channels.where((c) => c.kind != dmChannelKind))
                 AppListRow(
                   leading: Icon(
                     c.kind == 'voice' ? AppIcons.voice : AppIcons.hash,
