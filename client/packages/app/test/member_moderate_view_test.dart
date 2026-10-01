@@ -146,7 +146,7 @@ void main() {
     await tester.pump();
 
     expect(find.text('admin-only'), findsOneWidget);
-    expect(find.text('Needs permissions you do not hold'), findsOneWidget);
+    expect(find.text('Needs permissions you lack'), findsOneWidget);
     final row = find.ancestor(
       of: find.text('admin-only'),
       matching: find.byType(AppListRow),

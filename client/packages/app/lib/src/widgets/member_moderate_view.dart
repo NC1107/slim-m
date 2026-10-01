@@ -159,7 +159,6 @@ class _MemberModerateViewState extends ConsumerState<MemberModerateView>
               'they hold permissions you do not.',
             ),
           ),
-          const AppMenuDivider(),
         ],
         if (widget.canOfferTimeoutChips) ...[
           const AppMenuLabel('TIME OUT'),
@@ -245,7 +244,7 @@ class _RoleRow extends StatelessWidget {
       meta: role.isEveryone ? 'Always granted' : null,
       subtitle: role.isEveryone || grantable
           ? null
-          : 'Needs permissions you do not hold',
+          : 'Needs permissions you lack',
       trailing: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
