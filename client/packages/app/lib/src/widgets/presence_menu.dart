@@ -229,10 +229,7 @@ class _PresenceMenuItemsState extends ConsumerState<_PresenceMenuItems>
   @override
   Widget build(BuildContext context) {
     final tokens = Theme.of(context).extension<AppTokens>()!;
-    final selfId = ref.watch(sessionProvider).tokens?.userId;
-    final current = selfId == null
-        ? AppPresence.unknown
-        : ref.watch(presenceForProvider(selfId));
+    final current = ref.watch(ownPresenceProvider);
     final currentStatus = ref.watch(meProvider).valueOrNull?.statusText ?? '';
     // Rule 2 of desktop-vs-mobile.md: status is a dropdown everywhere there is room for one, only compact still needs the sheet.
     final desktop = MediaQuery.sizeOf(context).width >= kCompactWidth;

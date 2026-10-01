@@ -374,17 +374,12 @@ class RailUserFooter extends ConsumerWidget {
     final inCallElsewhere =
         inCall && callChannelId != null && callChannelId != activeChannelId;
 
-    final statusLabel = selfId == null
-        ? null
-        : ref.watch(presenceForProvider(selfId)).word;
+    final statusLabel = ref.watch(ownPresenceProvider).word;
     // A typed status joins the presence word rather than replacing it, so both facts the member pane shows about you show here too (design review note 7).
     final statusText = selfId == null
         ? null
         : ref.watch(statusTextProvider((userId: selfId, snapshot: null)));
-    final secondLine = [
-      ?statusLabel,
-      ?statusText,
-    ].join(' · ');
+    final secondLine = [?statusLabel, ?statusText].join(' · ');
 
     // Mirrors [RailHeader]: the raised bar and its top border bleed to the
     // screen edge while [SafeArea] lifts the content off the home indicator.

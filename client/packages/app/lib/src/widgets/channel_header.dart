@@ -153,6 +153,7 @@ class ChannelHeader extends ConsumerWidget {
                         name: name,
                         userId: dmParticipantId,
                         size: AppAvatarSize.s24,
+                        presence: true,
                       )
                     else
                       ChannelKindIcon(

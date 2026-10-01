@@ -59,6 +59,15 @@ final presenceForProvider = Provider.autoDispose.family<AppPresence, String>((
   return resolvePresence(reported: reported, isSelf: isSelf, chosen: chosen);
 });
 
+/// What the signed-in user's own surfaces (the footer, the status menu, the
+/// tray) draw for them; [AppPresence.unknown] only with no session at all.
+final ownPresenceProvider = Provider.autoDispose<AppPresence>((ref) {
+  final selfId = ref.watch(sessionProvider).tokens?.userId;
+  return selfId == null
+      ? AppPresence.unknown
+      : ref.watch(presenceForProvider(selfId));
+});
+
 /// [presenceForProvider] for many people at once, from one snapshot, for a
 /// provider that groups or filters a roster rather than draws it.
 Map<String, AppPresence> presenceOfAll(Ref ref, Iterable<String> userIds) {
