@@ -8,7 +8,8 @@
 /// bottom corners rest above [miniPlayerComposerReserve] instead. The card
 /// renders `VoiceController.screenShareViewFor`/`cameraViewFor` - the same view
 /// the call screen and fullscreen route show - so moving presentation is a
-/// reparent and never a second subscription. See docs/decisions/0040.
+/// reparent and never a second subscription. It stays off a voice channel's own
+/// page, whose centred "Switch to this call" it would cover. See docs/decisions/0040.
 library;
 
 import 'package:flutter/material.dart';
@@ -18,6 +19,7 @@ import 'package:slimm_design_system/design_system.dart';
 import 'package:slimm_rtc/rtc.dart';
 
 import '../providers/call_mini_player.dart';
+import '../providers/channel_by_id_provider.dart';
 import '../providers/popout_window.dart';
 import '../providers/voice_controller.dart';
 import '../providers/voice_flags.dart';
@@ -77,10 +79,18 @@ class _CallMiniPlayerHostState extends ConsumerState<CallMiniPlayerHost> {
       voiceFlagsProvider.select((f) => (f.state, f.channelId)),
     );
     final feed = ref.watch(miniPlayerFeedProvider);
+    // A voice channel page offers the call itself, centred, where a corner card would sit on its button.
+    final onVoicePage =
+        selected != null &&
+        ref.watch(
+              channelByIdProvider(selected).select((c) => c.valueOrNull?.kind),
+            ) ==
+            'voice';
     final visible =
         callState == VoiceSessionState.connected &&
         feed != null &&
         selected != callChannel &&
+        !onVoicePage &&
         !_hidden &&
         !widget.keyboardUp;
 

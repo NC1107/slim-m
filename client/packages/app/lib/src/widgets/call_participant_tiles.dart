@@ -152,14 +152,24 @@ class CallParticipantTile extends StatelessWidget {
     );
     // This build's own context, so a popover anchors to this tile - see [onTap]'s doc.
     final onTapHere = onTap == null ? null : () => onTap!(context);
-    final label = Text(
-      participant.isLocal ? '${participant.name} (you)' : participant.name,
-      maxLines: 1,
-      overflow: TextOverflow.ellipsis,
-      textAlign: TextAlign.center,
-      style: AppText.ui.copyWith(
-        color: _showsCamera ? const Color(0xFFFFFFFF) : tokens.textPrimary,
-      ),
+    final nameStyle = AppText.ui.copyWith(
+      color: _showsCamera ? const Color(0xFFFFFFFF) : tokens.textPrimary,
+    );
+    // The name gives way before "(you)" does, so a long name still says whose tile it is.
+    final label = Row(
+      mainAxisSize: MainAxisSize.min,
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        Flexible(
+          child: Text(
+            participant.name,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: nameStyle,
+          ),
+        ),
+        if (participant.isLocal) Text(' (you)', style: nameStyle),
+      ],
     );
     Widget tile = Stack(
       clipBehavior: Clip.none,
@@ -209,14 +219,15 @@ class CallParticipantTile extends StatelessWidget {
                               ),
                             ),
                           Positioned(
-                            left: AppSpacing.s12 + 22 + AppSpacing.s8,
-                            right: AppSpacing.s12 + 22 + AppSpacing.s8,
+                            left: AppSpacing.s8,
+                            right: AppSpacing.s8,
                             bottom: AppSpacing.s12,
                             child: label,
                           ),
+                          // Top corner, so the name keeps the tile's whole width and its "(you)".
                           Positioned(
                             right: AppSpacing.s8,
-                            bottom: AppSpacing.s8,
+                            top: AppSpacing.s8,
                             child: _StateBadge(participant: participant),
                           ),
                         ],

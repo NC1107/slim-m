@@ -78,7 +78,7 @@ env: {SLIMM_SPOTIFY_CLIENT_ID: "${{ vars.SLIMM_SPOTIFY_CLIENT_ID }}"}
 jobs:
   # Narrows "client/** or crates/** changed" into the two booleans every job below gates on.
   changes:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     permissions:
       contents: read
       actions: read
@@ -128,7 +128,7 @@ jobs:
   linux-client:
     needs: [changes]
     if: needs.changes.outputs.client == 'true' || needs.changes.outputs.packaging == 'true'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     permissions:
       contents: read
     steps:
@@ -193,7 +193,7 @@ jobs:
   android-client:
     needs: [changes]
     if: needs.changes.outputs.client == 'true'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     permissions:
       contents: read
     env:
@@ -448,7 +448,7 @@ jobs:
   server-image:
     needs: [changes]
     if: needs.changes.outputs.server == 'true'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     permissions:
       contents: read
       packages: write

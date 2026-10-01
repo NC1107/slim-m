@@ -8,7 +8,10 @@ part of 'voice_controller.dart';
 /// in [VoiceAutoRejoin]; this is the part that knows what a drop meant and
 /// what to do about it.
 mixin VoiceControllerRejoinMixin
-    on StateNotifier<VoiceState>, VoiceControllerInputMixin {
+    on
+        StateNotifier<VoiceState>,
+        VoiceControllerInputMixin,
+        VoiceControllerCallClockMixin {
   /// Bridges to [VoiceController]'s own members, [VoiceControllerInputMixin]'s
   /// own reasoning: the `on` clause, not this file's privacy, is what bounds
   /// what a mixin can reach.
@@ -31,6 +34,25 @@ mixin VoiceControllerRejoinMixin
   static bool _rejoinableDrop(VoiceDisconnect dropped) =>
       dropped == VoiceDisconnect.connectionLost ||
       dropped == VoiceDisconnect.heartbeatLagEviction;
+
+  /// Marks the call failed for an SFU-decided drop, and queues a rejoin when the drop was an accident.
+  void _endCallForDrop(VoiceDisconnect dropped) {
+    // Read before the copyWith clears it: only a connected call is one to put back.
+    final rejoinable = _rejoinableDrop(dropped);
+    final wasConnected = _callClock.hold(
+      state.connectedAt,
+      rejoinable: rejoinable,
+    );
+    state = state.copyWith(
+      state: VoiceSessionState.failed,
+      error: dropped.message,
+      clearConnectedAt: true,
+    );
+    final channelId = state.channelId;
+    if (wasConnected && rejoinable && channelId != null) {
+      _scheduleAutoRejoin(channelId);
+    }
+  }
 
   /// Queues the next attempt and records whether there was one to queue, so
   /// [VoiceState.rejoining] is true exactly while an attempt is pending or in

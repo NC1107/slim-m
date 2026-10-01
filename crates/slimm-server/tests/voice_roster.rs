@@ -388,3 +388,64 @@ async fn a_hidden_participant_is_omitted_from_everyone_elses_roster_but_their_ow
         .collect();
     assert_eq!(carol_names, vec!["carol"], "unaffected by bob's choice");
 }
+
+#[tokio::test]
+async fn the_roster_reports_the_call_age_from_the_earliest_listed_join() {
+    let (store, _guard) = new_store().await;
+    store
+        .create_role("everyone", Permissions::VIEW_CHANNEL, true)
+        .await
+        .unwrap();
+    let channel = store.create_channel("general", "voice").await.unwrap();
+    let (token, alice_id) = member(&store, "alice").await;
+    let (_, bob_id) = member(&store, "bob").await;
+    let now_ms = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap()
+        .as_millis() as i64;
+    let voice = voice_at(
+        &spawn_room_service(json!([
+            { "identity": bob_id, "name": "bob", "joinedAtMs": (now_ms - 60_000).to_string() },
+            { "identity": alice_id, "name": "alice", "joinedAtMs": (now_ms - 7_000).to_string() },
+        ]))
+        .await,
+    );
+    let app = app(store.clone(), voice);
+
+    let response = app
+        .oneshot(request(
+            "GET",
+            &format!("/channels/{}/voice/roster", channel.id),
+            Some(&token),
+        ))
+        .await
+        .unwrap();
+    assert_eq!(response.status(), StatusCode::OK);
+    let age = json_body(response).await["call_age_ms"].as_i64().unwrap();
+    assert!(
+        (60_000..70_000).contains(&age),
+        "the age is the earliest join's, not the viewer's own: {age}"
+    );
+}
+
+#[tokio::test]
+async fn an_empty_room_has_no_call_age() {
+    let (store, _guard) = new_store().await;
+    store
+        .create_role("everyone", Permissions::VIEW_CHANNEL, true)
+        .await
+        .unwrap();
+    let channel = store.create_channel("general", "voice").await.unwrap();
+    let voice = voice_at(&spawn_room_service(json!([])).await);
+    let app = app(store.clone(), voice);
+    let (token, _) = member(&store, "alice").await;
+    let response = app
+        .oneshot(request(
+            "GET",
+            &format!("/channels/{}/voice/roster", channel.id),
+            Some(&token),
+        ))
+        .await
+        .unwrap();
+    assert!(json_body(response).await["call_age_ms"].is_null());
+}

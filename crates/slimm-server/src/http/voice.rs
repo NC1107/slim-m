@@ -311,6 +311,7 @@ struct RosterParticipantDto {
 #[derive(Serialize)]
 struct RosterResponse {
     participants: Vec<RosterParticipantDto>,
+    call_age_ms: Option<i64>,
 }
 
 /// Who is currently connected to a channel's voice room, whether or not the
@@ -329,6 +330,11 @@ struct RosterResponse {
 /// SFU has to tell participants about each other to let them hear one
 /// another - but this route is the *preview* shown before joining, and that
 /// preview must not become a second way to learn a hidden user is online.
+///
+/// `call_age_ms` is how long the longest-present listed participant has been
+/// in the room: the call's age, the same for everyone who can see them.
+/// Computed over the filtered list only, so a hidden participant cannot be
+/// inferred from an age older than anyone shown.
 ///
 /// A configured SFU that cannot be reached answers 503, not 500 or an empty
 /// list: an empty room and an unreachable one are different claims, and only
@@ -382,6 +388,8 @@ async fn roster(
         .collect();
     let visibilities = state.store.presence_visibility_many(&other_ids).await?;
 
+    let now = crate::store::now_ms();
+    let mut earliest_join: Option<i64> = None;
     let mut participants = Vec::with_capacity(connected.len());
     for participant in connected {
         if participant.user_id != ctx.user_id
@@ -389,6 +397,10 @@ async fn roster(
         {
             continue;
         }
+        earliest_join = match (earliest_join, participant.joined_at_ms) {
+            (Some(a), Some(b)) => Some(a.min(b)),
+            (a, b) => a.or(b),
+        };
         participants.push(RosterParticipantDto {
             user_id: participant.user_id.to_string(),
             display_name: participant.display_name,
@@ -397,7 +409,12 @@ async fn roster(
         });
     }
 
-    Ok(Json(RosterResponse { participants }))
+    // An age rather than a start time, so a client with a skewed clock still reads the same call length.
+    let call_age_ms = earliest_join.map(|joined| (now - joined).max(0));
+    Ok(Json(RosterResponse {
+        participants,
+        call_age_ms,
+    }))
 }
 
 /// Evicts a participant from a channel's voice room.

@@ -5,6 +5,7 @@ library;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:slimm_design_system/design_system.dart';
+import 'package:slimm_rtc/rtc.dart';
 
 import '../providers/channel_by_id_provider.dart';
 import '../providers/voice_controller.dart';
@@ -57,7 +58,7 @@ class CallHeaderLine extends ConsumerWidget {
             ),
           ),
         ),
-        if (inThisCall) ...[
+        if (inThisCall && voice.state == VoiceSessionState.connected) ...[
           const SizedBox(width: AppSpacing.s12),
           Text('${voice.participants.length} in call', style: facts),
           if (voice.connectedAt != null) ...[

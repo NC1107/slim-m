@@ -20,7 +20,7 @@ name: flatpak-ci
 # starting the bundle exposes that).
 #
 # What this does and does not prove, stated plainly. It builds on the same
-# ubuntu-latest runner release.yml's linux-client job uses, so it links
+# ubuntu-24.04 runner release.yml's linux-client job uses, so it links
 # against the same host packages (notably libayatana-appindicator3-dev) and
 # will not diverge the way a contributor's local Fedora build can; see
 # packaging/flatpak/README.md's account of that drift. It does NOT catch
@@ -53,7 +53,7 @@ concurrency:
 jobs:
   build-and-launch:
     name: build flatpak and check it starts
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 45
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
@@ -83,7 +83,7 @@ jobs:
       # through client-v0.61.0 report success while producing no bundle. #967.
       # librsvg2-common provides the gdk-pixbuf SVG loader (libpixbufloader-svg.so)
       # that `flatpak build-export` uses ON THIS HOST to validate every icon
-      # it exports; ubuntu-latest carries none of the gdk-pixbuf loaders by
+      # it exports; ubuntu-24.04 carries none of the gdk-pixbuf loaders by
       # default, so a perfectly valid SVG fails export with "Format not
       # recognized". Checked directly against packages.ubuntu.com for
       # noble/amd64, not assumed. See packaging/flatpak/README.md.
@@ -120,7 +120,7 @@ jobs:
       # dlopen time, when the app actually starts.
       #
       # dbus-run-session ships in the dbus-daemon package on Ubuntu 24.04
-      # (ubuntu-latest as of this writing), not dbus-bin: checked directly
+      # (ubuntu-24.04 as of this writing), not dbus-bin: checked directly
       # against packages.ubuntu.com's content search for noble/amd64, not
       # assumed, since a missing binary here would make every check below
       # pass vacuously.

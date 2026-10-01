@@ -25,6 +25,7 @@ import '../../providers/providers.dart';
 import '../../providers/slash_command.dart';
 import '../../routing/routes.dart';
 import '../../widgets/confirm_dialog.dart';
+import '../../widgets/ring_flush.dart';
 import '../../widgets/run_guarded.dart';
 import '../../widgets/settings_section_header.dart';
 import '../settings_screen_scaffold.dart';
@@ -172,11 +173,13 @@ class _DockPaneState extends ConsumerState<DockPane>
               ),
               const SizedBox(height: AppSpacing.s12),
             ],
-            AppInput(
-              controller: _query,
-              placeholder: 'Search modules',
-              semanticLabel: 'Search modules',
-              onChanged: (_) => setState(() {}),
+            RingFlush(
+              child: AppInput(
+                controller: _query,
+                placeholder: 'Search modules',
+                semanticLabel: 'Search modules',
+                onChanged: (_) => setState(() {}),
+              ),
             ),
             const SizedBox(height: AppSpacing.s12),
             if (shown.isEmpty)
@@ -252,7 +255,10 @@ class _UpdateAllBar extends StatelessWidget {
     return SettingsSectionCard(
       children: [
         Padding(
-          padding: const EdgeInsets.all(AppSpacing.s12),
+          padding: const EdgeInsets.symmetric(
+            horizontal: AppSpacing.s8,
+            vertical: AppSpacing.s4,
+          ),
           child: Row(
             children: [
               Icon(AppIcons.dock, color: tokens.accent),

@@ -308,6 +308,10 @@ struct Version {
     /// Whether creating an account here needs an invite code. Onboarding
     /// needs this before an account exists, so it rides on /version.
     invite_required: bool,
+    /// Whether the first account has registered. Lets a client open an empty
+    /// deployment on owner-claim wording; `invite_required` alone cannot, as
+    /// it reads true before anyone has joined.
+    claimed: bool,
     /// Whether this deployment can search and attach GIFs at all (both
     /// `SLIMM_GIF_PROVIDER` and `SLIMM_GIF_API_KEY` are set). The same
     /// two-state shape as `push_enabled`: absent is meaningless here since
@@ -418,6 +422,7 @@ async fn version(
         protocol: PROTOCOL_VERSION,
         push_enabled: state.push.is_enabled(),
         invite_required: state.store.join_policy().await? == JoinPolicy::Invite,
+        claimed: state.store.is_bootstrapped().await?,
         gif_search_enabled: state.gifs.is_enabled(),
         link_previews_enabled: state.link_previews.is_enabled(),
         screen_share_max_height: state.store.screen_share_max_height().await?,

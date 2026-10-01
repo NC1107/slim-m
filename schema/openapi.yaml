@@ -7877,6 +7877,16 @@ components:
             0.14.2, which a client must treat as unknown rather than false.
             Unauthenticated for the same reason `push_enabled` is: the
             sign-up screen has to say so before an account exists.
+        claimed:
+          type: boolean
+          description: >
+            Whether the first account has registered, which is what claims a
+            deployment and makes it the administrator. False means the next
+            registration becomes the admin and needs no invite, though
+            `invite_required` still reads true. Absent on servers older than
+            this field, which a client must treat as unknown rather than
+            false. Unauthenticated like `invite_required`: it reveals only
+            what an attempted registration already shows.
         gif_search_enabled:
           type: boolean
           description: >
@@ -11525,6 +11535,15 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/VoiceRosterParticipant"
+        call_age_ms:
+          type: integer
+          format: int64
+          nullable: true
+          description: >-
+            How long the longest-present listed participant has been in the
+            room, in milliseconds - the call's age. An age rather than a start
+            time so every client reads the same length whatever its clock says.
+            Null when nobody is listed.
 
     VoiceRosterParticipant:
       type: object

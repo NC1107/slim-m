@@ -153,6 +153,30 @@ void main() {
       await ctx.done();
     });
 
+    testWidgets('not over the switch button of another voice channel', (
+      tester,
+    ) async {
+      final ctx = await _pump(
+        tester,
+        location: '/channels/c-main',
+        voice: const VoiceState(
+          channelId: 'c-design',
+          state: VoiceSessionState.connected,
+          participants: [_remoteShare],
+        ),
+      );
+      final switchButton = find.text('Switch to this call');
+      expect(switchButton, findsOneWidget);
+      expect(
+        player.evaluate().isEmpty ||
+            !_rectOf(tester, player).overlaps(_rectOf(tester, switchButton)),
+        isTrue,
+        reason: 'the card must not sit on the page\'s own primary action',
+      );
+      expect(player, findsNothing);
+      await ctx.done();
+    });
+
     testWidgets('not when there is only audio to carry', (tester) async {
       final ctx = await _pump(
         tester,

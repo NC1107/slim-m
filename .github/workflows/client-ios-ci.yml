@@ -7,7 +7,8 @@ name: client-ios-ci
 # Dart-only ones that cannot affect it.
 #
 # The paths are what can actually change the answer: the iOS project itself,
-# the plugins that pull in CallKit and WebRTC, and the dependency set, which is
+# the plugins that pull in CallKit and WebRTC, the data package (its encrypted database
+# compiles native sqlite code, and a change there once shipped an iOS launch failure with no iOS job run), and the dependency set, which is
 # how a Dart-side change reaches an Xcode build. Push to main uses the same
 # filter: it gates nothing outside a release, and the release commit always
 # matches it through its pubspec bump.
@@ -30,6 +31,7 @@ on:
       - "client/packages/app/ios/**"
       - "client/packages/rtc/**"
       - "client/packages/platform/**"
+      - "client/packages/data/**"
       - "client/pubspec.yaml"
       - "client/pubspec.lock"
       - "client/packages/app/pubspec.yaml"
@@ -43,6 +45,7 @@ on:
       - "client/packages/app/ios/**"
       - "client/packages/rtc/**"
       - "client/packages/platform/**"
+      - "client/packages/data/**"
       - "client/pubspec.yaml"
       - "client/pubspec.lock"
       - "client/packages/app/pubspec.yaml"
@@ -65,7 +68,7 @@ jobs:
   # actually affect linking, the dorny/paths-filter pattern main-builds.yml
   # already uses for the same reason.
   changes:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     outputs:
       native: ${{ steps.filter.outputs.native }}
     steps:
@@ -78,6 +81,7 @@ jobs:
               - 'client/packages/app/ios/**'
               - 'client/packages/rtc/**'
               - 'client/packages/platform/**'
+              - 'client/packages/data/**'
               - 'client/pubspec.yaml'
               - 'client/pubspec.lock'
               - 'client/packages/app/pubspec.yaml'
@@ -89,7 +93,7 @@ jobs:
   # needed, so this runs on ubuntu ahead of the macOS jobs below.
   pbxproj-registration:
     name: ios sources are registered in project.pbxproj
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
       - name: every Runner .swift/.m file is in the Sources build phase

@@ -47,6 +47,14 @@ class CanvasToolButtons extends StatelessWidget {
         )
       : const [];
 
+  /// The caret only exists once the tool is selected, so the hint says what is true now.
+  String get _shapeHint {
+    final armed = 'Shape · ${canvasShapeKindLabel(shapeKind)} armed, ';
+    return tool == CanvasTool.shape
+        ? '${armed}change it from the caret beside the tool'
+        : '${armed}select it to choose another';
+  }
+
   Widget _withOptions(CanvasTool forTool, String label, Widget child) =>
       ControlOptionsMenu(
         active: true,
@@ -103,10 +111,7 @@ class CanvasToolButtons extends StatelessWidget {
           // The armed kind's own glyph, not a generic one - state must be visible, not just remembered.
           icon: canvasShapeKindIcon(shapeKind),
           semanticLabel: 'Shape',
-          tooltip: canDraw
-              ? 'Shape · ${canvasShapeKindLabel(shapeKind)} armed, '
-                    'change it from the caret beside the tool'
-              : "Can't draw right now",
+          tooltip: canDraw ? _shapeHint : "Can't draw right now",
           active: tool == CanvasTool.shape,
           onPressed: CanvasTool.shape.isAvailable(canDraw: canDraw)
               ? () => onToolChanged(CanvasTool.shape)
