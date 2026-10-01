@@ -133,6 +133,7 @@ class _RoleDisplayTabState extends ConsumerState<RoleDisplayTab>
                       : AppInput(
                           controller: _name,
                           placeholder: 'Role name',
+                          semanticLabel: 'Role name',
                           onChanged: (_) => setState(() {}),
                           onSubmitted: (_) => _renameIfChanged(),
                         ),

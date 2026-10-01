@@ -19,6 +19,9 @@ import 'settings_section_header.dart';
 const int _pronounsMaxChars = 40;
 const int _aboutMaxChars = 190;
 
+/// Spoken names for [AppCanvasColors.cursors], in the same order.
+const _colourNames = ['Pink', 'Purple', 'Blue', 'Orange', 'Green', 'Magenta'];
+
 class ProfileFieldsSection extends ConsumerStatefulWidget {
   const ProfileFieldsSection({super.key});
 
@@ -147,6 +150,7 @@ class _ProfileFieldsSectionState extends ConsumerState<ProfileFieldsSection> {
                       padding: const EdgeInsets.only(right: AppSpacing.s8),
                       child: _ColorSwatch(
                         color: AppCanvasColors.cursors[i],
+                        name: _colourNames[i],
                         selected: me?.profileColor == i,
                         onTap: me == null ? null : () => _setColor(i),
                       ),
@@ -174,11 +178,13 @@ class _ProfileFieldsSectionState extends ConsumerState<ProfileFieldsSection> {
 class _ColorSwatch extends StatelessWidget {
   const _ColorSwatch({
     required this.color,
+    required this.name,
     required this.selected,
     required this.onTap,
   });
 
   final Color color;
+  final String name;
   final bool selected;
   final VoidCallback? onTap;
 
@@ -188,7 +194,7 @@ class _ColorSwatch extends StatelessWidget {
     return Semantics(
       button: true,
       selected: selected,
-      label: 'Profile colour',
+      label: 'Profile colour: $name',
       child: InkWell(
         onTap: onTap,
         customBorder: const CircleBorder(),
