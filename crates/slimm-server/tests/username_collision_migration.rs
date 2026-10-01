@@ -130,7 +130,7 @@ async fn a_database_with_colliding_usernames_migrates_and_keeps_every_row() {
             .map(|(old, _, n)| (old.as_str(), *n))
             .collect::<Vec<_>>(),
         vec![("Alice", 2), ("ALICE", 3), (&"l".repeat(32), 6)],
-        "the earliest of each group keeps its name; the deleted row is left alone"
+        "with no activity the earliest of each group keeps its name; the deleted row is left alone"
     );
     assert_eq!(renamed[0].1, "Alice_02020202");
     assert_eq!(renamed[2].1, format!("{}_06060606", "l".repeat(23)));
@@ -196,4 +196,80 @@ async fn a_database_without_collisions_migrates_unchanged() {
         .await
         .unwrap();
     assert_eq!(renames, 0);
+}
+
+async fn username_of(pool: &SqlitePool, n: u8) -> String {
+    sqlx::query_scalar(&format!("SELECT username FROM users WHERE id = {}", id(n)))
+        .fetch_one(pool)
+        .await
+        .unwrap()
+}
+
+/// The name stays with the account in use, not the oldest one: the live
+/// deployment's `claude` (dormant, earlier) and `Claude` (live, later).
+#[tokio::test]
+async fn the_name_stays_with_the_account_that_was_active_most_recently() {
+    let (pool, full, _guard) = pool_at_0094().await;
+    let statements = [
+        format!(
+            "INSERT INTO users (id, username, display_name, password_hash, created_at) VALUES
+             ({d1}, 'claude', 'Claude', 'h', 100), ({d2}, 'Claude', 'Claude', 'h', 200),
+             ({e1}, 'dana', 'Dana', 'h', 100), ({e2}, 'Dana', 'Dana', 'h', 200),
+             ({f1}, 'finn', 'Finn', 'h', 100), ({f2}, 'Finn', 'Finn', 'h', 200)",
+            d1 = id(0x11),
+            d2 = id(0x12),
+            e1 = id(0x21),
+            e2 = id(0x22),
+            f1 = id(0x31),
+            f2 = id(0x32),
+        ),
+        format!(
+            "INSERT INTO devices (id, user_id, name, created_at, last_seen_at) VALUES
+             ({k1}, {d1}, 'old', 100, 150), ({k2}, {d2}, 'new', 200, 900),
+             ({k3}, {e1}, 'a', 100, 500), ({k4}, {e2}, 'b', 200, 900)",
+            k1 = id(0x41),
+            k2 = id(0x42),
+            k3 = id(0x43),
+            k4 = id(0x44),
+            d1 = id(0x11),
+            d2 = id(0x12),
+            e1 = id(0x21),
+            e2 = id(0x22),
+        ),
+        // claude: only a revoked session. Claude: a live one. The Dana pair has no session at all.
+        format!(
+            "INSERT INTO sessions (id, user_id, device_id, created_at, last_used_at, revoked_at) VALUES
+             ({s1}, {d1}, {k1}, 100, 5000, 6000), ({s2}, {d2}, {k2}, 200, 300, NULL)",
+            s1 = id(0x51),
+            s2 = id(0x52),
+            d1 = id(0x11),
+            d2 = id(0x12),
+            k1 = id(0x41),
+            k2 = id(0x42),
+        ),
+    ];
+    for statement in statements {
+        sqlx::query(&statement).execute(&pool).await.unwrap();
+    }
+
+    full.run(&pool).await.unwrap();
+
+    assert_eq!(
+        username_of(&pool, 0x12).await,
+        "Claude",
+        "the live account keeps it"
+    );
+    assert_eq!(username_of(&pool, 0x11).await, "claude_11111111");
+    assert_eq!(
+        username_of(&pool, 0x22).await,
+        "Dana",
+        "latest device activity wins"
+    );
+    assert_eq!(username_of(&pool, 0x21).await, "dana_21212121");
+    assert_eq!(
+        username_of(&pool, 0x31).await,
+        "finn",
+        "no activity: earliest wins"
+    );
+    assert_eq!(username_of(&pool, 0x32).await, "Finn_32323232");
 }

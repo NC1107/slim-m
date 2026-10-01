@@ -3,7 +3,7 @@
 --
 -- A deployment that already holds such a pair must not fail to start, and no
 -- account is deleted or merged. The earliest account of each colliding group
--- (by created_at, then id) keeps its name; every later one is renamed to its
+-- (see below) keeps its name; every other one is renamed to its
 -- own name, cut to 23 characters, plus "_" and the last 8 hex digits of its
 -- id, which keeps it a valid username of at most 32 characters. Display names
 -- are untouched. Each rename is recorded in username_collision_renames so an
@@ -17,13 +17,31 @@ CREATE TABLE username_collision_renames (
     renamed_at   INTEGER NOT NULL
 ) STRICT;
 
+-- The name stays with the account that was active most recently, so a live
+-- member is never renamed in favour of a dormant one: an account with a
+-- non-revoked session ranks first, then by its latest session activity, else
+-- its latest device last_seen_at, else its latest message. Ties go to the
+-- earliest created_at, then id.
 CREATE TEMP TABLE username_collision_losers AS
 SELECT id FROM (
     SELECT id, row_number() OVER (
-        PARTITION BY lower(username) ORDER BY created_at, id
+        PARTITION BY lower(username)
+        ORDER BY has_live DESC, activity DESC, created_at, id
     ) AS rank
-    FROM users
-    WHERE deleted_at IS NULL
+    FROM (
+        SELECT u.id, u.username, u.created_at,
+               EXISTS (SELECT 1 FROM sessions s
+                       WHERE s.user_id = u.id AND s.revoked_at IS NULL) AS has_live,
+               COALESCE(
+                   (SELECT max(COALESCE(s.last_used_at, s.created_at)) FROM sessions s
+                    WHERE s.user_id = u.id AND s.revoked_at IS NULL),
+                   (SELECT max(d.last_seen_at) FROM devices d WHERE d.user_id = u.id),
+                   (SELECT max(m.created_at) FROM messages m WHERE m.author_id = u.id),
+                   0
+               ) AS activity
+        FROM users u
+        WHERE u.deleted_at IS NULL
+    )
 ) WHERE rank > 1;
 
 INSERT INTO username_collision_renames (user_id, old_username, new_username, renamed_at)

@@ -123,7 +123,8 @@ Keep the recovery codes somewhere other than the phone, and give a second person
 
 Usernames are unique without regard to letter case, so `Alice` cannot register beside `alice`, and sign-in ignores case.
 Migration 0095 added the index.
-A deployment that already held a colliding pair kept the earliest account's name and had each later one renamed to its own name plus `_` and the last eight hex digits of its id.
+A deployment that already held a colliding pair kept the name for the account that was active most recently: one with a live session first, then by latest session use, else latest device activity, else latest message, with ties going to the earliest account.
+Every other account in the group was renamed to its own name plus `_` and the last eight hex digits of its id.
 `username_collision_renames` records the old and new name of each, so you can tell those members what to sign in with.
 Display names were not touched.
 
