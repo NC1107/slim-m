@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
-/// WCAG 1.4.11: the edge of an input or a card is a UI component boundary and
-/// meets 3:1 against the surface behind it. Computed from the tokens, then
+/// WCAG 1.4.11: the edge of an input is a UI component boundary and meets 3:1
+/// against the surface behind it. A card is a container, not a control, so it
+/// keeps the hairline (decision 0004, 2026-10-01 addendum). Computed from the tokens, then
 /// read back off the rendered widgets so a swap to the hairline fails here.
 library;
 
@@ -73,12 +74,10 @@ void main() {
       expect(_contrast(edge, tokens.surfaceBase), greaterThanOrEqualTo(3.0));
     });
 
-    testWidgets('$name AppCard draws its edge in the boundary token',
-        (tester) async {
+    testWidgets('$name AppCard keeps the hairline', (tester) async {
       await pump(tester, const AppCard(child: Text('Body')));
-      final edge = _edgeOf(tester, AppCard, tokens.surfaceRaised);
-      expect(edge, tokens.borderStrong);
-      expect(_contrast(edge, tokens.surfaceBase), greaterThanOrEqualTo(3.0));
+      expect(
+          _edgeOf(tester, AppCard, tokens.surfaceRaised), tokens.borderSubtle);
     });
 
     test('$name theme text fields draw their edge in the boundary token', () {

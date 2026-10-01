@@ -316,8 +316,9 @@ A stroke entirely enclosed inside an image's box has no exposed tap target at al
 ### Addendum 2026-10-01: the hairline question is answered
 
 A separator hairline is incidental and stays `borderSubtle`.
-The edge of a control or a container a person has to find is a UI component under WCAG 1.4.11 and meets 3:1.
-Text inputs (`AppInput` and the theme's `InputDecorationTheme`) and `AppCard` now draw their edge in `borderStrong`.
-Dividers, card header rules, chips and menu separators keep the hairline.
+The edge of a control a person has to find is a UI component under WCAG 1.4.11 and meets 3:1.
+Text inputs (`AppInput` and the theme's `InputDecorationTheme`) now draw their edge in `borderStrong`.
+Cards are containers, not controls, so `AppCard` keeps the hairline: a 3:1 card edge around 3:1 inputs read as a box in a box in settings.
+Dividers, card header rules, chips and menu separators keep the hairline too.
 `borderStrong` on light was darkened from `#898E93` to `#858A8F` because the old value reached only 2.92:1 on `surfaceSunken`.
 It now measures 3.08 to 3.48 in light, 3.41 to 4.04 in dark and 4.16 to 4.48 on true black, and `component_boundary_contrast_test.dart` computes this from the tokens.
