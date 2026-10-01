@@ -210,6 +210,41 @@ void main() {
       await expectMapped(500, 'not json', isA<ServerException>());
     });
 
+    test('a 429 carries the wait the body names when no header does', () async {
+      await expectMapped(
+        429,
+        '{"error":"rate limited","retry_after_seconds":3}',
+        isA<RateLimitedException>().having(
+          (e) => e.retryAfter,
+          'retryAfter',
+          const Duration(seconds: 3),
+        ),
+      );
+    });
+
+    test('a 429 prefers the Retry-After header over the body', () async {
+      final api = SlimmApi(
+        baseUrl: _base,
+        httpClient: MockClient(
+          (_) async => http.Response(
+            '{"error":"x","retry_after_seconds":9}',
+            429,
+            headers: {'retry-after': '2'},
+          ),
+        ),
+      );
+      await expectLater(
+        api.version,
+        throwsA(
+          isA<RateLimitedException>().having(
+            (e) => e.retryAfter,
+            'retryAfter',
+            const Duration(seconds: 2),
+          ),
+        ),
+      );
+    });
+
     test('a dead connection is a transport failure, not a server error',
         () async {
       final api = SlimmApi(
@@ -217,6 +252,40 @@ void main() {
         httpClient: MockClient((_) async => throw const SocketishFailure()),
       );
       await expectLater(api.version, throwsA(isA<TransportException>()));
+    });
+  });
+
+  group('listReadStates', () {
+    test('parses every channel marker from one GET /read-states', () async {
+      final requests = <String>[];
+      final api = SlimmApi(
+        baseUrl: _base,
+        session: SessionStore(tokens: _tokens()),
+        httpClient: MockClient((request) async {
+          requests.add('${request.method} ${request.url.path}');
+          return http.Response(
+            jsonEncode([
+              {
+                'channel_id': 'c1',
+                'last_read_seq': 4,
+                'unread': 2,
+                'manually_unread': true,
+              },
+              {'channel_id': 'c2', 'last_read_seq': 0, 'unread': 0},
+            ]),
+            200,
+          );
+        }),
+      );
+
+      final states = await api.listReadStates();
+
+      expect(requests, ['GET /read-states']);
+      expect(states.map((s) => s.channelId), ['c1', 'c2']);
+      expect(states[0].state.lastReadSeq, 4);
+      expect(states[0].state.manuallyUnread, isTrue);
+      expect(states[0].state.showsUnread, isTrue);
+      expect(states[1].state.manuallyUnread, isFalse);
     });
   });
 
