@@ -21,11 +21,8 @@ import 'status_dot.dart';
 /// author.
 enum AppAvatarShape { circle, square }
 
-/// The closed six-colour set a round avatar's tint is hashed from. Kept
-/// local rather than added to [AppTokens] (which already has a comparable
-/// closed set in `AppCanvasColors.cursors`) because token values are gated
-/// behind a design review this port does not have standing to reopen; see
-/// the design-system notes for this file.
+/// The closed six-colour set a round avatar's tint is hashed from; kept local
+/// because token values are gated behind a design review.
 const List<Color> _avatarTints = [
   Color(0xFF4E6B66),
   Color(0xFF5C6E7A),
@@ -59,26 +56,17 @@ String initialsFor(String name) {
   return stripped.substring(0, take).toUpperCase();
 }
 
-/// A light ink for the fixed, non-theme-swapped tint colours above. None of
-/// [AppTokens]'s existing text colours fit: they all invert with theme, and
-/// these tints do not, so [AppTokens.accentOn] would go illegible in dark and
-/// true-black themes even though it is correct in light. Flagged as a gap
-/// rather than reused.
+/// Light ink for the fixed tints above; every themed text colour inverts and
+/// would go illegible on them in dark.
 const Color _avatarTintInk = Color(0xFFFFFFFF);
 
 /// A person's (or bot's) picture, falling back to a tinted initials disc (or,
 /// for a square avatar, to [placeholder]) when [image] is null or fails to
 /// load.
 ///
-/// The picture draws at [FilterQuality.medium] because an avatar is nearly
-/// always MINIFIED at paint time, not magnified: `UserAvatar` decodes at
-/// `max(devicePixelRatio, 3) x size`, so a 36pt avatar holds a 108px texture
-/// and paints it into 36 physical pixels on any 1.0-ratio display - a 0.33x
-/// scale. Flutter's own [FilterQuality] docs put the mipmap medium adds
-/// squarely in that regime ("prevent loss of detail at small scale sizes"),
-/// and warn that [FilterQuality.high] is worse than medium below 0.5x.
-/// [FilterQuality.low] is plain bilinear with no mipmap, which loses detail
-/// on exactly this downscale and is what made avatars read as soft.
+/// The picture draws at [FilterQuality.medium]: an avatar is nearly always
+/// minified at paint time (decoded at 3x, painted at 1x), the regime medium's
+/// mipmap exists for, and [FilterQuality.low] made avatars read as soft.
 class AppAvatar extends StatelessWidget {
   const AppAvatar({
     super.key,
