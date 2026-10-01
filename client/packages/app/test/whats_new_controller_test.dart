@@ -30,9 +30,15 @@ void _mockVersion(String version) {
 /// `StateNotifierProvider`, so nothing runs its constructor, and therefore
 /// nothing starts the async check, until something reads it. A real launch
 /// gets that read from `WhatsNewGate`; here it is this helper.
-ProviderContainer _container({required bool fresh}) {
+ProviderContainer _container({
+  required bool fresh,
+  bool justRegistered = false,
+}) {
   final container = ProviderContainer(
-    overrides: [isFreshInstallProvider.overrideWith((ref) => fresh)],
+    overrides: [
+      isFreshInstallProvider.overrideWith((ref) => fresh),
+      justRegisteredProvider.overrideWith((ref) => justRegistered),
+    ],
   );
   addTearDown(container.dispose);
   container.read(whatsNewControllerProvider);
@@ -62,6 +68,28 @@ void main() {
             'upgrade would replay every entry ever written as if all of it '
             'were new',
       );
+    },
+  );
+
+  test('a brand-new account on a device that launched before sees nothing '
+      'and records the current version', () async {
+    _mockVersion('0.89.0');
+    final container = _container(fresh: false, justRegistered: true);
+    await pumpEventQueue();
+
+    expect(container.read(whatsNewControllerProvider), isEmpty);
+    final prefs = await SharedPreferences.getInstance();
+    expect(prefs.getString(lastSeenWhatsNewVersionKey), '0.89.0');
+  });
+
+  test(
+    'the same device without a registration still owes the backlog',
+    () async {
+      _mockVersion('0.89.0');
+      final container = _container(fresh: false);
+      await pumpEventQueue();
+
+      expect(container.read(whatsNewControllerProvider), isNotEmpty);
     },
   );
 

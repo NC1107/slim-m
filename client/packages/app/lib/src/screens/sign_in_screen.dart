@@ -22,6 +22,7 @@ import '../widgets/onboarding_shell.dart';
 import '../widgets/server_identity_confirmation.dart';
 import '../widgets/server_notice.dart';
 import '../providers/toasts.dart';
+import '../providers/whats_new_controller.dart';
 import 'reset_password_sheet.dart';
 import 'sign_in_alternatives.dart';
 import 'sign_in_credential_fields.dart';
@@ -332,6 +333,8 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
     final invite = ref.read(pendingInviteProvider);
     try {
       if (_creatingAccount) {
+        // Before the call: its session change is what starts the what's-new check.
+        ref.read(justRegisteredProvider.notifier).state = true;
         await api.register(
           username: _username.text.trim(),
           displayName: _displayName.text.trim().isEmpty
@@ -372,6 +375,7 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
       }
       unawaited(ref.read(pushControllerProvider.notifier).register());
     } on ApiException catch (e) {
+      ref.read(justRegisteredProvider.notifier).state = false;
       if (!mounted) return;
       setState(() => _error = signInErrorFor(e));
     } finally {
