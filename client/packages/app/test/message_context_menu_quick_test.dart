@@ -18,6 +18,7 @@ import 'package:slimm_design_system/design_system.dart';
 import 'message_row_harness.dart';
 
 MessageActions _actions({
+  VoidCallback? onBlock,
   bool own = false,
   bool moderator = false,
   bool selecting = false,
@@ -35,7 +36,7 @@ MessageActions _actions({
   canReport: !own,
   onReport: onReport ?? noop,
   canBlockAuthor: !own,
-  onBlockAuthor: noop,
+  onBlockAuthor: onBlock ?? noop,
   canOpenThread: true,
   onOpenThread: noop,
   canCopyLink: true,
@@ -222,6 +223,21 @@ void main() {
     await tester.tap(find.text('Report message'));
     await tester.pumpAndSettle();
     expect(reported, isTrue);
+    expect(find.byType(AppMenu), findsNothing);
+  });
+
+  testWidgets('Block user runs from behind More and closes the menu', (
+    tester,
+  ) async {
+    var blocked = false;
+    await _open(tester, _actions(onBlock: () => blocked = true));
+
+    await tester.tap(find.text('More'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Block user'));
+    await tester.pumpAndSettle();
+
+    expect(blocked, isTrue);
     expect(find.byType(AppMenu), findsNothing);
   });
 
