@@ -900,11 +900,27 @@ The macOS app is ad-hoc signed by the build itself, so Gatekeeper quarantines a 
 Both jobs declare `environment: release`, matching every asset-publishing job in `release`.
 They are tag-triggered, so unlike `main-builds` they should sit behind a reviewer gate if one is ever added; `main-builds` documents its own opt-out for the opposite reason, that a continuous build must not block on review.
 
+### The Windows build runs under pwsh, and the one release that shipped without it
+
+Client 0.89.0 was published without its Windows zip and without `manifest.json`, so no desktop install on any platform could update to or from it until the release was backfilled.
+The change that wired the Spotify client id into the build moved the Windows build step to `shell: bash`.
+The job sets `CL` to a value that begins with a slash, Git Bash rewrites slash-leading environment values into Windows paths before handing them to a native program, and the first thing to notice was CMake: `No CMAKE_CXX_COMPILER could be found`, eleven seconds into `flutter build windows`.
+The same tag built under pwsh on the same runner image, with nothing else changed, which is what the fix is.
+The failed run took the manifest job with it, because `manifest` needs both desktop builds and a failed need skips it without a word.
+
+Two things made it expensive, and both still hold.
+This workflow runs on a tag and nowhere else, so the pull request that broke it could not have failed: the first run of a change here is the release.
+And nothing compares a published release against the assets it should have, so the release page looked finished.
+
+`scripts/lib/test_windows_builds_do_not_run_under_bash.py` refuses `flutter build` under `shell: bash` in any Windows job.
+That closes this exact door and no other.
+Before merging a change to this file, dispatch it from the branch against the newest existing tag (`gh workflow run desktop-clients.yml --ref <branch> -f tag=client-vX.Y.Z`): it rebuilds and re-attaches the same assets with `--clobber`, which is harmless, and it is the only way the change runs before a release depends on it.
+
 ## update-manifest
 
 Groundwork for the per-user, signed self-update in `docs/decisions/0041`.
 It downloads the desktop artifacts already attached to a client release (the Linux tarball from `release`, the Windows and macOS archives from `desktop-clients`), builds a manifest of them with `scripts/update-manifest.py`, signs it with ed25519, checks the signature against the key's own public half, and attaches `manifest.json` and `manifest.json.sig` to the release.
-Nothing in the client reads the manifest yet.
+The desktop client fetches it and its signature from the release, verifies them, and only then downloads an artifact (`client/packages/app/lib/src/desktop/self_update/self_update.dart`), so a release without a manifest is a release nothing can update to.
 
 It is a reusable workflow rather than steps inside `release` because `release.yml` sits near its line budget, and `desktop-clients` is the one workflow that knows when the Windows and macOS archives are attached.
 `desktop-clients` calls it as its last job; by hand it takes a `tag` and a `require` list, which is how to backfill a release or to re-sign with `linux-x64` added once `release` has attached the tarball.
