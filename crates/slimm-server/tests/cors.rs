@@ -114,6 +114,18 @@ async fn a_configured_origin_is_echoed_back() {
     assert!(vary.to_ascii_lowercase().contains("origin"), "{vary}");
 }
 
+/// A browser hides every response header from script unless the server names
+/// it. The web client could not read `Retry-After` on a 429, so it guessed.
+#[tokio::test]
+async fn retry_after_is_exposed_to_a_browser_script() {
+    let (router, _guard) = configured().await;
+    let (_, headers) = headers_of(router, simple_get(WEB_CLIENT)).await;
+    let exposed = header(&headers, "access-control-expose-headers")
+        .unwrap_or_default()
+        .to_ascii_lowercase();
+    assert!(exposed.contains("retry-after"), "exposed: {exposed:?}");
+}
+
 #[tokio::test]
 async fn another_origin_is_refused() {
     let (router, _guard) = configured().await;
