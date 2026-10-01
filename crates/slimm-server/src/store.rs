@@ -4,11 +4,10 @@
 //! the handful of methods (account creation, liveness, live user ids) that do
 //! not belong to any single feature area.
 //!
-//! Everything else is split by feature, mirroring the HTTP surface: messages
-//! (send, edit, delete, list, search) in [`messages`], channel CRUD in
-//! [`channels`], user profiles and the member list in [`users`], reactions in
-//! [`reactions`], and so on. This is inherent on [`Store`] for now; it lifts
-//! to a repository trait when a second backend (Postgres) actually needs one.
+//! Everything else is split by feature, mirroring the HTTP surface: messages in
+//! [`messages`], channel CRUD in [`channels`], user profiles and the member
+//! list in [`users`], reactions in [`reactions`], and so on. Inherent on
+//! [`Store`] for now; it lifts to a repository trait when Postgres needs one.
 
 use std::sync::Arc;
 
@@ -70,6 +69,7 @@ mod module_artifacts;
 mod module_kv;
 mod module_permissions;
 mod modules;
+mod nicknames;
 mod notification_schedule;
 mod notifications;
 mod overwrites_batch;

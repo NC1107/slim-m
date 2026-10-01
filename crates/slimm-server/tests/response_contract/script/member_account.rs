@@ -30,3 +30,23 @@ pub(super) async fn member_account_calls(c: &mut Contract, root: &str, code: &st
     )
     .await;
 }
+
+/// Gives a member a space-local name and takes it away again, so the
+/// `UserProfile` the later calls read is back to the account's own name.
+pub(super) async fn nickname_calls(c: &mut Contract, root: &str, member_id: &str) {
+    c.json(
+        "setMemberNickname",
+        "PUT",
+        &format!("/members/{member_id}/nickname"),
+        root,
+        serde_json::json!({ "nickname": "Contract Nick" }),
+    )
+    .await;
+    c.bare(
+        "clearMemberNickname",
+        "DELETE",
+        &format!("/members/{member_id}/nickname"),
+        root,
+    )
+    .await;
+}

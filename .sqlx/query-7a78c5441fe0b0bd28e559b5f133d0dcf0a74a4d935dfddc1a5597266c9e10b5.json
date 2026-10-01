@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "UPDATE member_nicknames SET set_by = NULL WHERE set_by = ?",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": []
+  },
+  "hash": "7a78c5441fe0b0bd28e559b5f133d0dcf0a74a4d935dfddc1a5597266c9e10b5"
+}

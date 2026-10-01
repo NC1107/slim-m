@@ -68,6 +68,7 @@ pub(crate) use crate::hidden_chars;
 mod interactions;
 mod invites;
 pub mod link_preview;
+mod member_nicknames;
 mod members;
 mod members_bulk;
 mod message_components;
@@ -211,6 +212,7 @@ pub fn router(state: AppState) -> Router {
         .merge(emoji::routes())
         .merge(invites::routes())
         .merge(members::routes())
+        .merge(member_nicknames::routes())
         .merge(members_bulk::routes())
         .merge(messages::routes())
         .merge(messages_bulk::router())

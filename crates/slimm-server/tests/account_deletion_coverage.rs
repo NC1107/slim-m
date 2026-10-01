@@ -88,6 +88,8 @@ const DECISIONS: &[(&str, &str, OnDelete)] = &[
     ("invite_redemptions", "user_id", OnDelete::Purge),
     ("invites", "created_by", OnDelete::Anonymize),
     ("member_roles", "user_id", OnDelete::Purge),
+    ("member_nicknames", "set_by", OnDelete::Anonymize),
+    ("member_nicknames", "user_id", OnDelete::Purge),
     ("member_timeouts", "issued_by", OnDelete::Anonymize),
     (
         "member_timeouts",

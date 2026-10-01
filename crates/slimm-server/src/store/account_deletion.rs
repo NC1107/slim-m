@@ -207,6 +207,15 @@ impl Store {
         )
         .execute(&mut *tx)
         .await?;
+        sqlx::query!("DELETE FROM member_nicknames WHERE user_id = ?", user_id)
+            .execute(&mut *tx)
+            .await?;
+        sqlx::query!(
+            "UPDATE member_nicknames SET set_by = NULL WHERE set_by = ?",
+            user_id
+        )
+        .execute(&mut *tx)
+        .await?;
         sqlx::query!(
             "UPDATE space_removals SET removed_by = NULL WHERE removed_by = ?",
             user_id

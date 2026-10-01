@@ -122,6 +122,7 @@ pub(crate) async fn farewell_calls(
 
     bulk_member_calls(c, root, &erin_id).await;
 
+    member_account::nickname_calls(c, root, &erin_id).await;
     member_account::member_account_calls(c, root, code).await;
 
     recovery_calls(c, root, bob_id).await;

@@ -417,6 +417,7 @@ class _MemberProfileBodyState extends ConsumerState<MemberProfileBody>
             canManageRoles: canManageRoles,
             outranked: gates.outranked,
             canOfferTimeoutChips: canOfferTimeoutChips,
+            canRename: gates.canRename,
             canIssueReset: canIssueReset,
             canRemove: canRemove,
             canEject: canEject,

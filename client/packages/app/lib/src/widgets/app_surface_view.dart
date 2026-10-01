@@ -17,19 +17,16 @@
 /// same shared route from within [ModuleCommandOutput].
 library;
 
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:slimm_api/api.dart' as api;
 import 'package:slimm_design_system/design_system.dart';
 
+import '../providers/app_launches.dart';
 import '../providers/message_extras.dart';
-import '../providers/providers.dart';
 import 'module_command_output.dart';
-import 'run_guarded.dart';
-
-/// The fenced-block index an app surface stores its shared state at. An app
-/// message has no fenced blocks, so block 0 is always free and always its.
-const _appBlockIndex = 0;
 
 class AppSurfaceView extends ConsumerStatefulWidget {
   const AppSurfaceView({
@@ -50,11 +47,7 @@ class AppSurfaceView extends ConsumerStatefulWidget {
   ConsumerState<AppSurfaceView> createState() => _AppSurfaceViewState();
 }
 
-class _AppSurfaceViewState extends ConsumerState<AppSurfaceView>
-    with GuardedActionState<AppSurfaceView> {
-  bool _running = false;
-  bool _autoRan = false;
-
+class _AppSurfaceViewState extends ConsumerState<AppSurfaceView> {
   api.CodeRun? _sharedRun() {
     final runs =
         ref.watch(
@@ -62,41 +55,28 @@ class _AppSurfaceViewState extends ConsumerState<AppSurfaceView>
         ) ??
         const <api.CodeRun>[];
     for (final run in runs) {
-      if (run.blockIndex == _appBlockIndex) return run;
+      if (run.blockIndex == appBlockIndex) return run;
     }
     return null;
   }
 
-  Future<void> _run() async {
-    setState(() => _running = true);
-    await guard(
-      whatFailed: 'launch this app',
-      action: () async {
-        await ref
-            .read(apiProvider)
-            .runCodeBlock(
-              messageId: widget.messageId,
-              blockIndex: _appBlockIndex,
-              moduleId: widget.surface.moduleId,
-              command: widget.surface.command,
-              // A launch takes no argument; a well-behaved app returns its initial frame for empty input.
-              input: '',
-            );
-      },
-    );
-    if (!mounted) return;
-    setState(() => _running = false);
-  }
+  void _launch({bool retry = false}) => unawaited(
+    ref
+        .read(appLaunchesProvider.notifier)
+        .launch(widget.messageId, widget.surface, retry: retry),
+  );
 
   @override
   Widget build(BuildContext context) {
     final tokens = Theme.of(context).extension<AppTokens>()!;
     final sharedRun = _sharedRun();
+    final launch = ref.watch(
+      appLaunchesProvider.select((m) => m[widget.messageId]),
+    );
     // First viewer with no stored run kicks it off once; the broadcast then feeds every viewer, including this one, through the shared cache.
-    if (sharedRun == null && !_running && !_autoRan && actionError == null) {
-      _autoRan = true;
+    if (sharedRun == null && launch == null) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted) _run();
+        if (mounted) _launch();
       });
     }
 
@@ -126,16 +106,12 @@ class _AppSurfaceViewState extends ConsumerState<AppSurfaceView>
             ],
           ),
           const SizedBox(height: AppSpacing.s8),
-          if (actionError != null)
-            AppErrorState(message: actionError!, onDismiss: clearActionError)
-          else if (sharedRun != null)
-            ModuleCommandOutput(
-              result: _asResult(sharedRun),
-              moduleId: widget.surface.moduleId,
-              command: widget.surface.command,
-              messageId: widget.messageId,
-              blockIndex: _appBlockIndex,
-            )
+          if (sharedRun != null)
+            _output(_asResult(sharedRun))
+          else if (launch?.result case final answered?)
+            _output(answered)
+          else if (launch?.error case final error?)
+            AppErrorState(message: error, onRetry: () => _launch(retry: true))
           else
             const Padding(
               padding: EdgeInsets.symmetric(vertical: AppSpacing.s8),
@@ -149,6 +125,14 @@ class _AppSurfaceViewState extends ConsumerState<AppSurfaceView>
       ),
     );
   }
+
+  Widget _output(api.RunModuleCommandResult result) => ModuleCommandOutput(
+    result: result,
+    moduleId: widget.surface.moduleId,
+    command: widget.surface.command,
+    messageId: widget.messageId,
+    blockIndex: appBlockIndex,
+  );
 
   /// A [CodeRun]'s single `output` is the module's output when it succeeded, or
   /// its error otherwise - the same split [ModuleCommandOutput] renders.

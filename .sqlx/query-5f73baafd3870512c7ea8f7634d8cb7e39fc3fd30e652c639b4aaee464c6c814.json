@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "DELETE FROM member_nicknames WHERE user_id = ?",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": []
+  },
+  "hash": "5f73baafd3870512c7ea8f7634d8cb7e39fc3fd30e652c639b4aaee464c6c814"
+}

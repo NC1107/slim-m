@@ -2518,6 +2518,66 @@ paths:
         "429":
           $ref: "#/components/responses/TooManyRequests"
 
+  /members/{userId}/nickname:
+    parameters:
+      - name: userId
+        in: path
+        required: true
+        description: The member's or bot's UUID.
+        schema:
+          type: string
+          format: uuid
+    put:
+      operationId: setMemberNickname
+      tags: [moderation]
+      summary: Give a member or bot a space-local name. Requires KICK_MEMBERS.
+      description: >
+        Every reader then sees the nickname as the account's `display_name`;
+        the account keeps its own name (`account_display_name`) and still sees
+        it in its own profile. Replaces any nickname already set. Refused on
+        yourself, on an account whose granted permissions the caller's own do
+        not contain, and for a blank, hidden-character or over-64-character
+        name. Audited as nickname_set.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [nickname]
+              properties:
+                nickname:
+                  type: string
+      responses:
+        "204":
+          description: The nickname is in force.
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
+    delete:
+      operationId: clearMemberNickname
+      tags: [moderation]
+      summary: Remove a space-local name. Requires KICK_MEMBERS.
+      description: >
+        Idempotent. The account's own name shows again. Audited as
+        nickname_clear when there was one to remove.
+      responses:
+        "204":
+          description: No nickname is in force.
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
+
   /members/{userId}/timeout:
     parameters:
       - name: userId
@@ -8172,6 +8232,15 @@ components:
           type: string
         display_name:
           type: string
+          description: >
+            What readers see: the nickname an administrator gave this account
+            if there is one, else `account_display_name`.
+        account_display_name:
+          type: string
+          description: The account's own name, whatever the nickname is.
+        nickname:
+          type: [string, "null"]
+          description: The space-local name an administrator gave this account.
         created_at:
           type: integer
           format: int64
@@ -9477,6 +9546,8 @@ components:
             - totp_cleared
             - account_delete
             - reset_code_issue
+            - nickname_set
+            - nickname_clear
         reason:
           type: [string, "null"]
         until:

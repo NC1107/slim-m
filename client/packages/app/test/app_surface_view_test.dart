@@ -129,4 +129,152 @@ void main() {
       );
     },
   );
+
+  group('a launch that cannot complete', () {
+    Future<(ProviderContainer, List<String>)> pumpRefused(
+      WidgetTester tester, {
+      required int status,
+      Widget Function()? home,
+    }) async {
+      tester.view.physicalSize = const Size(400, 900);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+      final paths = <String>[];
+      final container = ProviderContainer(
+        overrides: [
+          keyStoreProvider.overrideWithValue(InMemoryKeyStore()),
+          sessionProvider.overrideWithValue(api.SessionStore(tokens: _tokens)),
+          liveEventsProvider.overrideWithValue(const Stream.empty()),
+          apiProvider.overrideWith((ref) {
+            final built = api.SlimmApi(
+              baseUrl: Uri.parse('http://localhost:8080'),
+              session: ref.watch(sessionProvider),
+              httpClient: MockClient((request) async {
+                paths.add(request.url.path);
+                return http.Response(
+                  jsonEncode({'error': 'insufficient permissions'}),
+                  status,
+                  headers: {'content-type': 'application/json'},
+                );
+              }),
+            );
+            ref.onDispose(built.close);
+            return built;
+          }),
+        ],
+      );
+      addTearDown(container.dispose);
+      await tester.pumpWidget(
+        UncontrolledProviderScope(
+          container: container,
+          child: MaterialApp(
+            theme: buildTheme(Brightness.light, AppTokens.light),
+            home: Scaffold(body: home?.call() ?? _surface(const ValueKey('a'))),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      return (container, paths);
+    }
+
+    testWidgets('says so with a Retry instead of spinning', (tester) async {
+      await pumpRefused(tester, status: 403);
+
+      expect(find.byType(AppErrorState), findsOneWidget);
+      expect(find.byType(CircularProgressIndicator), findsNothing);
+      expect(find.text('Retry'), findsOneWidget);
+    });
+
+    testWidgets('asks once over a minute, however often it rebuilds', (
+      tester,
+    ) async {
+      final (_, paths) = await pumpRefused(tester, status: 429);
+      for (var i = 0; i < 60; i++) {
+        await tester.pump(const Duration(seconds: 1));
+      }
+
+      expect(paths, hasLength(1));
+    });
+
+    testWidgets('a remount of the same message does not ask again', (
+      tester,
+    ) async {
+      final (container, paths) = await pumpRefused(tester, status: 403);
+
+      await tester.pumpWidget(
+        UncontrolledProviderScope(
+          container: container,
+          child: MaterialApp(
+            theme: buildTheme(Brightness.light, AppTokens.light),
+            home: Scaffold(body: _surface(const ValueKey('b'))),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(paths, hasLength(1));
+      expect(find.byType(CircularProgressIndicator), findsNothing);
+    });
+
+    testWidgets('Retry asks again, and only then', (tester) async {
+      final (_, paths) = await pumpRefused(tester, status: 403);
+
+      await tester.tap(find.text('Retry'));
+      await tester.pumpAndSettle();
+
+      expect(paths, hasLength(2));
+      expect(find.byType(AppErrorState), findsOneWidget);
+    });
+  });
+
+  testWidgets('a launch that answered shows its frame without the broadcast', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(400, 900);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    final container = ProviderContainer(
+      overrides: [
+        keyStoreProvider.overrideWithValue(InMemoryKeyStore()),
+        sessionProvider.overrideWithValue(api.SessionStore(tokens: _tokens)),
+        liveEventsProvider.overrideWithValue(const Stream.empty()),
+        apiProvider.overrideWith((ref) {
+          final built = api.SlimmApi(
+            baseUrl: Uri.parse('http://localhost:8080'),
+            session: ref.watch(sessionProvider),
+            httpClient: MockClient(
+              (_) async => http.Response(
+                jsonEncode({'ok': true, 'output': _scene('s1')}),
+                200,
+                headers: {'content-type': 'application/json'},
+              ),
+            ),
+          );
+          ref.onDispose(built.close);
+          return built;
+        }),
+      ],
+    );
+    addTearDown(container.dispose);
+    await tester.pumpWidget(
+      UncontrolledProviderScope(
+        container: container,
+        child: MaterialApp(
+          theme: buildTheme(Brightness.light, AppTokens.light),
+          home: Scaffold(body: _surface(const ValueKey('a'))),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.bySemanticsLabel('Step forward'), findsOneWidget);
+    expect(find.byType(CircularProgressIndicator), findsNothing);
+  });
 }
+
+Widget _surface(Key key) => AppSurfaceView(
+  key: key,
+  messageId: 'm1',
+  surface: const api.AppSurface(moduleId: 'music-box', command: 'sequence'),
+  title: 'music-box',
+);

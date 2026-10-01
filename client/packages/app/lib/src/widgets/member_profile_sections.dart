@@ -45,9 +45,13 @@ class MemberProfileHeader extends ConsumerWidget {
     final timedOut = profile.timedOutUntil != null;
 
     final handleLine = Text(
-      profile.pronouns == null
-          ? '@${profile.username}'
-          : '@${profile.username} · ${profile.pronouns}',
+      [
+        '@${profile.username}',
+        // A nickname hides the account's own name everywhere else, so say it here.
+        if (profile.nickname != null && profile.accountDisplayName != null)
+          'account name ${profile.accountDisplayName}',
+        ?profile.pronouns,
+      ].join(' · '),
       overflow: TextOverflow.ellipsis,
       style: AppText.caption.copyWith(color: tokens.textSecondary),
     );

@@ -75,7 +75,13 @@ pub fn routes() -> Router<AppState> {
 pub(super) struct UserDto {
     id: String,
     username: String,
+    /// What readers see: the nickname an administrator gave this account if
+    /// there is one, else [`Self::account_display_name`]. Decision 0053.
     display_name: String,
+    /// The account's own display name, whatever the nickname is.
+    account_display_name: String,
+    /// The space-local name an administrator gave this account, or `null`.
+    nickname: Option<String>,
     created_at: i64,
     /// When this user's avatar was last set, or `null` for no avatar. Not a
     /// fetchable value on its own - a client appends it as a cache-busting
@@ -177,14 +183,20 @@ async fn to_dtos(store: &Store, users: Vec<User>) -> anyhow::Result<Vec<UserDto>
     // Batched for the same reason the roles above are; see this function's note.
     let timed_out = store.timed_out_among_until(&ids).await?;
     let hoisted = store.hoisted_roles_for_users(&ids).await?;
+    let nicknames = store.nicknames_for(&ids).await?;
     Ok(users
         .into_iter()
         .map(|user| {
             let held = roles.get(&user.id).cloned().unwrap_or_default();
+            let nickname = nicknames.get(&user.id).cloned();
             UserDto {
                 id: user.id.to_string(),
                 username: user.username,
-                display_name: user.display_name,
+                display_name: nickname
+                    .clone()
+                    .unwrap_or_else(|| user.display_name.clone()),
+                account_display_name: user.display_name,
+                nickname,
                 created_at: user.created_at,
                 avatar_updated_at: user.avatar_updated_at,
                 roles: held.iter().map(|(_, name)| name.clone()).collect(),

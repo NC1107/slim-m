@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "INSERT INTO member_nicknames (user_id, nickname, set_by, set_at)\n             VALUES (?, ?, ?, ?)\n             ON CONFLICT(user_id) DO UPDATE SET\n                 nickname = excluded.nickname,\n                 set_by = excluded.set_by,\n                 set_at = excluded.set_at",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 4
+    },
+    "nullable": []
+  },
+  "hash": "91afd0e2389bff441caabbd40087dc27b958a3b94d00b72f011f584840f51ad4"
+}
