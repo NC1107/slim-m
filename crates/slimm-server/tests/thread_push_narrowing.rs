@@ -88,7 +88,8 @@ async fn a_reply_wakes_only_the_parent_author_and_actual_repliers() {
                     push_token: token,
                     voip_push_token: None,
                     push_public_key: &KEY,
-                    include_content: false,
+                    include_content: Some(false),
+                    include_content_chosen: true,
                 },
             )
             .await
@@ -148,7 +149,8 @@ async fn the_first_reply_in_an_empty_thread_still_wakes_the_parent_author() {
                 push_token: "alice-token",
                 voip_push_token: None,
                 push_public_key: &KEY,
-                include_content: false,
+                include_content: Some(false),
+                include_content_chosen: true,
             },
         )
         .await
@@ -162,7 +164,8 @@ async fn the_first_reply_in_an_empty_thread_still_wakes_the_parent_author() {
                 push_token: "bob-token",
                 voip_push_token: None,
                 push_public_key: &KEY,
-                include_content: false,
+                include_content: Some(false),
+                include_content_chosen: true,
             },
         )
         .await
@@ -209,7 +212,8 @@ async fn a_mention_wakes_a_bystander_the_thread_would_otherwise_exclude() {
                     push_token: token,
                     voip_push_token: None,
                     push_public_key: &KEY,
-                    include_content: false,
+                    include_content: Some(false),
+                    include_content_chosen: true,
                 },
             )
             .await
@@ -268,7 +272,8 @@ async fn a_mention_never_reaches_somebody_without_view_permission() {
                     push_token: token,
                     voip_push_token: None,
                     push_public_key: &KEY,
-                    include_content: false,
+                    include_content: Some(false),
+                    include_content_chosen: true,
                 },
             )
             .await
@@ -326,7 +331,8 @@ async fn blocking_still_holds_inside_a_thread() {
                     push_token: token,
                     voip_push_token: None,
                     push_public_key: &KEY,
-                    include_content: false,
+                    include_content: Some(false),
+                    include_content_chosen: true,
                 },
             )
             .await
@@ -391,7 +397,8 @@ async fn a_view_denial_on_the_parent_excludes_a_push_recipient_from_the_thread()
                 push_token: "alice-token",
                 voip_push_token: None,
                 push_public_key: &KEY,
-                include_content: false,
+                include_content: Some(false),
+                include_content_chosen: true,
             },
         )
         .await
@@ -405,7 +412,8 @@ async fn a_view_denial_on_the_parent_excludes_a_push_recipient_from_the_thread()
                 push_token: "bob-token",
                 voip_push_token: None,
                 push_public_key: &KEY,
-                include_content: false,
+                include_content: Some(false),
+                include_content_chosen: true,
             },
         )
         .await

@@ -63,4 +63,5 @@ No number is used twice.
 | [0051](0051-who-reacted.md) | Who left a reaction is readable on request, never on the wire | accepted |
 | [0052](0052-version-reports-claimed.md) | /version says whether the deployment is claimed | accepted |
 | [0053](0053-custom-emoji-names-search-and-typed-shortcodes.md) | Custom emoji names, search, and what a typed shortcode does | accepted |
+| [0054](0054-push-preview-default-on.md) | Push previews are an account choice, on by default | accepted |
 | [0055](0055-member-nicknames.md) | An administrator can give a member or bot a space-local name | accepted |

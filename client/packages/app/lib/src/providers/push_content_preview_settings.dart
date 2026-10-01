@@ -1,65 +1,91 @@
 // SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
-/// Whether this device asks the server to seal a message preview inside its
-/// push envelope, so a notification can show who sent it and part of what it
-/// says rather than the relay's generic fallback string.
+/// Whether push envelopes carry a message preview, as the member sees and
+/// changes it.
 ///
-/// A pure local device preference with no server truth of its own, the same
-/// shape `notification_sound_settings.dart` already documents - except this
-/// one really is device-scoped rather than merely stored per device: the
-/// server's own `include_content` field (`http/push.rs`) is read per
-/// registration, so a personal phone and a shared tablet on the same account
-/// can answer differently, matching where `SharedPreferences` already lives.
+/// The truth is the account's choice on the server (`GET /push/preview`), so a
+/// reinstall or a new device shows the same answer without anyone toggling
+/// anything. The local `SharedPreferences` key holds only an explicit choice
+/// the server has not yet accepted; registration sends `include_content` only
+/// while one is pending, so a device that never toggled can never overwrite a
+/// choice made on another.
 library;
 
+import 'dart:async';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:slimm_api/api.dart';
 
 import 'providers.dart';
 
 const pushIncludeContentKey = 'slimm.notifications.push_include_content';
 
-class PushContentPreviewController extends StateNotifier<bool> {
-  PushContentPreviewController(this._ref) : super(false) {
-    _ready = _load();
+/// State is the effective value, or null while the server has not answered.
+class PushContentPreviewController extends StateNotifier<bool?> {
+  PushContentPreviewController(this._ref) : super(null) {
+    unawaited(refresh());
   }
 
   final Ref _ref;
+  bool _chosen = false;
 
-  /// Awaited by [currentValue] and [setEnabled] so neither ever reads or
-  /// writes the in-memory default ahead of the real, persisted value - a
-  /// registration racing app startup must not silently send `false` for a
-  /// device that actually has this turned on.
-  ///
-  /// Never throws: [currentValue] is on every registration's path, and a
-  /// device whose local storage briefly fails still deserves a real
-  /// registration rather than [PushController] reading it as a server error.
-  late final Future<void> _ready;
-
-  Future<void> _load() async {
+  /// Reads the account's effective value; a failure leaves it unknown rather
+  /// than guessing, and a pending explicit choice is shown meanwhile.
+  Future<void> refresh() async {
+    final pending = await pendingChoice();
+    if (pending != null && !_chosen) state = pending;
     try {
-      final prefs = await _ref.read(preferencesProvider.future);
-      state = prefs.getBool(pushIncludeContentKey) ?? false;
+      final served = await _ref.read(apiProvider).pushPreview();
+      if (!_chosen) state = served;
     } catch (_) {
-      // state already holds this class's own false default; see above.
+      // state keeps the pending choice, or stays unknown.
     }
   }
 
-  /// The persisted value, for a caller (registration) that needs the real
-  /// answer rather than whatever [state] happens to hold before [_load]
-  /// finishes.
-  Future<bool> currentValue() async {
-    await _ready;
-    return state;
+  /// The explicit choice the server has not confirmed yet, or null. Never
+  /// throws: it is on every registration's path, and a failed read is retried
+  /// by the next caller because the cached provider error is invalidated.
+  Future<bool?> pendingChoice() async {
+    try {
+      final prefs = await _ref.read(preferencesProvider.future);
+      return prefs.getBool(pushIncludeContentKey);
+    } catch (_) {
+      _ref.invalidate(preferencesProvider);
+      return null;
+    }
   }
 
+  /// Drops the pending choice once the server holds it.
+  Future<void> markSent() async {
+    try {
+      final prefs = await _ref.read(preferencesProvider.future);
+      await prefs.remove(pushIncludeContentKey);
+    } catch (_) {
+      _ref.invalidate(preferencesProvider);
+    }
+  }
+
+  /// Saves the member's explicit choice to the account. If the server cannot
+  /// be reached the choice is kept as pending and sent with the next
+  /// registration.
   Future<void> setEnabled(bool enabled) async {
-    await _ready;
+    _chosen = true;
     state = enabled;
-    final prefs = await _ref.read(preferencesProvider.future);
-    await prefs.setBool(pushIncludeContentKey, enabled);
+    try {
+      final prefs = await _ref.read(preferencesProvider.future);
+      await prefs.setBool(pushIncludeContentKey, enabled);
+    } catch (_) {
+      _ref.invalidate(preferencesProvider);
+    }
+    try {
+      await _ref.read(apiProvider).setPushPreview(enabled);
+      await markSent();
+    } catch (_) {
+      // Left pending on purpose; see above.
+    }
   }
 }
 
 final pushContentPreviewSettingsProvider =
-    StateNotifierProvider<PushContentPreviewController, bool>(
+    StateNotifierProvider<PushContentPreviewController, bool?>(
       (ref) => PushContentPreviewController(ref),
     );

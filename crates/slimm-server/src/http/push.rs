@@ -41,6 +41,7 @@ pub fn routes() -> Router<AppState> {
         .route("/push", put(register).delete(deregister))
         .route("/push/lifecycle", put(report_lifecycle))
         .route("/push/preference", get(get_preference).put(set_preference))
+        .route("/push/preview", get(get_preview).put(set_preview))
         .layer(DefaultBodyLimit::max(BODY_LIMIT))
 }
 
@@ -54,16 +55,22 @@ struct RegisterRequest {
     voip_push_token: Option<String>,
     /// The device's X25519 public key, base64-encoded (32 bytes decoded).
     push_public_key: String,
-    /// Whether this device wants a preview of the message sealed inside its
-    /// own envelope. Absent means no, so a client that predates this field
-    /// keeps getting exactly the content-free envelope it was built for.
-    ///
-    /// Device-scoped, unlike the account-wide notification preference below:
-    /// this decides what appears on one physical device's lock screen, so a
-    /// personal phone and a shared tablet on the same account can answer
-    /// differently. It never changes *whether* a device is woken, only what
-    /// its own envelope carries, and the relay can read neither answer.
+    /// The member's explicit choice about a preview sealed inside the
+    /// envelope, saved to the account. Absent means the client never asked,
+    /// so the account's own choice (or the server default) applies. It never
+    /// changes *whether* a device is woken, only what its own envelope
+    /// carries, and the relay can read neither answer.
     #[serde(default)]
+    include_content: Option<bool>,
+    /// Marks `include_content` as a deliberate toggle, so an explicit `false`
+    /// is saved. Without it a `false` is ignored, since a client that predates
+    /// this field sends `false` when the member never toggled.
+    #[serde(default)]
+    include_content_chosen: bool,
+}
+
+#[derive(Deserialize, Serialize)]
+struct PushPreviewDto {
     include_content: bool,
 }
 
@@ -119,6 +126,7 @@ async fn register(
                 voip_push_token,
                 push_public_key: &public_key,
                 include_content: req.include_content,
+                include_content_chosen: req.include_content_chosen,
             },
         )
         .await?;
@@ -208,6 +216,35 @@ async fn set_preference(
     Ok(Json(NotificationPreferenceDto {
         preference: preference.as_str().to_owned(),
     }))
+}
+
+async fn get_preview(
+    AuthedLimited(ctx): AuthedLimited<AUTHED_READ>,
+    State(state): State<AppState>,
+) -> Result<Json<PushPreviewDto>, ApiError> {
+    let include_content = state
+        .store
+        .push_preview(ctx.user_id)
+        .await?
+        .ok_or(ApiError::Unauthorized)?;
+    Ok(Json(PushPreviewDto { include_content }))
+}
+
+async fn set_preview(
+    Authed(ctx): Authed,
+    parts: Parts,
+    State(state): State<AppState>,
+    Json(req): Json<PushPreviewDto>,
+) -> Result<Json<PushPreviewDto>, ApiError> {
+    enforce(&state, &parts, Some(&ctx), Class::Write)?;
+    if !state
+        .store
+        .set_push_preview(ctx.user_id, req.include_content)
+        .await?
+    {
+        return Err(ApiError::Unauthorized);
+    }
+    Ok(Json(req))
 }
 
 // --- Validation ---

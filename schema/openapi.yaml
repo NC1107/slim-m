@@ -4648,6 +4648,46 @@ paths:
         "429":
           $ref: "#/components/responses/TooManyRequests"
 
+  /push/preview:
+    get:
+      operationId: getPushPreview
+      tags: [push]
+      summary: Read whether the caller's push envelopes carry a message preview.
+      description: >
+        Account-wide, so a reinstall or a new device shows the same answer.
+      responses:
+        "200":
+          description: The choice now in effect.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PushPreview"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
+    put:
+      operationId: setPushPreview
+      tags: [push]
+      summary: Choose whether push envelopes carry a message preview.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PushPreview"
+      responses:
+        "200":
+          description: The choice now in effect.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PushPreview"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
+
   /notification-preferences/channels:
     get:
       operationId: listChannelNotificationOverrides
@@ -12038,20 +12078,30 @@ components:
             device without one registered cannot receive push.
         include_content:
           type: boolean
-          default: false
           description: >
-            Whether this device wants a preview of the message (sender, channel
-            name, and a truncated body) sealed inside its own push envelope.
-            Absent means no, so a client predating this field keeps receiving
-            the content-free envelope it was built for.
+            The member's explicit choice about a preview (sender, channel name,
+            a truncated body) sealed inside the push envelope, saved to the
+            account. Absent means the client never asked, so the account's own
+            choice applies, else the server default. It never changes whether
+            a device is woken. The preview rides inside the sealed box, so the
+            relay and APNs and FCM cannot read it.
+        include_content_chosen:
+          type: boolean
+          description: >
+            Marks `include_content` as a deliberate toggle by the member. An
+            unmarked `false` is ignored, because a client that predates this
+            field sends `false` whenever the member never toggled; an unmarked
+            `true` is always saved. A marked value is always saved.
 
-
-            Device-scoped, unlike the account-wide notification preference: it
-            decides what can reach one physical device's lock screen, and never
-            whether that device is woken at all. The preview rides inside the
-            sealed box, so the relay and the APNs and FCM infrastructure it
-            forwards through cannot read it - that needs the device's own
-            private key, which never leaves the device.
+    PushPreview:
+      type: object
+      required: [include_content]
+      properties:
+        include_content:
+          type: boolean
+          description: >
+            Whether push envelopes carry a preview of the message. The
+            account's own choice, else the server default.
 
     ReportLifecycleRequest:
       type: object

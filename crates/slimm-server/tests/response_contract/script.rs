@@ -301,6 +301,15 @@ async fn push_calls(c: &mut Contract, root: &str, channel: &str, bob_id: &str) {
         json!({ "preference": "mentions" }),
     )
     .await;
+    c.get("getPushPreview", "/push/preview", root).await;
+    c.json(
+        "setPushPreview",
+        "PUT",
+        "/push/preview",
+        root,
+        json!({ "include_content": false }),
+    )
+    .await;
     c.json(
         "registerPush",
         "PUT",

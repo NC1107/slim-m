@@ -11,6 +11,7 @@
 
 use super::{Store, now_ms};
 use crate::ids::{DeviceId, UserId};
+use crate::notifications::DEFAULT_PUSH_PREVIEW;
 
 /// Why a push-registration write did not happen.
 #[derive(Debug)]
@@ -64,12 +65,16 @@ pub struct PushRegistration<'a> {
     pub voip_push_token: Option<&'a str>,
     /// The device's X25519 public key, 32 bytes.
     pub push_public_key: &'a [u8],
-    /// The device's own answer to whether the sealed envelope should carry a
-    /// preview of the message. Re-stated on every registration rather than
-    /// living behind a separate route, so a device can never end up with a
-    /// stale answer it did not mean: the registration it sends is the whole of
-    /// what it is asking for.
-    pub include_content: bool,
+    /// The member's explicit choice about a sealed preview, saved to the
+    /// account. `None` means the client never asked, so the account's own
+    /// choice (or `DEFAULT_PUSH_PREVIEW`) applies; a registration can never
+    /// reset a choice it did not make.
+    pub include_content: Option<bool>,
+    /// Set by a client that marks `include_content` as a deliberate toggle.
+    /// An unmarked `false` is ignored, because a client that predates the
+    /// marker sends `false` whenever the member never toggled; an unmarked
+    /// `true` can only be a real opt-in and is always saved.
+    pub include_content_chosen: bool,
 }
 
 impl Store {
@@ -104,8 +109,24 @@ impl Store {
             voip_push_token,
             push_public_key,
             include_content,
+            include_content_chosen,
         } = registration;
         let mut tx = self.begin_write().await?;
+
+        if let Some(choice) = include_content.filter(|&on| on || include_content_chosen) {
+            sqlx::query("UPDATE users SET push_include_content = ? WHERE id = ?")
+                .bind(choice)
+                .bind(user_id)
+                .execute(&mut *tx)
+                .await?;
+        }
+        let stored: Option<i64> =
+            sqlx::query_scalar("SELECT push_include_content FROM users WHERE id = ?")
+                .bind(user_id)
+                .fetch_optional(&mut *tx)
+                .await?
+                .flatten();
+        let include_content = stored.map_or(DEFAULT_PUSH_PREVIEW, |v| v != 0);
 
         sqlx::query!(
             "UPDATE devices
@@ -141,6 +162,39 @@ impl Store {
         }
         tx.commit().await?;
         Ok(())
+    }
+
+    /// Whether the account's push envelopes carry a preview: the member's
+    /// choice, else `DEFAULT_PUSH_PREVIEW`. `None` if the account is gone.
+    pub async fn push_preview(&self, user_id: UserId) -> anyhow::Result<Option<bool>> {
+        let row: Option<Option<i64>> = sqlx::query_scalar(
+            "SELECT push_include_content FROM users WHERE id = ? AND deleted_at IS NULL",
+        )
+        .bind(user_id)
+        .fetch_optional(&self.pool)
+        .await?;
+        Ok(row.map(|choice| choice.map_or(DEFAULT_PUSH_PREVIEW, |v| v != 0)))
+    }
+
+    /// Saves the member's explicit choice and re-syncs every device row of the
+    /// account. Returns `false` if the account is gone.
+    pub async fn set_push_preview(&self, user_id: UserId, enabled: bool) -> anyhow::Result<bool> {
+        let mut tx = self.begin_write().await?;
+        let affected = sqlx::query(
+            "UPDATE users SET push_include_content = ? WHERE id = ? AND deleted_at IS NULL",
+        )
+        .bind(enabled)
+        .bind(user_id)
+        .execute(&mut *tx)
+        .await?
+        .rows_affected();
+        sqlx::query("UPDATE devices SET push_include_content = ? WHERE user_id = ?")
+            .bind(enabled)
+            .bind(user_id)
+            .execute(&mut *tx)
+            .await?;
+        tx.commit().await?;
+        Ok(affected > 0)
     }
 
     /// Clears a device's own push registration (the client opting out).
@@ -217,7 +271,12 @@ impl Store {
         let mut builder = sqlx::QueryBuilder::new(
             "SELECT id, user_id, platform, push_token_ref, voip_push_token_ref, \
                     push_public_key, lifecycle_state, lifecycle_reported_at, \
-                    push_include_content \
+                    COALESCE((SELECT u.push_include_content FROM users u \
+                               WHERE u.id = devices.user_id), ",
+        );
+        builder.push_bind(DEFAULT_PUSH_PREVIEW);
+        builder.push(
+            ") AS push_include_content \
              FROM devices \
              WHERE push_token_ref IS NOT NULL \
                AND push_public_key IS NOT NULL AND platform IS NOT NULL \

@@ -174,6 +174,7 @@ async fn register_push(
                 "push_token": push_token,
                 "push_public_key": BASE64.encode(public.as_bytes()),
                 "include_content": include_content,
+                "include_content_chosen": true,
             })),
         ))
         .await

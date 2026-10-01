@@ -43,6 +43,8 @@ pub(crate) async fn register_device(
                 "push_token": push_token,
                 "voip_push_token": voip_push_token,
                 "push_public_key": BASE64.encode(secret.public_key().as_bytes()),
+                "include_content": false,
+                "include_content_chosen": true,
             })),
         ))
         .await
