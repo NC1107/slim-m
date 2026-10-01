@@ -4,10 +4,8 @@
 ///
 /// The owner, from the real iOS app on 2026-09-30: "I'm less convinced the
 /// bottom bar connected ui is truly connected". He was right, and it was not a
-/// misreading. `presenceDisplayOf(null)` returned the literal word `connected`
-/// with a green online dot, and null is every launch until someone picks a
-/// status, because there is no endpoint to read the choice back
-/// (`presenceVisibilityDisplayProvider`). So the footer said "connected" with
+/// misreading. The footer returned the literal word `connected` with a green
+/// online dot whenever no status had been picked, so it said "connected" with
 /// the socket down, beside a header dot correctly reading offline.
 ///
 /// The footer's line is a presence line now and says nothing about the socket,
@@ -29,7 +27,6 @@ import 'package:slimm_app/src/providers/presence_controller.dart';
 import 'package:slimm_app/src/providers/sync_controller.dart';
 import 'package:slimm_app/src/providers/sync_failure.dart';
 import 'package:slimm_app/src/widgets/channel_rail_frame.dart';
-import 'package:slimm_app/src/widgets/presence_menu.dart';
 import 'package:slimm_design_system/design_system.dart';
 import 'package:slimm_platform/platform.dart';
 
@@ -103,44 +100,10 @@ Future<void> _pumpFooter(
   await tester.pumpAndSettle();
 }
 
-/// Every second line the footer can render, which is the presence vocabulary
-/// plus the one word for a choice this client cannot read back.
-const _footerWords = [
-  'online',
-  'away',
-  'do not disturb',
-  'appear offline',
-  unknownPresenceLabel,
-];
+/// Every second line the footer can render: the presence vocabulary.
+final _footerWords = [for (final state in AppPresence.values) ?state.word];
 
 void main() {
-  test('every visibility gets the member pane\'s own word, and no visibility '
-      'gets one about the connection', () {
-    expect(presenceDisplayOf(api.PresenceVisibility.online), (
-      'online',
-      AppPresence.online,
-    ));
-    expect(presenceDisplayOf(api.PresenceVisibility.away), (
-      'away',
-      AppPresence.away,
-    ));
-    expect(presenceDisplayOf(api.PresenceVisibility.dnd), (
-      'do not disturb',
-      AppPresence.dnd,
-    ));
-    expect(presenceDisplayOf(api.PresenceVisibility.hidden), (
-      'appear offline',
-      AppPresence.hidden,
-    ));
-    expect(
-      presenceDisplayOf(null),
-      (unknownPresenceLabel, AppPresence.offline),
-      reason:
-          'null is every launch: it must claim neither a visibility it cannot '
-          'read back nor a connection it does not own',
-    );
-  });
-
   test('nothing the footer can say is something the connection indicator '
       'can say', () {
     final connectionWords = {
@@ -157,11 +120,6 @@ void main() {
             'question, which is how "connected" ended up in the footer',
       );
     }
-    expect(
-      connectionWords,
-      isNot(contains(unknownPresenceLabel)),
-      reason: 'the unknown case is about a preference, never about the socket',
-    );
   });
 
   test('a refused session never reads as a connection worth waiting out', () {
@@ -187,7 +145,7 @@ void main() {
     addTearDown(container.dispose);
     await _pumpFooter(tester, container);
 
-    expect(find.text(unknownPresenceLabel), findsOneWidget);
+    expect(find.text('online'), findsOneWidget);
     for (final status in SyncStatus.values) {
       for (final failure in [null, ...SyncFailure.values]) {
         expect(
@@ -197,15 +155,6 @@ void main() {
         );
       }
     }
-    expect(
-      tester
-          .widget<PresenceMenuButton>(find.byType(PresenceMenuButton))
-          .presence,
-      isNot(AppPresence.online),
-      reason:
-          'the green online dot was as unearned as the word beside it, and it '
-          'would out someone who chose appear-offline on another device',
-    );
   });
 
   testWidgets('the footer line does not move when the socket does, so it '

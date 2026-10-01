@@ -74,7 +74,6 @@ Future<void> showMemberProfile(
   BuildContext anchor,
   WidgetRef ref, {
   required api.UserProfile profile,
-  required AppPresence status,
   String? mentionChannelName,
   String? callChannelName,
   bool initiallyModerating = false,
@@ -99,7 +98,6 @@ Future<void> showMemberProfile(
         top: false,
         child: MemberProfileBody(
           profile: profile,
-          status: status,
           mentionChannelName: mentionChannelName,
           callChannelName: callChannelName,
           compact: true,
@@ -131,7 +129,6 @@ Future<void> showMemberProfile(
       anchorSize: anchorSize,
       child: MemberProfileBody(
         profile: profile,
-        status: status,
         mentionChannelName: mentionChannelName,
         callChannelName: callChannelName,
         compact: false,
@@ -168,7 +165,6 @@ class MemberProfileBody extends ConsumerStatefulWidget {
   const MemberProfileBody({
     super.key,
     required this.profile,
-    required this.status,
     required this.compact,
     required this.onDone,
     this.mentionChannelName,
@@ -180,7 +176,6 @@ class MemberProfileBody extends ConsumerStatefulWidget {
   });
 
   final api.UserProfile profile;
-  final AppPresence status;
 
   /// Opens straight onto [MemberModerateView] rather than the profile - a
   /// quick-actions menu's own "Moderate..." row uses this so tapping it does
@@ -311,7 +306,6 @@ class _MemberProfileBodyState extends ConsumerState<MemberProfileBody>
     final profileRows = <Widget>[
       MemberProfileHeader(
         profile: profile,
-        status: widget.status,
         isSelf: isSelf,
         inCallTogether: inCallTogether,
         callChannelName: widget.callChannelName,

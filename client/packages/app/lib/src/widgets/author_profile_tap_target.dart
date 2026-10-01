@@ -10,15 +10,13 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:slimm_design_system/design_system.dart';
 
-import '../providers/member_presence.dart' show presenceOf;
-import '../providers/presence_controller.dart';
 import '../providers/user_profiles.dart';
 import 'member_profile.dart';
 
 /// Wraps [child] so a tap (or its own accessible action) opens [authorId]'s
 /// profile - the exact popover [showMemberProfile] already opens from the
 /// member pane - reusing [userProfileProvider], the same resolver
-/// `AuthorAvatar` already uses for its own avatar cache key.
+/// `UserAvatar` already uses for its own avatar cache key.
 ///
 /// Absent entirely while there is nothing to open: a null [authorId] (an
 /// anonymised author) or a profile that has not resolved yet skip the wrap
@@ -78,14 +76,7 @@ class _AuthorProfileTapTargetState
 
     final tokens = Theme.of(context).extension<AppTokens>()!;
 
-    void open() => unawaited(
-      showMemberProfile(
-        context,
-        ref,
-        profile: profile,
-        status: presenceOf(ref.read(presenceControllerProvider)[id]),
-      ),
-    );
+    void open() => unawaited(showMemberProfile(context, ref, profile: profile));
 
     return Semantics(
       button: true,

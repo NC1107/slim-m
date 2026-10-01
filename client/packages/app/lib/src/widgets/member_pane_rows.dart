@@ -18,7 +18,8 @@ import 'package:slimm_design_system/design_system.dart';
 import '../providers/member_presence.dart';
 import '../providers/member_selection.dart';
 import '../providers/presence_activity.dart';
-import '../providers/presence_controller.dart';
+import '../providers/presence_view.dart';
+import '../providers/status_text.dart';
 import 'member_profile.dart';
 import 'user_avatar.dart';
 
@@ -64,20 +65,6 @@ class MemberGroupLabel extends StatelessWidget {
   }
 }
 
-/// How a presence state is spoken, since on screen it is only a dot's colour
-/// and silhouette.
-///
-/// Hidden is deliberately absent: it renders for the one person appearing
-/// offline, and naming it aloud beside their own name tells them nothing they
-/// did not choose.
-String? _presenceDescription(AppPresence status) => switch (status) {
-  AppPresence.online => 'online',
-  AppPresence.away => 'away',
-  AppPresence.dnd => 'do not disturb',
-  AppPresence.offline => 'offline',
-  AppPresence.hidden => null,
-};
-
 /// A row is muted (dimmed, per [AppListRow.muted]) only once fully offline;
 /// away and do-not-disturb still read as present, matching the grouping
 /// rule the pane applies.
@@ -116,9 +103,7 @@ class MemberRow extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     debugMemberRowBuildCounts[profile.id] =
         (debugMemberRowBuildCounts[profile.id] ?? 0) + 1;
-    final status = presenceOf(
-      ref.watch(presenceControllerProvider.select((m) => m[profile.id])),
-    );
+    final status = ref.watch(presenceForProvider(profile.id));
     // The roster snapshot, patched by memberProfileOverridesProvider if a live edit has since landed.
     final displayed =
         ref.watch(
@@ -126,6 +111,9 @@ class MemberRow extends ConsumerWidget {
         ) ??
         profile;
     final activity = ref.watch(memberActivityProvider(profile.id));
+    final statusText = ref.watch(
+      statusTextProvider((userId: profile.id, snapshot: profile.statusText)),
+    );
     // One slot only in a 236px pane; bot beats a role, whose names are a tap away.
     final badge = displayed.isBot
         ? 'Bot'
@@ -142,13 +130,7 @@ class MemberRow extends ConsumerWidget {
     final selectable = selecting && !isSelf;
 
     void open() => unawaited(
-      showMemberProfile(
-        context,
-        ref,
-        profile: displayed,
-        status: status,
-        channelId: channelId,
-      ),
+      showMemberProfile(context, ref, profile: displayed, channelId: channelId),
     );
     void toggle() =>
         ref.read(memberSelectionProvider.notifier).toggle(profile.id);
@@ -161,17 +143,15 @@ class MemberRow extends ConsumerWidget {
         : null;
 
     final row = AppListRow(
-      // Taller than a channel row: a 26px avatar's corner status dot crops at the default height.
+      // Taller than a channel row: a 28px avatar's corner status dot crops at the default height.
       height: 36,
       label: displayed.displayName,
-      // What they are playing wins over a typed status; the card shows both.
-      subtitle: activity == null
-          ? displayed.statusText
-          : describeActivity(activity),
+      // What they are playing wins over a typed status; the card shows the activity.
+      subtitle: personLine(activity, statusText),
       subtitleIcon: activity == null ? null : activityIcon(activity.kind),
       muted: status == AppPresence.offline,
       // On screen presence is only a dot and an opacity; this is how it is spoken.
-      stateDescription: _presenceDescription(status),
+      stateDescription: status.word,
       trailing: badge == null
           ? null
           : AppBadge(
@@ -180,12 +160,12 @@ class MemberRow extends ConsumerWidget {
                   : AppBadgeVariant.role,
               label: badge,
             ),
-      leading: UserAvatar(
+      leading: UserAvatar.known(
         userId: profile.id,
         avatarUpdatedAt: displayed.avatarUpdatedAt,
         name: displayed.displayName,
-        size: 26,
-        status: status,
+        size: AppAvatarSize.s28,
+        presence: true,
       ),
       selected: selected,
       // Opens the profile, which is where every verb about a member lives now.

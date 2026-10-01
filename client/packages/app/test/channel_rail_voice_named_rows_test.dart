@@ -95,7 +95,7 @@ void main() {
     await tester.pump();
 
     expect(find.text('Priya'), findsOneWidget);
-    expect(find.byType(AuthorAvatar), findsNWidgets(2));
+    expect(find.byType(UserAvatar), findsNWidgets(2));
   });
 
   testWidgets(
@@ -157,7 +157,7 @@ void main() {
       );
       await tester.pump();
 
-      expect(find.byType(AuthorAvatar), findsNWidgets(8));
+      expect(find.byType(UserAvatar), findsNWidgets(8));
       expect(find.text('+2 more'), findsOneWidget);
     },
   );

@@ -200,10 +200,10 @@ class ThreadRow extends ConsumerWidget {
           router.push(Routes.thread(thread.id));
         }
       },
-      leading: AuthorAvatar(
+      leading: UserAvatar(
         userId: thread.parentAuthorId,
         name: name,
-        size: AppSizes.icon28,
+        size: AppAvatarSize.s28,
       ),
       title: AuthorNameLine(
         name: name,

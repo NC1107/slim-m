@@ -146,7 +146,7 @@ Widget _strip(AppTokens tokens) {
           mainAxisSize: MainAxisSize.min,
           spacing: AppSpacing.s16,
           children: [
-            for (final status in AppPresence.values)
+            for (final status in AppStatusDot.shapeOf.keys)
               AppStatusDot(status: status, size: _dotSize),
           ],
         ),
@@ -163,7 +163,7 @@ void main() {
         (tester) async {
       final area = (_dotSize * _dotSize).toInt();
       final masks = <AppPresence, List<bool>>{};
-      for (final status in AppPresence.values) {
+      for (final status in AppStatusDot.shapeOf.keys) {
         masks[status] = await _silhouette(tester, status, brightness, tokens);
       }
 
@@ -184,7 +184,7 @@ void main() {
         );
       }
 
-      final states = AppPresence.values;
+      final states = AppStatusDot.shapeOf.keys.toList();
       for (var i = 0; i < states.length; i++) {
         for (var j = i + 1; j < states.length; j++) {
           final difference = _differing(masks[states[i]]!, masks[states[j]]!);

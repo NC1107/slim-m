@@ -120,7 +120,7 @@ Future<void> _pump(WidgetTester tester, ProviderContainer container) async {
               const SizedBox(
                 width: 44,
                 height: 44,
-                child: PresenceMenuButton(presence: AppPresence.online),
+                child: PresenceMenuButton(),
               ),
               const Expanded(child: AppMemberPane(channelId: 'c1')),
             ],

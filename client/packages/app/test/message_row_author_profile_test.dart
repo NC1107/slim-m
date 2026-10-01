@@ -84,7 +84,7 @@ void main() {
     await tester.pumpWidget(harness(_row(), overrides: _resolvedProfile()));
     await tester.pumpAndSettle();
 
-    await tester.tap(find.byType(AuthorAvatar));
+    await tester.tap(find.byType(UserAvatar));
     await tester.pumpAndSettle();
 
     expect(find.text('Message'), findsOneWidget);
@@ -109,7 +109,7 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      expect(find.byType(AuthorAvatar), findsNothing);
+      expect(find.byType(UserAvatar), findsNothing);
       expect(find.byType(AuthorProfileTapTarget), findsNothing);
     },
   );

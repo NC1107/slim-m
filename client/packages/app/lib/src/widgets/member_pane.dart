@@ -4,9 +4,9 @@
 /// Presence is real now: `presenceSeedProvider` (in `member_presence.dart`,
 /// where the roster and presence data this pane renders all live now)
 /// batch-fetches status for the resolved member list and
-/// [presenceControllerProvider] keeps it current from live
-/// `presence.changed` events, so the roster grouping gets a real
-/// status map instead of an empty one.
+/// the presence controller keeps it current from live `presence.changed`
+/// events, so the roster grouping gets a real status map instead of an empty
+/// one.
 ///
 /// A member's first role becomes a badge. `@everyone` is excluded server-side,
 /// so an empty list means no badge rather than no data. There is still no
@@ -24,12 +24,11 @@
 /// never this list; `home_shell.dart`'s `_MemberPaneSlot` and
 /// `channel_header.dart`'s `ChannelHeader.isDm` are what withhold it there.
 ///
-/// This pane watches presence only through `reachablePresenceKey`, a
-/// selector over the reachable id set rather than the raw map, so a member's
-/// dot changing colour within the same Online/Offline section never
-/// rebuilds the pane; only someone crossing sections does. Each `MemberRow`
-/// separately watches its own id for the dot itself, which is what actually
-/// keeps a single dot change from rebuilding every row.
+/// This pane watches presence only through `rosterEntriesProvider`, which
+/// regroups when someone crosses between sections and not when a dot changes
+/// colour within one. Each `MemberRow` separately watches its own id for the
+/// dot itself, which is what keeps a single dot change from rebuilding every
+/// row.
 library;
 
 import 'dart:async';
@@ -44,7 +43,6 @@ import '../providers/admin_providers.dart';
 import '../providers/member_moderation_error.dart';
 import '../providers/member_presence.dart';
 import '../providers/member_selection.dart';
-import '../providers/presence_controller.dart';
 import '../providers/providers.dart';
 import '../providers/roster_grouping.dart';
 import 'member_bulk_actions.dart';
@@ -78,12 +76,10 @@ class AppMemberPane extends ConsumerWidget {
     final membersAsync = channelId == null
         ? ref.watch(membersProvider)
         : ref.watch(channelMembersProvider(channelId));
-    // Purely to start the seed fetch; statuses come back through presenceControllerProvider below.
+    // Purely to start the seed fetch; statuses reach each row through presenceForProvider.
     ref.watch(presenceSeedProvider(channelId));
     // Purely a side-effect subscription: a join, a timeout or a moderation event makes a row on screen wrong.
     ref.watch(memberModerationWatcherProvider);
-    // Scoped watch: see the class doc comment above for why.
-    ref.watch(presenceControllerProvider.select(reachablePresenceKey));
     final myId = ref.watch(meProvider).valueOrNull?.id;
     final mine = ref.watch(myPermissionsProvider);
     final canTimeOut = mine.hasPermission(Perm.kickMembers);

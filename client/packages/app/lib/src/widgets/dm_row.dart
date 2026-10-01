@@ -21,10 +21,10 @@
 /// account. It reverses itself once the other person sends something new, or
 /// the moment this device opens or messages them again.
 ///
-/// The avatar carries the peer's live presence dot now, the same
-/// [AppAvatar.status] overlay `MemberRow` already draws; `DirectMessagesSection`
-/// seeds it from the deployment-wide roster, since one deployment is one
-/// community and every DM peer is already a member of it.
+/// The avatar carries the peer's presence dot, the same [UserAvatar] dot
+/// `MemberRow` draws; `DirectMessagesSection` seeds it from the
+/// deployment-wide roster, since one deployment is one community and every
+/// DM peer is already a member of it. A peer not yet reported draws none.
 library;
 
 import 'dart:async';
@@ -41,9 +41,7 @@ import '../providers/channel_notification_overrides_controller.dart';
 import '../providers/dm_call_activity.dart';
 import 'mark_unread_action.dart';
 import '../providers/dms.dart';
-import '../providers/member_presence.dart' show presenceOf;
 import '../providers/notification_schedule_controller.dart';
-import '../providers/presence_controller.dart';
 import '../providers/providers.dart' show apiProvider;
 import '../providers/unread_indicator_rules.dart';
 import '../routing/routes.dart';
@@ -211,13 +209,6 @@ class DmRow extends ConsumerWidget {
       mentioned: channel.mentionedSeq > channel.lastReadSeq,
       manuallyUnread: channel.manuallyUnread ?? false,
     );
-    // Seeded by DirectMessagesSection from the deployment-wide roster; absent here, this stays offline until that seed or a live event lands.
-    final peerId = channel.dmParticipantId;
-    final presence = peerId == null
-        ? null
-        : presenceOf(
-            ref.watch(presenceControllerProvider.select((m) => m[peerId])),
-          );
     return ContextMenuRegion(
       itemsBuilder: (menuContext, close) => _menuItems(menuContext, ref, close),
       // AppListRow is already its own tab stop; see ContextMenuFocus.ownsFocusNode.
@@ -228,11 +219,11 @@ class DmRow extends ConsumerWidget {
         unread: indicator.unread,
         mentioned: indicator.mentioned,
         muted: muted,
-        leading: AuthorAvatar(
+        leading: UserAvatar(
           name: channel.name,
           userId: channel.dmParticipantId,
-          size: 20,
-          status: presence,
+          size: AppAvatarSize.s24,
+          presence: true,
         ),
         trailing: inCall
             ? Icon(

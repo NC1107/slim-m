@@ -7,6 +7,7 @@ import 'package:slimm_api/api.dart' as api;
 
 import 'member_presence.dart';
 import 'presence_controller.dart';
+import 'presence_view.dart';
 
 /// Online people who can view [channelId], bots excluded, sorted by name.
 ///
@@ -17,10 +18,12 @@ final callCouldJoinProvider = Provider.autoDispose
       ref.watch(presenceSeedProvider(channelId));
       final members = ref.watch(channelMembersProvider(channelId));
       ref.watch(presenceControllerProvider.select(reachablePresenceKey));
-      final presence = ref.read(presenceControllerProvider);
+      ref.watch(presenceVisibilityDisplayProvider);
+      final roster = members.valueOrNull ?? const <api.UserProfile>[];
+      final presence = presenceOfAll(ref, roster.map((m) => m.id));
       return [
-        for (final m in members.valueOrNull ?? const <api.UserProfile>[])
-          if (!m.isBot && isReachablePresence(presenceOf(presence[m.id]))) m,
+        for (final m in roster)
+          if (!m.isBot && isReachablePresence(presence[m.id]!)) m,
       ]..sort(
         (a, b) =>
             a.displayName.toLowerCase().compareTo(b.displayName.toLowerCase()),

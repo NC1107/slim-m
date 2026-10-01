@@ -184,10 +184,10 @@ class _SavedMessageRowState extends ConsumerState<SavedMessageRow>
               messageId: message.id,
             );
           },
-          leading: AuthorAvatar(
+          leading: UserAvatar(
             userId: message.authorId,
             name: name,
-            size: AppSizes.icon28,
+            size: AppAvatarSize.s28,
           ),
           title: AuthorNameLine(
             name: name,

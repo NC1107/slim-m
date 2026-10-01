@@ -82,7 +82,7 @@ Widget _harness(Widget child) => ProviderScope(
   ),
 );
 
-/// [VoiceChannelRow] renders an [AuthorAvatar] per participant, which does
+/// [VoiceChannelRow] renders an [UserAvatar] per participant, which does
 /// read providers (a profile lookup, an avatar-bytes cache), so the voice
 /// test below needs a real session and API client the way
 /// `channel_rail_voice_roster_test.dart` already does for the same widget.
@@ -237,7 +237,7 @@ void main() {
             'against the combined row-plus-strip height below it',
       );
       expect(
-        find.byType(AuthorAvatar),
+        find.byType(UserAvatar),
         findsOneWidget,
         reason: 'the participant strip must still render beneath the row',
       );

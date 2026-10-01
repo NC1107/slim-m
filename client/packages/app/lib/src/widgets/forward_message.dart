@@ -283,11 +283,11 @@ class _ForwardTargetSheetState extends ConsumerState<_ForwardTargetSheet>
         return AppListRow(
           // A DM is a person; one generic glyph made them all look alike.
           leading: target.isDm && target.userId != null
-              ? UserAvatar(
+              ? UserAvatar.known(
                   userId: target.userId!,
                   avatarUpdatedAt: target.avatarUpdatedAt,
                   name: target.label,
-                  size: 24,
+                  size: AppAvatarSize.s24,
                 )
               : Icon(target.isDm ? AppIcons.account : AppIcons.hash),
           label: target.label,

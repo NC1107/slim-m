@@ -24,10 +24,12 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:slimm_api/api.dart' as api;
+import 'package:slimm_design_system/design_system.dart' show AppPresence;
 import 'package:slimm_rtc/rtc.dart';
 import 'package:tray_manager/tray_manager.dart';
 
 import '../../providers/presence_controller.dart';
+import '../../providers/presence_view.dart';
 import '../../providers/providers.dart';
 import '../../providers/voice_controller.dart';
 import '../../providers/voice_flags.dart';
@@ -47,7 +49,7 @@ class DesktopTrayController with TrayListener {
   final ProviderContainer container;
 
   ProviderSubscription<(VoiceSessionState, bool, bool)>? _voiceSubscription;
-  ProviderSubscription<api.PresenceVisibility?>? _presenceSubscription;
+  ProviderSubscription<AppPresence>? _presenceSubscription;
 
   Future<void> start() async {
     TrayManager.instance.addListener(this);
@@ -61,13 +63,13 @@ class DesktopTrayController with TrayListener {
       ),
       (previous, next) => _rebuildMenu(),
     );
-    _presenceSubscription = container.listen<api.PresenceVisibility?>(
-      presenceVisibilityDisplayProvider,
-      (previous, next) {
-        if (previous == next) return;
-        _rebuildMenu();
-      },
-    );
+    _presenceSubscription = container.listen<AppPresence>(ownPresenceProvider, (
+      previous,
+      next,
+    ) {
+      if (previous == next) return;
+      _rebuildMenu();
+    });
   }
 
   void dispose() {
@@ -120,7 +122,7 @@ class DesktopTrayController with TrayListener {
   Future<void> _setContextMenu() async {
     final voiceFlags = container.read(voiceFlagsProvider);
     final inCall = voiceFlags.state == VoiceSessionState.connected;
-    final selected = container.read(presenceVisibilityDisplayProvider);
+    final selected = container.read(ownPresenceProvider);
     final items = trayMenuActions(inCall: inCall)
         .map((kind) => _itemFor(kind, voiceFlags, selected))
         .toList(growable: false);
@@ -130,7 +132,7 @@ class DesktopTrayController with TrayListener {
   MenuItem _itemFor(
     TrayMenuActionKind kind,
     VoiceFlags voiceState,
-    api.PresenceVisibility? selected,
+    AppPresence selected,
   ) => switch (kind) {
     TrayMenuActionKind.showHide => MenuItem(
       label: 'Show/Hide slim-m',
@@ -140,10 +142,10 @@ class DesktopTrayController with TrayListener {
       label: 'Status',
       submenu: Menu(
         items: [
-          for (final (visibility, label, _) in presenceOptions)
+          for (final (visibility, label, presence) in presenceOptions)
             MenuItem.checkbox(
               label: label,
-              checked: visibility == selected,
+              checked: presence == selected,
               onClick: (_) => _setPresence(visibility),
             ),
         ],

@@ -52,12 +52,8 @@ Widget _harness(Widget child, {Set<String> blocked = const {}}) =>
       ),
     );
 
-Widget _body(api.UserProfile profile) => MemberProfileBody(
-  profile: profile,
-  status: AppPresence.online,
-  compact: false,
-  onDone: () {},
-);
+Widget _body(api.UserProfile profile) =>
+    MemberProfileBody(profile: profile, compact: false, onDone: () {});
 
 void main() {
   setUpAll(loadRealFonts);

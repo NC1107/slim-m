@@ -71,12 +71,8 @@ class _FixedBlocks extends BlocksController {
   Future<void> refresh() async {}
 }
 
-Widget _body(api.UserProfile profile) => MemberProfileBody(
-  profile: profile,
-  status: AppPresence.online,
-  compact: false,
-  onDone: () {},
-);
+Widget _body(api.UserProfile profile) =>
+    MemberProfileBody(profile: profile, compact: false, onDone: () {});
 
 Widget _harness(
   Widget child, {

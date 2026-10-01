@@ -25,8 +25,7 @@ import 'package:go_router/go_router.dart';
 import '../providers/bot_ui_uses.dart';
 import '../providers/call_recap.dart';
 import '../providers/last_text_channel.dart';
-import '../providers/member_presence.dart' show membersProvider, presenceOf;
-import '../providers/presence_controller.dart';
+import '../providers/member_presence.dart' show membersProvider;
 import '../providers/voice_controller.dart';
 import '../providers/voice_flags.dart';
 import '../routing/breakpoints.dart';
@@ -363,10 +362,5 @@ void _openProfile(
       .firstOrNull;
   if (profile == null) return;
 
-  showMemberProfile(
-    context,
-    ref,
-    profile: profile,
-    status: presenceOf(ref.read(presenceControllerProvider)[profile.id]),
-  );
+  showMemberProfile(context, ref, profile: profile);
 }

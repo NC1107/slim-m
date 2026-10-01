@@ -17,16 +17,16 @@ void main() {
   group('AppStatusDot', () {
     test('every state maps to its own shape', () {
       final shapes =
-          AppPresence.values.map((s) => AppStatusDot.shapeOf[s]).toSet();
+          AppStatusDot.shapeOf.keys.map((s) => AppStatusDot.shapeOf[s]).toSet();
       expect(
         shapes.length,
-        AppPresence.values.length,
+        AppStatusDot.shapeOf.length,
         reason: 'colour alone must never carry presence; two states sharing a '
             'shape would collapse under greyscale',
       );
     });
 
-    for (final status in AppPresence.values) {
+    for (final status in AppStatusDot.shapeOf.keys) {
       testWidgets('$status renders the shape it is mapped to', (tester) async {
         await _pump(tester, AppStatusDot(status: status));
 
@@ -41,6 +41,20 @@ void main() {
         expect(painter.shape, AppStatusDot.shapeOf[status]);
       });
     }
+
+    testWidgets('unknown draws nothing and names nothing', (tester) async {
+      await _pump(tester, const AppStatusDot(status: AppPresence.unknown));
+
+      expect(AppStatusDot.shapeOf.containsKey(AppPresence.unknown), isFalse);
+      expect(
+        find.descendant(
+          of: find.byType(AppStatusDot),
+          matching: find.byType(CustomPaint),
+        ),
+        findsNothing,
+      );
+      expect(AppPresence.unknown.word, isNull);
+    });
 
     testWidgets('hidden reuses the offline colour, distinguished only by shape',
         (tester) async {

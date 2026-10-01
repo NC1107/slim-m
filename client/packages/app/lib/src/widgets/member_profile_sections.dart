@@ -10,25 +10,25 @@
 library;
 
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:slimm_api/api.dart' as api;
 import 'package:slimm_design_system/design_system.dart';
 
+import '../providers/presence_view.dart';
 import 'user_avatar.dart';
 
 /// Avatar, name, role badge, and the presence word beside its dot - never the
 /// dot alone, which is the rule every surface in this app follows.
-class MemberProfileHeader extends StatelessWidget {
+class MemberProfileHeader extends ConsumerWidget {
   const MemberProfileHeader({
     super.key,
     required this.profile,
-    required this.status,
     required this.isSelf,
     required this.inCallTogether,
     this.callChannelName,
   });
 
   final api.UserProfile profile;
-  final AppPresence status;
   final bool isSelf;
   final bool inCallTogether;
 
@@ -39,8 +39,9 @@ class MemberProfileHeader extends StatelessWidget {
   final String? callChannelName;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final tokens = Theme.of(context).extension<AppTokens>()!;
+    final word = ref.watch(presenceForProvider(profile.id)).word;
     final timedOut = profile.timedOutUntil != null;
 
     final handleLine = Text(
@@ -67,20 +68,10 @@ class MemberProfileHeader extends StatelessWidget {
               ),
             ],
           )
-        : Row(
-            children: [
-              AppStatusDot(status: status),
-              const SizedBox(width: AppSpacing.s8),
-              Flexible(
-                child: Text(
-                  isSelf
-                      ? '${presenceWord(status)} - you'
-                      : presenceWord(status),
-                  overflow: TextOverflow.ellipsis,
-                  style: AppText.caption.copyWith(color: tokens.textSecondary),
-                ),
-              ),
-            ],
+        : Text(
+            isSelf ? [?word, 'you'].join(' - ') : word ?? '',
+            overflow: TextOverflow.ellipsis,
+            style: AppText.caption.copyWith(color: tokens.textSecondary),
           );
 
     return Padding(
@@ -90,11 +81,12 @@ class MemberProfileHeader extends StatelessWidget {
           // The avatar only, never the text, which would cost its contrast.
           Opacity(
             opacity: timedOut ? 0.7 : 1,
-            child: UserAvatar(
+            child: UserAvatar.known(
               userId: profile.id,
               avatarUpdatedAt: profile.avatarUpdatedAt,
               name: profile.displayName,
-              size: 44,
+              size: AppAvatarSize.s44,
+              presence: true,
               // The ring here means "in a call with you", so the name says that.
               speaking: inCallTogether,
               // The profile colour; absent on an older server reads as no ring.
@@ -140,14 +132,6 @@ Color? profileRingColor(api.UserProfile profile) {
   final cursors = AppCanvasColors.cursors;
   return cursors[index % cursors.length];
 }
-
-String presenceWord(AppPresence status) => switch (status) {
-  AppPresence.online => 'online',
-  AppPresence.away => 'away',
-  AppPresence.dnd => 'do not disturb',
-  AppPresence.offline => 'offline',
-  AppPresence.hidden => 'appearing offline',
-};
 
 /// The timed-out banner: amber rather than red, because it expires on its own
 /// and the error grammar reserves red for something that needs acting on.

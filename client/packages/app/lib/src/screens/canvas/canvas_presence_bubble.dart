@@ -86,7 +86,7 @@ class _AvatarMarker extends StatelessWidget {
 
   final VoiceParticipant participant;
 
-  static const double _avatarSize = 56;
+  static const double _avatarSize = AppAvatarSize.s56;
 
   @override
   Widget build(BuildContext context) {
@@ -98,7 +98,7 @@ class _AvatarMarker extends StatelessWidget {
           Stack(
             clipBehavior: Clip.none,
             children: [
-              AuthorAvatar(
+              UserAvatar(
                 name: participant.name,
                 userId: participant.identity,
                 size: _avatarSize,

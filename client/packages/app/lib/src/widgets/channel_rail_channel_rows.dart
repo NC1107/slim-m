@@ -342,10 +342,10 @@ class _ParticipantList extends StatelessWidget {
               padding: const EdgeInsets.only(bottom: 2),
               child: Row(
                 children: [
-                  AuthorAvatar(
+                  UserAvatar(
                     name: participant.name,
                     userId: participant.identity,
-                    size: 16,
+                    size: AppAvatarSize.s16,
                     speaking: participant.isSpeaking,
                   ),
                   const SizedBox(width: AppSpacing.s4),

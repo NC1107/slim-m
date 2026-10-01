@@ -65,10 +65,10 @@ class VoiceStripIndicator extends ConsumerWidget {
           for (final p in voice.participants.take(2))
             Padding(
               padding: const EdgeInsets.only(right: 4),
-              child: AuthorAvatar(
+              child: UserAvatar(
                 userId: p.identity,
                 name: p.name,
-                size: 20,
+                size: AppAvatarSize.s20,
                 speaking: p.isSpeaking,
               ),
             ),

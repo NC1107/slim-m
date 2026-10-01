@@ -49,7 +49,6 @@ class SettingsProfilePreview extends ConsumerWidget {
             children: [
               MemberProfileHeader(
                 profile: profile,
-                status: AppPresence.online,
                 isSelf: true,
                 inCallTogether: false,
               ),

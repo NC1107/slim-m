@@ -97,9 +97,15 @@ void main() {
     });
   });
 
-  testWidgets('a member is announced with their presence', (tester) async {
+  testWidgets('a member nobody has reported on is announced by name alone', (
+    tester,
+  ) async {
     await withShell(tester, () async {
-      expect(find.bySemanticsLabel(RegExp('Ada Lovelace, offline')), findsOne);
+      expect(find.bySemanticsLabel(RegExp('Ada Lovelace')), findsWidgets);
+      expect(
+        find.bySemanticsLabel(RegExp('Ada Lovelace, offline')),
+        findsNothing,
+      );
     });
   });
 
@@ -122,7 +128,7 @@ void main() {
   testWidgets('a member is named once, not once per widget', (tester) async {
     await withShell(tester, () async {
       final node = tester.getSemantics(
-        find.bySemanticsLabel(RegExp('Ada Lovelace, offline')),
+        find.bySemanticsLabel(RegExp('Ada Lovelace')).first,
       );
       expect('Ada Lovelace'.allMatches(node.label).length, 1);
     });

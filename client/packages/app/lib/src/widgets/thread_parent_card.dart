@@ -34,7 +34,7 @@ const int _snippetMaxRunes = 240;
 
 /// The avatar beside the parent's own author, matching
 /// `ForwardedMessageCard`'s own quoted-author sizing.
-const double _avatarSize = 20;
+const double _avatarSize = AppAvatarSize.s20;
 
 class ThreadParentCard extends ConsumerWidget {
   const ThreadParentCard({
@@ -107,7 +107,7 @@ class ThreadParentCard extends ConsumerWidget {
       body = Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          AuthorAvatar(
+          UserAvatar(
             name: name,
             userId: parent.parentAuthorId,
             size: _avatarSize,

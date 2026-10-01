@@ -108,11 +108,7 @@ Future<void> _pump(WidgetTester tester, ProviderContainer container) async {
         home: const Scaffold(
           body: Align(
             alignment: Alignment.bottomLeft,
-            child: SizedBox(
-              width: 44,
-              height: 44,
-              child: PresenceMenuButton(presence: AppPresence.online),
-            ),
+            child: SizedBox(width: 44, height: 44, child: PresenceMenuButton()),
           ),
         ),
       ),

@@ -193,10 +193,10 @@ class _ParticipantList extends StatelessWidget {
               child: ExcludeSemantics(
                 child: Row(
                   children: [
-                    AuthorAvatar(
+                    UserAvatar(
                       name: person.name,
                       userId: person.identity,
-                      size: 24,
+                      size: AppAvatarSize.s24,
                     ),
                     const SizedBox(width: AppSpacing.s8),
                     Expanded(

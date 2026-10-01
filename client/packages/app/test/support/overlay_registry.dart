@@ -107,12 +107,8 @@ final overlays = <String, FutureOr<void> Function(BuildContext, WidgetRef)>{
   'avatar-crop-sheet': (context, ref) => showAvatarCropSheet(context, _png),
   'whats-new-sheet': (context, ref) =>
       showWhatsNewSheet(context, whatsNewEntries),
-  'member-profile-popover': (context, ref) => showMemberProfile(
-    context,
-    ref,
-    profile: _adaProfile,
-    status: AppPresence.online,
-  ),
+  'member-profile-popover': (context, ref) =>
+      showMemberProfile(context, ref, profile: _adaProfile),
   'command-palette': (context, ref) => openCommandPalette(context),
   'composer-actions-sheet': (context, ref) => showComposerActionsSheet(
     context,

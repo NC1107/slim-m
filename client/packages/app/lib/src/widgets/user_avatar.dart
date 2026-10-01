@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
-/// [AppAvatar], wired to a real picture: watches the user's cached avatar
-/// bytes and swaps them in once they arrive, falling back to the same
-/// initials disc `AppAvatar` already draws for everyone without one.
+/// The one avatar for a person: their picture or initials, and optionally
+/// their presence dot, resolved from the same providers on every surface.
 library;
 
 import 'package:flutter/material.dart';
@@ -9,37 +8,56 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:slimm_design_system/design_system.dart';
 
 import '../providers/avatar_bytes.dart';
+import '../providers/presence_view.dart';
+import '../providers/providers.dart';
 import '../providers/user_profiles.dart';
 import 'image_decode.dart';
 
-/// For a caller that already holds a full profile (or `Me`) and so knows
-/// [userId] and [avatarUpdatedAt] outright (a null one means no picture): a member row, the caller's own
-/// rail footer, the settings preview.
+/// A person's picture, or their initials when they have none (or no [userId]:
+/// a deleted account), at one of the [AppAvatarSize] steps.
+///
+/// [presence] adds the dot from [presenceForProvider], the single answer the
+/// footer, the rows and the card all share; leave it off where the dot would
+/// only repeat something beside it. It needs at least [AppAvatarSize.s24].
+///
+/// The picture's cache key comes from the signed-in user's own profile for
+/// oneself, and from [userProfileProvider] for anybody else. A caller that
+/// already holds the version ([UserAvatar.known]) skips that lookup.
 class UserAvatar extends ConsumerWidget {
   const UserAvatar({
     super.key,
     required this.name,
-    this.userId,
-    this.avatarUpdatedAt,
-    this.size = 36,
+    required this.userId,
+    this.size = AppAvatarSize.s36,
     this.shape = AppAvatarShape.circle,
-    this.status,
+    this.presence = false,
     this.speaking = false,
     this.ringColor,
     this.semanticLabel,
     this.placeholder,
-  });
+  }) : _known = null;
+
+  const UserAvatar.known({
+    super.key,
+    required this.name,
+    required this.userId,
+    required int? avatarUpdatedAt,
+    this.size = AppAvatarSize.s36,
+    this.shape = AppAvatarShape.circle,
+    this.presence = false,
+    this.speaking = false,
+    this.ringColor,
+    this.semanticLabel,
+    this.placeholder,
+  }) : _known = (avatarUpdatedAt,);
 
   final String name;
 
-  /// Null while the profile this avatar belongs to has not loaded yet, or
-  /// for content with no author (a deleted account): renders as initials
-  /// only, same as [AppAvatar] with no image ever passed in.
+  /// Null for a deleted or never-attributed author: renders initials only.
   final String? userId;
-  final int? avatarUpdatedAt;
   final double size;
   final AppAvatarShape shape;
-  final AppPresence? status;
+  final bool presence;
   final bool speaking;
   final Color? ringColor;
   final String? semanticLabel;
@@ -47,14 +65,21 @@ class UserAvatar extends ConsumerWidget {
   /// Drawn instead of initials on a square avatar with no picture (a bot).
   final Widget? placeholder;
 
+  final (int?,)? _known;
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final id = userId;
+    final version = id == null
+        ? null
+        : _known != null
+        ? _known.$1
+        : ref.watch(_avatarVersionProvider(id));
     ImageProvider? image;
-    // A null timestamp is the server's "no avatar", so asking would only 404.
-    if (id != null && avatarUpdatedAt != null) {
+    // A null version is the server's "no avatar", so asking would only 404.
+    if (id != null && version != null) {
       final bytes = ref
-          .watch(avatarBytesProvider((userId: id, updatedAt: avatarUpdatedAt)))
+          .watch(avatarBytesProvider((userId: id, updatedAt: version)))
           .valueOrNull;
       if (bytes != null) {
         // Floored at 3x, not the paint ratio, so a desktop scaled past 2x while under-reporting its ratio still lands a crisp avatar; the 512px source affords it. See decodeEdge.
@@ -74,7 +99,9 @@ class UserAvatar extends ConsumerWidget {
       image: image,
       size: size,
       shape: shape,
-      status: status,
+      status: presence && id != null
+          ? ref.watch(presenceForProvider(id))
+          : null,
       speaking: speaking,
       ringColor: ringColor,
       semanticLabel: semanticLabel,
@@ -83,51 +110,17 @@ class UserAvatar extends ConsumerWidget {
   }
 }
 
-/// [UserAvatar], for a caller that holds only an author id and a display
-/// name (a message row, a pinned-message tile) rather than the profile it
-/// rides on: resolves [userProfileProvider] first for the avatar cache key,
-/// then renders exactly like [UserAvatar] once that resolves.
-class AuthorAvatar extends ConsumerWidget {
-  const AuthorAvatar({
-    super.key,
-    required this.name,
-    required this.userId,
-    this.size = 36,
-    this.shape = AppAvatarShape.circle,
-    this.speaking = false,
-    this.status,
-    this.placeholder,
-  });
-
-  final String name;
-
-  /// Null for a deleted or never-attributed author: no lookup to make, so
-  /// this renders straight to initials.
-  final String? userId;
-  final double size;
-  final AppAvatarShape shape;
-
-  /// Draws [AppAvatar]'s speaking ring, for the voice surfaces that identify
-  /// a participant by author id the same way a message row does.
-  final bool speaking;
-  final AppPresence? status;
-  final Widget? placeholder;
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final id = userId;
-    final profile = id == null
-        ? null
-        : ref.watch(userProfileProvider(id)).valueOrNull;
-    return UserAvatar(
-      name: name,
-      userId: id,
-      avatarUpdatedAt: profile?.avatarUpdatedAt,
-      size: size,
-      shape: shape,
-      speaking: speaking,
-      status: status,
-      placeholder: placeholder,
+final _avatarVersionProvider = Provider.autoDispose.family<int?, String>((
+  ref,
+  userId,
+) {
+  final isSelf = ref.watch(sessionProvider).tokens?.userId == userId;
+  if (isSelf) {
+    return ref.watch(
+      meProvider.select((me) => me.valueOrNull?.avatarUpdatedAt),
     );
   }
-}
+  return ref.watch(
+    userProfileProvider(userId).select((p) => p.valueOrNull?.avatarUpdatedAt),
+  );
+});

@@ -164,7 +164,7 @@ class _FacePile extends StatelessWidget {
   final List<_Present> present;
 
   static const int _maxShown = 4;
-  static const double _avatarSize = 24;
+  static const double _avatarSize = AppAvatarSize.s24;
   static const double _overlap = 8;
 
   /// The horizontal distance from one avatar's left edge to the next -
@@ -216,7 +216,7 @@ class _FacePile extends StatelessWidget {
                                 width: 2,
                               ),
                             ),
-                            child: AuthorAvatar(
+                            child: UserAvatar(
                               name: shown[i].name,
                               userId: shown[i].id,
                               size: _avatarSize,

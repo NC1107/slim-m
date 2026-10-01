@@ -112,8 +112,8 @@ void main() {
   });
 
   testWidgets(
-    'a peer this session has no presence for yet defaults to offline, not '
-    'to no dot at all',
+    'a peer this session has no presence for yet is unknown, which draws no '
+    'dot, rather than offline, which draws a grey ring',
     (tester) async {
       final channel = _dm('dm-1', 'Priya', 'user-priya');
       final container = _container();
@@ -121,7 +121,7 @@ void main() {
       await _pumpRow(tester, container, channel);
 
       final avatar = tester.widget<AppAvatar>(find.byType(AppAvatar));
-      expect(avatar.status, AppPresence.offline);
+      expect(avatar.status, AppPresence.unknown);
       container.dispose();
     },
   );

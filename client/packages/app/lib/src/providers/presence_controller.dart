@@ -12,6 +12,9 @@ import 'live_events.dart';
 import 'presence_activity.dart';
 import 'providers.dart';
 
+/// The most ids `GET /presence` accepts in one request.
+const _presenceBatchLimit = 100;
+
 /// Every user this session currently has a presence status for. A user
 /// absent from this map is simply unknown yet, never "offline": that
 /// distinction belongs to the caller, which is why this holds
@@ -46,13 +49,24 @@ class PresenceController extends StateNotifier<Map<String, api.PresenceState>> {
   }
 
   /// Batch-fetches presence for [userIds] and merges it into what is already
-  /// known. Best-effort: a failed refresh just leaves the map as it was
+  /// known, a request per [_presenceBatchLimit] ids because the server refuses
+  /// a longer list outright and one refusal used to leave a large roster all
+  /// unreported. Best-effort: a failed batch leaves its ids as they were
   /// rather than surfacing an error the member pane has nowhere to show.
   Future<void> refresh(Iterable<String> userIds) async {
     final ids = userIds.toList(growable: false);
-    if (ids.isEmpty) return;
+    for (var start = 0; start < ids.length; start += _presenceBatchLimit) {
+      final end = start + _presenceBatchLimit;
+      await _refreshBatch(
+        ids.sublist(start, end > ids.length ? ids.length : end),
+      );
+    }
+  }
+
+  Future<void> _refreshBatch(List<String> ids) async {
     try {
       final statuses = await _ref.read(apiProvider).listPresence(ids);
+      if (!mounted) return;
       state = {
         ...state,
         for (final status in statuses) status.userId: status.status,
@@ -78,24 +92,19 @@ final presenceControllerProvider =
       (ref) => PresenceController(ref),
     );
 
-/// The caller's own visibility choice as far as this client knows it, or null
-/// for "not known", which is the state every launch starts in.
+/// The visibility the caller chose in this session, or null before they
+/// choose one, which is every launch.
 ///
-/// The preference itself is durable and does not need re-applying: the server
-/// stores it in `users.presence_visibility` (migration 0008), so relaunching
-/// or reconnecting does not make someone who chose appear-offline visible
-/// again. What is missing is a way to read it back. `PATCH /presence` echoes
-/// only the value it just set, and `GET /presence` resolves a caller's own id
-/// to their true connection state rather than the preference (`presence.rs`'s
-/// `status_for`, and its `hidden_reads_as_offline_to_others_but_true_to_self`
-/// test), so a hidden user's own client cannot tell hidden from online.
+/// Nothing reads the stored preference back: `PATCH /presence` echoes only the
+/// value just set, and `GET /presence` and `presence.changed` resolve the
+/// caller's own id to their true connection state, so a hidden user's client
+/// sees itself online. Until the server returns the preference (for instance
+/// on `GET /me`), a fresh launch shows the reported state and cannot tell
+/// hidden from online. Persisting the last choice on the device would be worse
+/// than that: a stale "appearing offline" would tell someone they are hidden
+/// while another device had made them visible.
 ///
-/// KNOWN GAP, deliberately left open here: closing it needs a read-back on the
-/// server, not a cache on the device. Persisting the last choice locally and
-/// re-applying it on connect would let a device holding a stale value silently
-/// un-hide someone who chose appear-offline from another device, which is a
-/// worse failure than not knowing. Until that endpoint exists, every surface
-/// showing this must render null as "no choice known" rather than asserting
-/// one, which is why the type is nullable rather than defaulting to online.
+/// Surfaces never read this directly; `presenceForProvider` combines it with
+/// what the server reports.
 final presenceVisibilityDisplayProvider =
     StateProvider<api.PresenceVisibility?>((ref) => null);

@@ -246,7 +246,7 @@ void main() {
       setup.container.read(presenceVisibilityDisplayProvider),
       api.PresenceVisibility.hidden,
     );
-    expect(find.text('appear offline'), findsOneWidget);
+    expect(find.text('appearing offline'), findsOneWidget);
     expect(find.text('online'), findsNothing);
   });
 

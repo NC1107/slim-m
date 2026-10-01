@@ -72,7 +72,7 @@ def change_status(client, api):
     client.click(L.CHANGE_STATUS, settle=2)
     client.wait_for(L.DND)
     client.click(L.DND, settle=3)
-    # The footer's own line, lowercased; see presenceDisplayOf.
+    # The footer's own line: the presence word for the state just chosen.
     client.wait_for('do not disturb')
 
     me_id = api.me()['id']
