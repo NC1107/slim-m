@@ -85,7 +85,7 @@ void main() {
 
     final tile = tester.getRect(find.byType(CallParticipantTile));
     expect(tile.size, const Size(320, 200));
-    final label = tester.getRect(find.text('Me (you)'));
+    final label = tester.getRect(find.text('Me'));
     expect(tile.contains(label.topLeft), isTrue);
     expect(tile.contains(label.bottomRight), isTrue);
 
@@ -169,7 +169,7 @@ void main() {
     );
     await call.emit([callMe]);
     final before = tester.element(
-      find.widgetWithText(CallParticipantTile, 'Me (you)', skipOffstage: false),
+      find.widgetWithText(CallParticipantTile, 'Me', skipOffstage: false),
     );
     expect(find.text('Alice and Nadia are online'), findsOneWidget);
 

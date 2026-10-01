@@ -63,12 +63,13 @@ extension SlimmApiVoice on SlimmApi {
   /// roster rather than retry), and [UnavailableException] when one is
   /// configured but could not be reached just now (unknown, not empty; keep
   /// showing the last roster you had rather than clearing it to nothing).
-  Future<List<VoiceRosterParticipant>> voiceRoster(String channelId) async {
+  Future<List<VoiceRosterParticipant>> voiceRoster(String channelId) async =>
+      (await voiceRosterSnapshot(channelId)).participants;
+
+  /// [voiceRoster] with the call's age the same response carries.
+  Future<VoiceRoster> voiceRosterSnapshot(String channelId) async {
     final json = await _send('GET', '/channels/$channelId/voice/roster');
-    final participants = (json as Map<String, dynamic>)['participants'];
-    return (participants as List<dynamic>)
-        .map((p) => VoiceRosterParticipant.fromJson(p as Map<String, dynamic>))
-        .toList(growable: false);
+    return VoiceRoster.fromJson(json as Map<String, dynamic>);
   }
 
   /// Rings the other side of a DM channel's call.

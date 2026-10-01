@@ -42,6 +42,7 @@ import 'call_roster_motion.dart';
 import 'fullscreen_video_overlay.dart';
 import 'local_screen_share_banner.dart';
 import 'screen_share_stage.dart';
+import 'voice_reconnect_banner.dart';
 import 'watch_session_bar.dart';
 
 /// The dock's own visible height plus its margin, so the last row of
@@ -104,6 +105,8 @@ class CallStageLayout extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           _CallHeader(voice: voice),
+          // One banner at a time: the reconnect notice already says why the stage is quiet.
+          if (voice.rejoining) const VoiceReconnectBanner(),
           if (!isDm && voice.channelId != null)
             WatchSessionGate(
               channelId: voice.channelId!,
@@ -120,7 +123,7 @@ class CallStageLayout extends StatelessWidget {
               padding: EdgeInsets.only(top: AppSpacing.s12),
               child: LocalScreenSharePendingBanner(),
             ),
-          if (voice.error != null)
+          if (voice.error != null && !voice.rejoining)
             Padding(
               padding: const EdgeInsets.only(top: AppSpacing.s12),
               child: AppErrorState(message: voice.error!),

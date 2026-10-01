@@ -380,6 +380,7 @@ http.Client voiceApi({
   bool canPublish = true,
   String sfuUrl = 'wss://sfu.example.com',
   bool failHeartbeat = false,
+  int? callAgeMs,
   void Function(http.Request request)? onRequest,
 }) {
   return MockClient((request) async {
@@ -389,6 +390,9 @@ http.Client voiceApi({
         return http.Response('', 503);
       }
       return http.Response('', 204);
+    }
+    if (request.url.path.endsWith('/voice/roster')) {
+      return http.Response('{"participants":[],"call_age_ms":$callAgeMs}', 200);
     }
     if (!request.url.path.endsWith('/voice/token')) {
       return http.Response('{}', 404);

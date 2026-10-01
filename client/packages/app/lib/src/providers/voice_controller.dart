@@ -19,6 +19,7 @@ import '../diagnostics/debug_log.dart';
 import 'call_recap.dart';
 import 'providers.dart';
 import 'voice_auto_rejoin.dart';
+import 'voice_call_clock.dart';
 import 'voice_call_heartbeat.dart';
 import 'voice_call_lifecycle_report.dart';
 import 'voice_camera_failure.dart';
@@ -30,6 +31,7 @@ import 'voice_state.dart';
 export 'voice_state.dart' show VoiceState;
 
 part 'voice_controller_audio_devices.dart';
+part 'voice_controller_call_clock.dart';
 part 'voice_controller_input.dart';
 part 'voice_controller_rejoin.dart';
 part 'voice_controller_share.dart';
@@ -37,6 +39,7 @@ part 'voice_controller_share.dart';
 class VoiceController extends StateNotifier<VoiceState>
     with
         VoiceControllerInputMixin,
+        VoiceControllerCallClockMixin,
         VoiceControllerRejoinMixin,
         VoiceControllerShareMixin,
         VoiceControllerAudioDevicesMixin {
@@ -56,6 +59,7 @@ class VoiceController extends StateNotifier<VoiceState>
          now: now,
        ),
        _autoRejoin = VoiceAutoRejoin(delays: autoRejoinDelays),
+       _callClock = VoiceCallClock(_ref, now: now),
        _now = now ?? DateTime.now,
        _activity = CallActivityTracker(now: now ?? DateTime.now),
        super(const VoiceState()) {
@@ -77,19 +81,7 @@ class VoiceController extends StateNotifier<VoiceState>
       if (s == VoiceSessionState.failed && dropped != null) {
         _heartbeat.stop();
         _log('Call ended: ${dropped.name}', detail: dropped.message);
-        // Read before the copyWith clears it: only a connected call is one to put back.
-        final wasConnected = state.connectedAt != null;
-        state = state.copyWith(
-          state: s,
-          error: dropped.message,
-          clearConnectedAt: true,
-        );
-        final channelId = state.channelId;
-        if (wasConnected &&
-            VoiceControllerRejoinMixin._rejoinableDrop(dropped) &&
-            channelId != null) {
-          _scheduleAutoRejoin(channelId);
-        }
+        _endCallForDrop(dropped);
         return;
       }
       switch (s) {
@@ -104,20 +96,21 @@ class VoiceController extends StateNotifier<VoiceState>
         default:
           break;
       }
-      // The duration clock starts at the connected transition and only there,
-      // so participant churn does not restart it.
+      // The clock starts at the connected transition only; see VoiceCallClock.
       state = switch (s) {
         VoiceSessionState.connected when state.connectedAt == null =>
-          state.copyWith(state: s, connectedAt: _now()),
+          state.copyWith(state: s, connectedAt: _callClock.beginHere()),
         VoiceSessionState.idle || VoiceSessionState.failed => state.copyWith(
           state: s,
           clearConnectedAt: true,
         ),
         _ => state.copyWith(state: s),
       };
+      if (s == VoiceSessionState.connected) unawaited(_adoptServerCallStart());
     });
     _participants = _session.participantChanges.listen((p) {
       _activity.observe(p);
+      unawaited(_adoptServerCallStart());
       // Trust the session's view of the local participant over the local
       // toggle: the SFU is what actually decides whether a track is live.
       final sharing = p.any((x) => x.isLocal && x.isScreenSharing);
@@ -152,6 +145,8 @@ class VoiceController extends StateNotifier<VoiceState>
   final CallLifecycleChannel _callLifecycle;
   final VoiceCallHeartbeat _heartbeat;
   final VoiceAutoRejoin _autoRejoin;
+  @override
+  final VoiceCallClock _callClock;
   final VoiceJoinMuted _joinMuted = VoiceJoinMuted();
   final DateTime Function() _now;
   final CallActivityTracker _activity;
@@ -307,6 +302,7 @@ class VoiceController extends StateNotifier<VoiceState>
         : null;
     _heartbeat.stop();
     _autoRejoin.reset();
+    _callClock.forget();
     await _session.leave();
     if (generation != _callGeneration) return;
     // Best-effort and fire-and-forget: this client already disconnected.
