@@ -34,7 +34,6 @@ import '../widgets/bot_call_controls.dart';
 import '../widgets/call_stage_layout.dart';
 import '../widgets/member_profile.dart';
 import '../widgets/participant_call_menu.dart';
-import '../widgets/voice_reconnect_banner.dart';
 import 'voice_call_dock.dart';
 import 'voice_join_preview.dart';
 import 'voice_text_pane.dart';
@@ -310,12 +309,6 @@ class _InCall extends ConsumerWidget {
                 close: close,
               ),
         ),
-        // A bounded auto-rejoin in progress: see voice_screen.dart's own stage comment.
-        if (voice.rejoining)
-          const Align(
-            alignment: Alignment.topCenter,
-            child: VoiceReconnectBanner(),
-          ),
         Align(
           alignment: Alignment.bottomCenter,
           child: SafeArea(
