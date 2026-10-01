@@ -475,6 +475,13 @@ Every `run` call is held to resource limits, taken from the manifest's `runtime.
 | `wall_ms` | 1000 | wall-clock deadline; a command is a synchronous request-response, not a background job |
 | `fuel` | 50,000,000 | roughly one unit per executed instruction, so this bounds a runaway loop |
 
+The `memory_mb` ceiling also bounds the rest of what the host allocates for the module before it runs a single instruction.
+A module may declare one memory and one table, and is one instance; a second memory, table or instance is refused when the module loads.
+Each table element is charged 16 bytes against `memory_mb`, so the default allows a table of one million elements and a module declaring `(table 400000000 funcref)` is refused at load instead of costing the server gigabytes.
+A response may be at most 1 MiB (`MAX_RESPONSE_BYTES`) whatever the memory ceiling, and a larger one is refused.
+
+Wasm runs in slices of about a million fuel and the deadline is checked between slices, so a run that passes `wall_ms` stops within a few milliseconds and stops using CPU, rather than returning to the caller while the module keeps running until its fuel is gone.
+
 What the default fuel buys for text processing depends on how many times the module walks the input, not on how big the input is.
 Measured on a release wasm built with `wasm32-unknown-unknown` (`opt-level = "s"`), ASCII input, default 50,000,000 fuel, the largest input that still completes is roughly:
 
@@ -491,7 +498,7 @@ Non-ASCII text costs more per byte, and a different toolchain or optimisation le
 The `code-block-runner` route accepts request bodies up to 256 KB, about three times what a few such passes can cover under the default.
 A module that walks the input more than a couple of times should raise `runtime.limits.fuel` in its manifest rather than expect the default to reach the body limit.
 The host caps a manifest at 2,000,000,000 fuel (`MAX_FUEL`), 40 times the default.
-`wall_ms` is capped at 10,000 (`MAX_WALL_MS`) and `memory_mb` at 256 (`MAX_MEMORY_MB`); fuel and wall-clock are independent limits and either one ends the run, so a large fuel budget also needs a wall deadline the run can finish inside.
+`wall_ms` is capped at 10,000 (`MAX_WALL_MS`) and `memory_mb` at 256 (`MAX_MEMORY_MB`); fuel and wall-clock are independent limits and either one ends the run.
 
 Set them higher in the manifest if your module genuinely needs it (Game of Life uses 64 MB / 2 s), but a shared row that rides fan-out is capped well below whatever a module can produce, so enormous output is truncated regardless.
 
