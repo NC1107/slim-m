@@ -63,7 +63,7 @@ Its own text: "this was never a Windows-only concern: those libraries type-check
 Check `docs/dependencies.md` before touching `file_picker`, `device_info_plus`, `package_info_plus`, or `flutter_secure_storage`.
 
 **`audioplayers_windows` is already resolved in the committed lockfile.**
-Confirmed by grepping `client/pubspec.lock`: `audioplayers_windows` is a resolved transitive dependency of `audioplayers`, the package `docs/dependencies.md` documents choosing for the notification-sound slice (the pre-trim `CLAUDE.md`, "The seven sounds finally play: the in-app slice" (that section is no longer in `CLAUDE.md`; `git log -S` on its heading finds the commit that removed it)).
+Confirmed by grepping `client/pubspec.lock`: `audioplayers_windows` is a resolved transitive dependency of `audioplayers`, the package `docs/dependencies.md` documents choosing for the notification-sound slice (the pre-trim `CLAUDE.md`, "The seven sounds finally play: the in-app slice").
 This means the dependency graph is already Windows-capable for audio playback in principle; it does not mean playback has ever been exercised on Windows (a Windows zip does build now, via `desktop-clients`).
 
 ~~**The bundled notification-sound assets are a git symlink, and CLAUDE.md's own reasoning for why that is safe explicitly excludes Windows.**~~
