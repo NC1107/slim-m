@@ -606,7 +606,7 @@ See PR #250 ("A release can succeed and still ship no store build") for the full
 
 The SHA-keyed group stops a run from being silently cancelled, but nothing before this watched for the state that cancellation already produced once: a release-please manifest bumped to a new version, meaning its release PR merged, with no tag ever following it.
 A push-triggered check cannot close this on its own, because the push that should have cut the tag is the same one that did not - there is no later event to hang a check on.
-`release-tag-watchdog.yml` runs on a 15-minute schedule instead (plus `workflow_dispatch`) and asks a plain question of git history: for each package, does the current manifest version have a matching `<component>-v<version>` tag, and if not, how long has the manifest read that version?
+`release-tag-watchdog.yml` runs hourly instead (plus `workflow_dispatch`) and asks a plain question of git history: for each package, does the current manifest version have a matching `<component>-v<version>` tag, and if not, how long has the manifest read that version?
 The workflow has no concurrency group on purpose: it shipped with `cancel-in-progress: true`, and a run slower than the cron interval was cancelled by the next one, three times in the first hour.
 A cancelled run never asks the question, so the silent failure it exists to catch could pass underneath it; the job is read-only and idempotent, so overlap costs nothing.
 `scripts/check-release-tag-lag.sh` does the check itself, pulled out so `scripts/lib/test_check_release_tag_lag.py` can drive it against a real temp git repo rather than the live one; a missing tag inside a 15-minute grace window is normal (the same run that merges a release PR usually tags it within its own run) and a missing tag past it is reported with `::error::`, naming the tag, the version, and how long it has been missing.
@@ -843,6 +843,7 @@ The page polls `version.json` and shows a reload pill when the id differs (decis
 
 Linking a Spotify account needs a client id, which is the compile-time define `SLIMM_SPOTIFY_CLIENT_ID`.
 The id is the repository variable of the same name, not a secret, and it is read as `vars.SLIMM_SPOTIFY_CLIENT_ID`.
+A composite action cannot read `vars`, so the `linux-tarball` action takes it as the input `spotify_client_id` and its callers pass the variable in (PR #1531, [CHANGING-CI.md](CHANGING-CI.md)).
 Every build a user installs passes it: the Android, iOS and Linux jobs in `release` and `main-builds`, the `linux-tarball` action (so `copr-catch-up` too), `desktop-clients`, and the web image through a build arg.
 The test builds (`client-ci`, `client-ios-ci`, `client-macos-ci`, `client-windows-ci`, `flatpak-ci`) do not, because nothing runs or ships what they produce.
 The release flatpak and rpm repackage the Linux bundle, so they carry whatever that build was given.

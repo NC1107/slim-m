@@ -463,9 +463,9 @@ The Game of Life reference module (`slim-addons/modules/game-of-life`) is the wo
 
 ## Limits and the security model
 
-A module is pure compute with zero host imports.
+A module that has no approved capability is pure compute with zero host imports.
 It receives an input and returns an output and can reach nothing else - not the network, not the filesystem, not other modules, not slim's own state.
-This is deliberate and is the entire v1 security model.
+This is deliberate and is the base of the security model; [Host capabilities](#host-capabilities) says what an admin's approval adds.
 
 Every `run` call is held to resource limits, taken from the manifest's `runtime.limits` or these defaults when unset:
 

@@ -261,7 +261,7 @@ That is an accepted trade-off for a friend-group deployment, and plain UDP TURN 
 Its listener also needs a certificate of its own.
 It cannot borrow Caddy's, because Caddy's ACME storage layout is not a stable path to mount from.
 
-To enable it: point a third DNS name at this host (`turn.example.com`, say), obtain a certificate and key for it by whatever means you like, mount them into the `livekit` container, uncomment the `- "5349:5349"` port line in `docker-compose.yml`, and add these four keys under the existing `turn:` block in `LIVEKIT_CONFIG`:
+To enable it: point a third DNS name at this host (`turn.example.com`, say), obtain a certificate and key for it by whatever means you like, mount them into the `livekit` container, uncomment the `- "5349:5349"` port line in `docker-compose.voice.yml`, and add these four keys under the existing `turn:` block in `LIVEKIT_CONFIG`:
 
 ```yaml
           domain: turn.example.com

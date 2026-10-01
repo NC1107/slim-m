@@ -111,7 +111,7 @@ There is no way to sideload on iOS, so TestFlight is the only route.
 
 What updates itself and what does not depends on how you installed it.
 A desktop app checks the latest client release for a signed `manifest.json`, and only an install the updater itself laid out will replace itself from it (decision [0041](decisions/0041-per-user-installs-and-signed-self-update.md)).
-A release published without `manifest.json` and `manifest.json.sig` cannot be updated to; the app then behaves as if there were no update.
+A release published without `manifest.json` and `manifest.json.sig` cannot be updated to; the client's fetch of `manifest.json` fails and nothing is downloaded.
 
 | Install | How it updates | How to remove it |
 | --- | --- | --- |
