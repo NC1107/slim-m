@@ -56,6 +56,20 @@ api.SlimmApi Function(Ref) _client(Uint8List png) =>
             headers: {'content-type': 'image/png'},
           );
         }
+        if (path.endsWith('/users/user-ada')) {
+          return http.Response(
+            jsonEncode({
+              'id': 'user-ada',
+              'username': 'ada',
+              'display_name': 'Ada Lovelace',
+              'created_at': 0,
+              'avatar_updated_at': 1,
+              'roles': <String>[],
+            }),
+            200,
+            headers: {'content-type': 'application/json'},
+          );
+        }
         if (path.endsWith('/c-main/voice/roster')) {
           return http.Response(
             jsonEncode({
