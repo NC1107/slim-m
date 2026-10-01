@@ -153,6 +153,11 @@ async fn deliver(
                     name.chars().count() - USERNAME_MAX_CHARS,
                 )));
             }
+            if name.chars().any(super::hidden_chars::is_hidden_char) {
+                return Err(ApiError::BadRequest(
+                    "username must not contain control or invisible characters",
+                ));
+            }
             Some(name)
         }
         _ => None,

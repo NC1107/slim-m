@@ -2390,7 +2390,10 @@ paths:
                   maxItems: 64
                 reason:
                   type: string
-                  description: Recorded against every member in the batch.
+                  description: >
+                    Recorded against every member in the batch. Control and
+                    invisible characters are refused, as for every reason;
+                    line breaks and tabs are ordinary text.
       responses:
         "204":
           description: Every named member has been removed.
@@ -9067,6 +9070,10 @@ components:
           type: string
           minLength: 1
           maxLength: 2000
+          description: >
+            Control and invisible characters are refused with 400; line breaks
+            and tabs are ordinary text. The same holds for the reason on a
+            timeout or a removal.
         channel_id:
           type: string
           format: uuid
@@ -9878,6 +9885,8 @@ components:
             this label is never checked for collision with a real member's
             name and is never mentionable. Never written to the webhook's own
             account name and never returned as a message's own author name.
+            Refused with 400 when it holds a control, text-direction or
+            invisible character, as a display name is.
         embeds:
           description: >-
             Honoured, in the same shape and with the same caps
@@ -10166,6 +10175,11 @@ components:
           type: string
           minLength: 1
           maxLength: 64
+          description: >
+            Refused with 400 when it holds a control, text-direction or
+            invisible character. The same rule covers channel and category
+            names and topics, and role names, on create and on rename; a name
+            already stored with one is still listed and can be edited.
         kind:
           type: string
           enum: [text, voice]

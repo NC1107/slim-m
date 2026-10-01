@@ -50,8 +50,16 @@ pub(super) fn validate_reason(
         Some(value) if value.chars().count() > MAX_REASON_CHARS => {
             Err(ApiError::BadRequest("that reason is too long"))
         }
+        Some(value) if value.chars().any(is_hidden_reason_char) => Err(ApiError::BadRequest(
+            "reason must not contain control or invisible characters",
+        )),
         Some(value) => Ok(Some(value.to_owned())),
     }
+}
+
+/// A reason may run to several lines, so line breaks and tabs are ordinary text here.
+fn is_hidden_reason_char(c: char) -> bool {
+    !matches!(c, '\t' | '\n' | '\r') && super::hidden_chars::is_hidden_char(c)
 }
 
 /// The device, block, and report routes.

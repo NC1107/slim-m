@@ -27,6 +27,7 @@ use super::AppState;
 use super::channel_slow_mode::validate_slow_mode_seconds;
 use super::error::ApiError;
 use super::extract::{AUTHED_READ, Authed, AuthedLimited, Json, enforce};
+use super::hidden_chars::is_hidden_char;
 use super::messages::parse_uuid;
 use crate::hub::Event;
 use crate::ids::{ChannelCategoryId, ChannelId};
@@ -471,9 +472,9 @@ fn validate_channel_topic(topic: &str) -> Result<Option<String>, ApiError> {
     if trimmed.chars().count() > CHANNEL_TOPIC_MAX_CHARS {
         return Err(ApiError::BadRequest("topic must be at most 256 characters"));
     }
-    if trimmed.chars().any(|c| c.is_control()) {
+    if trimmed.chars().any(is_hidden_char) {
         return Err(ApiError::BadRequest(
-            "topic must not contain control characters",
+            "topic must not contain control or invisible characters",
         ));
     }
     Ok(if trimmed.is_empty() {
@@ -490,9 +491,9 @@ fn validate_channel_name(name: &str) -> Result<&str, ApiError> {
     if trimmed.is_empty() || trimmed.chars().count() > 64 {
         return Err(ApiError::BadRequest("name must be 1 to 64 characters"));
     }
-    if trimmed.chars().any(|c| c.is_control()) {
+    if trimmed.chars().any(is_hidden_char) {
         return Err(ApiError::BadRequest(
-            "name must not contain control characters",
+            "name must not contain control or invisible characters",
         ));
     }
     Ok(trimmed)
