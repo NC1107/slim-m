@@ -68,7 +68,7 @@ Future<VerifiedUpdate?> fetchVerifiedUpdate({
     );
   }
   final manifest = parseManifest(manifestBytes);
-  if (parseVersion(manifest.version) == null) {
+  if (!isInstallableVersion(manifest.version)) {
     throw const SelfUpdateFailure(
       SelfUpdateFailureKind.badManifest,
       'The update information was not in a form this version understands.',
@@ -116,7 +116,7 @@ Future<String?> _latestClientTag(http.Client client) async {
     final tag = entry['tag_name'];
     if (tag is! String || !tag.startsWith('client-v')) continue;
     final version = tag.substring('client-v'.length);
-    if (parseVersion(version) == null) continue;
+    if (!isInstallableVersion(version)) continue;
     if (best == null || isNewer(version, best.substring('client-v'.length))) {
       best = tag;
     }

@@ -19,6 +19,7 @@ import 'presence_activity.dart';
 import 'presence_controller.dart';
 import 'voice_controller.dart';
 import 'failed_send_retry.dart';
+import 'last_text_channel.dart';
 import 'message_ops_sync.dart';
 import 'op_adjacency.dart';
 import 'message_extras.dart';
@@ -450,6 +451,7 @@ class SyncController extends StateNotifier<SyncStatus> {
     _ref.invalidate(hasFailedSinceLiveProvider);
     _ref.invalidate(syncFailureProvider);
     _ref.invalidate(ephemeralMessagesProvider);
+    _ref.invalidate(lastTextChannelProvider);
     _ref.read(messageExtrasProvider.notifier).clear();
     _ref.read(dmCallRingControllerProvider.notifier).clear();
     _ref.read(dmCallActivityProvider.notifier).clear();

@@ -221,6 +221,18 @@ void main() {
     },
   );
 
+  test('a version that could shape an install path is refused', () async {
+    for (final version in ['1.0.0-../x', '1.0.0+a/b', '1.0.0-rc.1']) {
+      final client = await _server(_Release(key: key, version: version));
+      expect(
+        await failureOf(run(client)),
+        SelfUpdateFailureKind.badManifest,
+        reason: version,
+      );
+      expect(stagedNames(), isEmpty);
+    }
+  });
+
   test('a manifest schema this build does not know is refused', () async {
     final client = await _server(_Release(key: key, schema: 2));
     expect(
