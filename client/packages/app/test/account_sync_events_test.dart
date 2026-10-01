@@ -66,31 +66,31 @@ void main() {
   test(
     'an override set or cleared on another device updates this one',
     () async {
-      final events = StreamController<ServerEvent>.broadcast();
-      addTearDown(events.close);
+      final store = MessageStore(SlimmDatabase(NativeDatabase.memory()));
+      addTearDown(store.db.close);
       final container = _container(
-        events: events.stream,
+        events: const Stream.empty(),
         handle: (request) async => _json(<Object>[]),
+        store: store,
       );
       container.listen(channelNotificationOverridesProvider, (_, _) {});
       await _settle();
+      final controller = container.read(syncControllerProvider.notifier);
 
-      events.add(
+      await controller.applyServerEventForTest(
         const NotificationOverrideChanged(
           channelId: 'c1',
           preference: NotificationPreference.mentions,
         ),
       );
-      await _settle();
       expect(
         container.read(channelNotificationOverridesProvider).overrideFor('c1'),
         NotificationPreference.mentions,
       );
 
-      events.add(
+      await controller.applyServerEventForTest(
         const NotificationOverrideChanged(channelId: 'c1', preference: null),
       );
-      await _settle();
       expect(
         container.read(channelNotificationOverridesProvider).overrideFor('c1'),
         isNull,

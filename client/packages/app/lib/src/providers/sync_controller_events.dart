@@ -57,6 +57,13 @@ extension SyncControllerEvents on SyncController {
           lastReadSeq,
           manuallyUnread: manuallyUnread,
         );
+      case NotificationOverrideChanged(:final channelId, :final preference):
+        // A controller not built yet fetches the current list when it is.
+        if (_ref.exists(channelNotificationOverridesProvider)) {
+          _ref
+              .read(channelNotificationOverridesProvider.notifier)
+              .applyRemote(channelId, preference);
+        }
       case ChannelCreated(:final channel):
       case ChannelUpdated(:final channel):
         await store.upsertChannels([channel]);
