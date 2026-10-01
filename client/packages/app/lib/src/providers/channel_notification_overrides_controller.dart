@@ -67,6 +67,22 @@ class ChannelNotificationOverridesController
   final Ref _ref;
   late final StreamSubscription<api.TokenPair?> _sub;
 
+  /// Another device of this account set ([preference]) or cleared (null) an
+  /// override; the live socket hands it over through `SyncController`.
+  void applyRemote(String channelId, api.NotificationPreference? preference) {
+    final byChannel = {...state.byChannel};
+    if (preference == null) {
+      byChannel.remove(channelId);
+    } else {
+      byChannel[channelId] = preference;
+    }
+    _generation++;
+    state = ChannelNotificationOverridesState(
+      byChannel: byChannel,
+      settled: state.settled,
+    );
+  }
+
   /// Whose overrides are held, so a session change that is only a token
   /// rotation is told apart from a different account signing in - the same
   /// distinction [blocksProvider]'s own controller draws for the identical

@@ -382,10 +382,10 @@ impl Store {
 
         let mut tx = self.begin_write().await?;
         let created = sqlx::query!(
-            "INSERT INTO devices (id, user_id, name, created_at, client_kind, client_version)
-             SELECT ?, ?, ?, ?, ?, ? WHERE EXISTS (SELECT 1 FROM users WHERE id = ? AND deleted_at IS NULL)
+            "INSERT INTO devices (id, user_id, name, created_at, last_seen_at, client_kind, client_version)
+             SELECT ?, ?, ?, ?, ?, ?, ? WHERE EXISTS (SELECT 1 FROM users WHERE id = ? AND deleted_at IS NULL)
                AND NOT EXISTS (SELECT 1 FROM space_removals WHERE user_id = ?)",
-            device_id, user_id, device_name, now, client_kind, client_version, user_id, user_id
+            device_id, user_id, device_name, now, now, client_kind, client_version, user_id, user_id
         )
         .execute(&mut *tx)
         .await?
@@ -530,9 +530,9 @@ impl Store {
         let Some(claimed) = claimed else {
             return Ok(None);
         };
+        super::safety::touch_device(&mut tx, claimed.device_id, now).await?;
 
-        // A live ticket for a revoked session should not exist (revocation
-        // deletes the session's tickets), but reject it if one somehow does.
+        // Revocation deletes a session's tickets, so a live one here is rejected anyway.
         let session = sqlx::query!(
             r#"SELECT revoked_at FROM sessions WHERE id = ?"#,
             claimed.session_id

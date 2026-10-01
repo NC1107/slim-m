@@ -19,6 +19,7 @@ mod authorization;
 mod binding;
 mod filenames;
 mod fixtures;
+mod message_filenames;
 mod ranges;
 mod serving;
 mod uploading;

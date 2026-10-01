@@ -47,25 +47,72 @@ pub(crate) struct FencedBlock {
     pub code: String,
 }
 
+/// The fenced blocks of `lines` as (open line, close line, language token).
 /// An opening fence with no closing fence after it is plain text, not a block.
-pub(crate) fn fenced_blocks(content: &str) -> Vec<FencedBlock> {
-    let lines: Vec<&str> = content.split('\n').collect();
-    let mut blocks = Vec::new();
+fn fence_spans<'a>(lines: &[&'a str]) -> Vec<(usize, usize, &'a str)> {
+    let mut spans = Vec::new();
     let mut i = 0;
     while i < lines.len() {
         if let Some(token) = fence_open(lines[i])
             && let Some(close) = (i + 1..lines.len()).find(|&j| is_fence_close(lines[j]))
         {
-            blocks.push(FencedBlock {
-                language: (!token.is_empty()).then(|| token.to_string()),
-                code: lines[i + 1..close].join("\n"),
-            });
+            spans.push((i, close, token));
             i = close + 1;
             continue;
         }
         i += 1;
     }
-    blocks
+    spans
+}
+
+pub(crate) fn fenced_blocks(content: &str) -> Vec<FencedBlock> {
+    let lines: Vec<&str> = content.split('\n').collect();
+    fence_spans(&lines)
+        .into_iter()
+        .map(|(open, close, token)| FencedBlock {
+            language: (!token.is_empty()).then(|| token.to_string()),
+            code: lines[open + 1..close].join("\n"),
+        })
+        .collect()
+}
+
+/// `content` with every fenced block and inline code span replaced by a space,
+/// so a scan for `@name` sees only what a reader sees as prose. Inline spans
+/// follow `message_inline.dart`: one pair of backticks on one line, non-empty.
+pub(crate) fn prose_outside_code(content: &str) -> String {
+    let lines: Vec<&str> = content.split('\n').collect();
+    let mut in_fence = vec![false; lines.len()];
+    for (open, close, _) in fence_spans(&lines) {
+        in_fence[open..=close].fill(true);
+    }
+    let prose: Vec<String> = lines
+        .iter()
+        .zip(&in_fence)
+        .filter(|(_, fenced)| !**fenced)
+        .map(|(line, _)| without_inline_code(line))
+        .collect();
+    prose.join("\n")
+}
+
+fn without_inline_code(line: &str) -> String {
+    let mut out = String::with_capacity(line.len());
+    let mut rest = line;
+    while let Some(open) = rest.find('`') {
+        out.push_str(&rest[..open]);
+        let after = &rest[open + 1..];
+        match after.find('`') {
+            Some(close) if close > 0 => {
+                out.push(' ');
+                rest = &after[close + 1..];
+            }
+            _ => {
+                out.push('`');
+                rest = after;
+            }
+        }
+    }
+    out.push_str(rest);
+    out
 }
 
 /// The code of the `index`th fenced block, or `None` when there is no such block.

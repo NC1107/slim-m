@@ -14,5 +14,13 @@
   {"name": "a language line closes nothing", "content": "```\n```js\n```", "blocks": [{"language": null, "code": "```js"}]},
   {"name": "a trailing bare fence with no close is text", "content": "```js\na\n```\nb\n```", "blocks": [{"language": "js", "code": "a"}]},
   {"name": "no-break space after the tag is whitespace", "content": "```js \nx\n```", "blocks": [{"language": "js", "code": "x"}]},
-  {"name": "indented fence is text", "content": " ```js\nx\n```", "blocks": []}
+  {"name": "indented fence is text", "content": " ```js\nx\n```", "blocks": []},
+  {"name": "mention in inline code", "content": "run `@bob` in a shell", "blocks": [], "mentions": [], "quoted": ["bob"]},
+  {"name": "mention in a fence", "content": "```\n@bob\n```", "blocks": [{"language": null, "code": "@bob"}], "mentions": [], "quoted": ["bob"]},
+  {"name": "prose around code", "content": "hi @carol\n```sh\n@bob\n```\nbye `@dave`", "blocks": [{"language": "sh", "code": "@bob"}], "mentions": ["carol"], "quoted": ["bob", "dave"]},
+  {"name": "unterminated fence is prose", "content": "```js\n@bob never closed", "blocks": [], "mentions": ["bob"], "quoted": []},
+  {"name": "unclosed backtick is prose", "content": "a `@bob here", "blocks": [], "mentions": ["bob"], "quoted": []},
+  {"name": "doubled backticks", "content": "``@bob``", "blocks": [], "mentions": [], "quoted": ["bob"]},
+  {"name": "parenthesised code", "content": "(`@bob`)", "blocks": [], "mentions": [], "quoted": ["bob"]},
+  {"name": "a mention after a code span", "content": "`x` @carol", "blocks": [], "mentions": ["carol"], "quoted": []}
 ]

@@ -5,21 +5,33 @@
 /// without changing what runs (trojan source, CVE-2021-42574). The block
 /// keeps its bytes; the rendering swaps each such character for a named
 /// marker such as `<U+202E>`, and the Run affordance is withheld while any
-/// is present. The set mirrors the server's own refusal in `code_runs.rs`.
+/// is present. The set is the server's own refusal, `isHiddenCodeCharacter` below.
 library;
 
 import 'package:slimm_design_system/design_system.dart';
 
+/// Mirrors `is_hidden_char` in the server's `hidden_chars.rs`; both are held to
+/// `crates/slimm-server/tests/fixtures/hidden_chars.json`. Tab, line feed and
+/// carriage return are layout inside a code block, so they are the one exemption.
 bool isHiddenCodeCharacter(int c) {
   if (c == 0x09 || c == 0x0A || c == 0x0D) return false;
   return c < 0x20 ||
       (c >= 0x7F && c <= 0x9F) ||
+      c == 0x00AD ||
+      c == 0x034F ||
       c == 0x061C ||
+      (c >= 0x115F && c <= 0x1160) ||
+      (c >= 0x17B4 && c <= 0x17B5) ||
+      c == 0x180E ||
       (c >= 0x200B && c <= 0x200F) ||
-      (c >= 0x202A && c <= 0x202E) ||
-      c == 0x2060 ||
-      (c >= 0x2066 && c <= 0x2069) ||
-      c == 0xFEFF;
+      (c >= 0x2028 && c <= 0x202E) ||
+      (c >= 0x2060 && c <= 0x206F) ||
+      c == 0x2800 ||
+      c == 0x3164 ||
+      c == 0xFEFF ||
+      c == 0xFFA0 ||
+      (c >= 0xFFF9 && c <= 0xFFFC) ||
+      (c >= 0xE0000 && c <= 0xE007F);
 }
 
 bool hasHiddenCodeCharacters(String code) =>

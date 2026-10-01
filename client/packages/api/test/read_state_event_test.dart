@@ -28,4 +28,48 @@ void main() {
     );
     expect(event, isNull);
   });
+
+  test('carries the manual unread flag, false when an older server omits it',
+      () {
+    final marked = ServerEvent.parse(
+      jsonEncode({
+        'type': 'read_state.changed',
+        'channel_id': 'c1',
+        'last_read_seq': 7,
+        'manually_unread': true,
+      }),
+    );
+    expect((marked as ReadStateChanged).manuallyUnread, isTrue);
+    final legacy = ServerEvent.parse(
+      jsonEncode({
+        'type': 'read_state.changed',
+        'channel_id': 'c1',
+        'last_read_seq': 7,
+      }),
+    );
+    expect((legacy as ReadStateChanged).manuallyUnread, isFalse);
+  });
+
+  test('parses notification_override.changed, null meaning cleared', () {
+    final set = ServerEvent.parse(
+      jsonEncode({
+        'type': 'notification_override.changed',
+        'channel_id': 'c1',
+        'preference': 'mentions',
+      }),
+    );
+    expect(set, isA<NotificationOverrideChanged>());
+    expect(
+      (set as NotificationOverrideChanged).preference,
+      NotificationPreference.mentions,
+    );
+    final cleared = ServerEvent.parse(
+      jsonEncode({
+        'type': 'notification_override.changed',
+        'channel_id': 'c1',
+        'preference': null,
+      }),
+    );
+    expect((cleared as NotificationOverrideChanged).preference, isNull);
+  });
 }

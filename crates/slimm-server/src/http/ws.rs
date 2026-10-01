@@ -39,6 +39,7 @@ use frames::ClientFrame;
 use frames::ServerFrame;
 use permission_cache::PermissionCache;
 
+mod account_frames;
 mod authorization;
 mod canvas_frames;
 mod ephemeral_frames;

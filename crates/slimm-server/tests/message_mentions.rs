@@ -226,3 +226,53 @@ async fn editing_a_message_recomputes_who_it_mentions() {
         "the edit's new mention must resolve for carol"
     );
 }
+
+/// A name quoted in inline code or a fenced block is not a mention: it must
+/// not light the badge, and it must not wake a device either (the same scan
+/// feeds push). Driven from the vectors the client asserts, so both sides
+/// agree on where code starts and ends.
+#[tokio::test]
+async fn a_name_quoted_in_code_mentions_nobody() {
+    let (store, _guard) = new_store().await;
+    everyone_role(&store).await;
+    let channel = store.create_channel("general", "text").await.unwrap();
+    let app = app(store.clone());
+    let alice = register(&store, "alice").await;
+    let bob = register(&store, "bob").await;
+    let carol = register(&store, "carol").await;
+    let vectors: Vec<Value> =
+        serde_json::from_str(include_str!("fixtures/code_fence_vectors.json"))
+            .expect("the fence vectors are JSON");
+
+    let mut checked = 0;
+    for vector in vectors.iter().filter(|v| v.get("mentions").is_some()) {
+        let message_id = Uuid::now_v7().to_string();
+        let sent = app
+            .clone()
+            .oneshot(request(
+                "POST",
+                &format!("/channels/{}/messages", channel.id),
+                Some(&alice),
+                Some(json!({ "id": message_id, "content": vector["content"] })),
+            ))
+            .await
+            .unwrap();
+        assert_eq!(sent.status(), StatusCode::OK, "{}", vector["name"]);
+        for (name, token) in [("bob", &bob), ("carol", &carol)] {
+            let expected = vector["mentions"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .any(|m| m == name);
+            let listed = list_messages(&app, &channel.id.to_string(), token).await;
+            assert_eq!(
+                mentions_me(&listed, &message_id),
+                expected,
+                "{name} in vector: {}",
+                vector["name"]
+            );
+        }
+        checked += 1;
+    }
+    assert!(checked >= 8, "the vectors must carry mention expectations");
+}

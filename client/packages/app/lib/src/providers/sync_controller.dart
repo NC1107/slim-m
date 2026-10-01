@@ -11,6 +11,7 @@ import 'package:slimm_api/api.dart';
 import 'package:slimm_data/data.dart';
 
 import 'channel_history.dart';
+import 'channel_notification_overrides_controller.dart';
 import 'channel_refresher.dart';
 import 'dm_call_activity.dart';
 import 'dm_call_ring_controller.dart';

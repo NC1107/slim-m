@@ -150,6 +150,34 @@ mod tests {
         serde_json::from_str(&raw).expect("role_mention_charset_cases.json must be valid JSON")
     }
 
+    /// The fence vectors carry the mentions a reader sees outside code, which
+    /// `message_mentions_test.dart` asserts from the client side.
+    #[test]
+    fn the_code_fence_vectors_agree_on_which_mentions_are_prose() {
+        let vectors: Vec<serde_json::Value> =
+            serde_json::from_str(include_str!("../../tests/fixtures/code_fence_vectors.json"))
+                .unwrap();
+        let mut checked = 0;
+        for v in vectors.iter().filter(|v| v.get("mentions").is_some()) {
+            let content = v["content"].as_str().unwrap();
+            let expected: HashSet<String> = v["mentions"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .map(|m| m.as_str().unwrap().to_owned())
+                .collect();
+            let prose = crate::http::code_fences::prose_outside_code(content);
+            assert_eq!(
+                mentioned_usernames(&prose),
+                expected,
+                "vector: {}",
+                v["name"]
+            );
+            checked += 1;
+        }
+        assert!(checked >= 8);
+    }
+
     #[test]
     fn finds_every_distinct_mention_and_nothing_else() {
         let names = mentioned_usernames("hey @alice and @bob, cc @alice again, not an email");
