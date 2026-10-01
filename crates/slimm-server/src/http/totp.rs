@@ -21,7 +21,7 @@ use super::messages::parse_uuid;
 use crate::hub::Event;
 use crate::ids::UserId;
 use crate::permissions::Permissions;
-use crate::store::{ChallengeError, OpenError, TotpError, TotpProof};
+use crate::store::{ChallengeError, TotpError, TotpProof};
 
 const BODY_LIMIT: usize = 4 * 1024;
 
@@ -303,13 +303,8 @@ fn challenge_error(err: ChallengeError) -> ApiError {
         ChallengeError::Unusable => ApiError::Unauthorized,
         ChallengeError::BadCode => ApiError::BadRequest(BAD_CODE),
         ChallengeError::Locked { .. } => ApiError::TooManyRequests,
-        ChallengeError::Open(OpenError::Removed) => {
-            ApiError::ForbiddenBecause("you have been removed from this server")
-        }
-        ChallengeError::Open(OpenError::AccountGone) => ApiError::Unauthorized,
-        ChallengeError::Open(OpenError::Internal(err)) | ChallengeError::Internal(err) => {
-            err.into()
-        }
+        ChallengeError::Open(open) => open.into(),
+        ChallengeError::Internal(err) => err.into(),
     }
 }
 
