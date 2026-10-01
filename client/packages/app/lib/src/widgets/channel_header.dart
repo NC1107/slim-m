@@ -21,11 +21,10 @@ import 'package:slimm_design_system/design_system.dart';
 import '../screens/canvas/canvas_open_button.dart';
 import '../screens/dm_call_button.dart';
 import '../routing/breakpoints.dart';
-import 'channel_kind_icon.dart';
+import 'channel_title_glyph.dart';
 import 'member_pane.dart';
 import 'pinned_messages_sheet.dart';
 import 'threads_sheet.dart';
-import 'user_avatar.dart';
 
 /// How much of the header a channel name may take before it has to elide, so
 /// a long one cannot crowd the topic out entirely. Only applies when there is
@@ -141,26 +140,14 @@ class ChannelHeader extends ConsumerWidget {
                 );
                 return Row(
                   children: [
-                    // A DM is a person: show their avatar like every other member-naming surface. The personal space keeps its notebook, and a text or voice channel its own icon.
-                    if (isPersonalSpace)
-                      Icon(
-                        AppIcons.notebook,
-                        size: AppSizes.icon16,
-                        color: tokens.textSecondary,
-                      )
-                    else if (isDm)
-                      UserAvatar(
-                        name: name,
-                        userId: dmParticipantId,
-                        size: AppAvatarSize.s24,
-                        presence: true,
-                      )
-                    else
-                      ChannelKindIcon(
-                        isVoice: isVoice,
-                        restricted: restricted,
-                        color: tokens.textSecondary,
-                      ),
+                    ChannelTitleGlyph(
+                      name: name,
+                      isVoice: isVoice,
+                      restricted: restricted,
+                      isDm: isDm,
+                      isPersonalSpace: isPersonalSpace,
+                      dmParticipantId: dmParticipantId,
+                    ),
                     const SizedBox(width: AppSpacing.s8),
                     if (!hasTopic)
                       Expanded(child: nameText)

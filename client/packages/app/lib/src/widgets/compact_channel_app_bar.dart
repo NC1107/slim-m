@@ -20,7 +20,7 @@ import '../providers/channel_search_controller.dart';
 import '../providers/pins_controller.dart';
 import '../screens/canvas/canvas_open_button.dart';
 import '../screens/dm_call_button.dart';
-import 'channel_kind_icon.dart';
+import 'channel_title_glyph.dart';
 import 'pinned_messages_sheet.dart';
 import 'threads_sheet.dart';
 
@@ -75,6 +75,9 @@ class CompactChannelAppBar extends ConsumerWidget
         topic: channel?.topic,
         isVoice: isVoice,
         restricted: channel?.restricted ?? false,
+        isDm: isDm,
+        isPersonalSpace: channel?.isPersonalSpace ?? false,
+        dmParticipantId: channel?.dmParticipantId,
       ),
       // A voice channel has neither a message to find nor a message to pin,
       // so those two would be controls that cannot do anything.
@@ -99,12 +102,18 @@ class _Title extends StatelessWidget {
     required this.name,
     required this.topic,
     required this.isVoice,
+    required this.isDm,
+    required this.isPersonalSpace,
+    required this.dmParticipantId,
     this.restricted = false,
   });
 
   final String name;
   final String? topic;
   final bool isVoice;
+  final bool isDm;
+  final bool isPersonalSpace;
+  final String? dmParticipantId;
 
   /// See `ChannelHeader.restricted`'s own doc comment; this bar is that
   /// header's compact-width equivalent for the same channel.
@@ -121,10 +130,13 @@ class _Title extends StatelessWidget {
         Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            ChannelKindIcon(
+            ChannelTitleGlyph(
+              name: name,
               isVoice: isVoice,
               restricted: restricted,
-              color: tokens.textSecondary,
+              isDm: isDm,
+              isPersonalSpace: isPersonalSpace,
+              dmParticipantId: dmParticipantId,
             ),
             const SizedBox(width: AppSpacing.s8),
             Flexible(
