@@ -85,14 +85,12 @@ class InviteRoleGrantPicker extends ConsumerWidget {
             AppMenuItem(
               label: 'None',
               selected: selected == null,
-              leading: selected == null ? AppIcons.check : null,
               onTap: () => Navigator.of(sheetContext).pop(const _Choice(null)),
             ),
             for (final role in grantable)
               AppMenuItem(
                 label: role.name,
                 selected: role.id == selected,
-                leading: role.id == selected ? AppIcons.check : null,
                 onTap: () => Navigator.of(sheetContext).pop(_Choice(role.id)),
               ),
           ],

@@ -84,7 +84,7 @@ Future<void> showAppLauncherSheet(
           child: Padding(
             padding: const EdgeInsets.fromLTRB(
               AppSpacing.s12,
-              AppSpacing.s8,
+              0,
               AppSpacing.s12,
               AppSpacing.s12,
             ),

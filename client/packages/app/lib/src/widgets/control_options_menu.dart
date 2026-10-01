@@ -25,7 +25,7 @@ class ControlOption extends ControlOptionEntry {
   final VoidCallback onSelected;
   final AppMenuItemTone tone;
 
-  /// Marks the current value of a pick-one group, by a check as well as tint.
+  /// Marks the current value of a pick-one group; [AppMenuItem] adds the check.
   final bool selected;
 }
 
@@ -113,20 +113,10 @@ class _ControlOptionsMenuState extends State<ControlOptionsMenu> {
       leading: option.icon,
       tone: option.tone,
       selected: option.selected,
-      trailing: _trailing(context, option),
       onTap: () {
         close();
         option.onSelected();
       },
     ),
   ];
-
-  Widget? _trailing(BuildContext context, ControlOption option) {
-    if (!option.selected) return null;
-    return Icon(
-      AppIcons.check,
-      size: AppSizes.icon16,
-      color: Theme.of(context).extension<AppTokens>()!.accent,
-    );
-  }
 }

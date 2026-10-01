@@ -90,13 +90,13 @@ class CanvasEmptyHint extends StatelessWidget {
                 Text(
                   'Draw with the pen, drop a note or a shape, or paste an '
                   'image from "More canvas actions"',
-                  style: AppText.caption.copyWith(color: tokens.textDisabled),
+                  style: AppText.caption.copyWith(color: tokens.textSecondary),
                   textAlign: TextAlign.center,
                 ),
                 const SizedBox(height: AppSpacing.s4),
                 Text(
                   panZoomHint(MediaQuery.sizeOf(context).width),
-                  style: AppText.caption.copyWith(color: tokens.textDisabled),
+                  style: AppText.caption.copyWith(color: tokens.textSecondary),
                   textAlign: TextAlign.center,
                 ),
               ],

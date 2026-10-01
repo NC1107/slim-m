@@ -14,18 +14,17 @@ String formatDateTime(int epochMs, {required bool use24Hour}) {
   final y = dt.year.toString().padLeft(4, '0');
   final mo = dt.month.toString().padLeft(2, '0');
   final d = dt.day.toString().padLeft(2, '0');
-  final time = use24Hour
-      ? '${dt.hour.toString().padLeft(2, '0')}:'
-            '${dt.minute.toString().padLeft(2, '0')}'
-      : _h12(dt);
-  return '$y-$mo-$d $time';
+  return '$y-$mo-$d ${formatClock(dt, use24Hour: use24Hour)}';
 }
 
-String _h12(DateTime dt) {
-  final hour12 = dt.hour % 12 == 0 ? 12 : dt.hour % 12;
+/// `HH:mm` or `h:mm AM/PM` following [use24Hour]. The 12-hour form joins its
+/// suffix with a no-break space so a line never wraps inside the time.
+String formatClock(DateTime dt, {required bool use24Hour}) {
   final minute = dt.minute.toString().padLeft(2, '0');
+  if (use24Hour) return '${dt.hour.toString().padLeft(2, '0')}:$minute';
+  final hour12 = dt.hour % 12 == 0 ? 12 : dt.hour % 12;
   final suffix = dt.hour < 12 ? 'AM' : 'PM';
-  return '$hour12:$minute $suffix';
+  return '$hour12:$minute\u00A0$suffix';
 }
 
 /// The hours/minutes/seconds a [Duration] breaks into, shared by

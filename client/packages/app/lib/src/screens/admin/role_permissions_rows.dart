@@ -31,7 +31,7 @@ class GroupHeader extends StatelessWidget {
           child: Text(
             title.toUpperCase(),
             style: AppText.micro.copyWith(
-              color: tokens.textDisabled,
+              color: tokens.textSecondary,
               fontWeight: AppWeights.medium,
               letterSpacing: title.length * 0.5,
             ),
@@ -158,7 +158,7 @@ class PermissionListRow extends StatelessWidget {
               const SizedBox(width: AppSpacing.s4),
               Text(
                 "you don't hold this",
-                style: AppText.caption.copyWith(color: tokens.textDisabled),
+                style: AppText.caption.copyWith(color: tokens.textSecondary),
               ),
             ],
           );

@@ -26,6 +26,7 @@ import 'package:slimm_design_system/design_system.dart';
 import '../routing/breakpoints.dart';
 import 'animated_menu_portal.dart';
 import 'context_menu_focus.dart';
+import 'floating_dock_card.dart';
 import 'message_context_menu_layout.dart';
 
 /// Where the menu's top-left sits relative to the row's own top-left, used
@@ -213,6 +214,9 @@ class ContextMenuRegionState extends State<ContextMenuRegion> {
     if (widget.opensAbove) {
       final box = context.findRenderObject() as RenderBox?;
       if (box != null) {
+        final left = box.localToGlobal(Offset.zero, ancestor: overlay).dx;
+        final dockTop = FloatingDockCard.topEdgeOf(context, overlay);
+        if (dockTop != null) return Offset(left, dockTop - AppSpacing.s8);
         return box.localToGlobal(const Offset(0, -4), ancestor: overlay);
       }
     }

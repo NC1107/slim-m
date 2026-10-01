@@ -204,7 +204,8 @@ class AppMenuItem extends StatefulWidget {
   final bool submenu;
 
   /// The current-value background: `accentSoft` normally, `warnSoft` when
-  /// [tone] is [AppMenuItemTone.warn].
+  /// [tone] is [AppMenuItemTone.warn]. Also draws a trailing check unless a
+  /// [trailing] widget takes that slot, so the choice never rests on a tint.
   final bool selected;
   final AppMenuItemTone tone;
 
@@ -246,6 +247,17 @@ class _AppMenuItemState extends State<AppMenuItem> {
         ? tokens.warnSoft
         : tokens.accentSoft;
 
+    final trailing = widget.trailing ??
+        (widget.selected
+            ? Icon(
+                AppIcons.check,
+                size: AppSizes.icon16,
+                color: widget.tone == AppMenuItemTone.warn
+                    ? tokens.warnText
+                    : tokens.accent,
+              )
+            : null);
+
     // The tint rides AppListRow's fast hover clock; density is still layout.
     final content = AnimatedContainer(
       duration: AppMotion.reduced(context, AppMotion.fast),
@@ -282,13 +294,13 @@ class _AppMenuItemState extends State<AppMenuItem> {
               ),
             ),
           ),
-          if (widget.trailing != null || widget.submenu)
+          if (trailing != null || widget.submenu)
             Row(
               mainAxisSize: MainAxisSize.min,
               // 6 is literal in the source, not on the --space-* grid.
               spacing: 6,
               children: [
-                if (widget.trailing != null) widget.trailing!,
+                if (trailing != null) trailing,
                 if (widget.submenu)
                   Icon(AppIcons.chevronRight,
                       size: 12, color: tokens.textSecondary),

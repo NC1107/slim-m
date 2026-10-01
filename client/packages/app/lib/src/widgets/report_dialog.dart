@@ -52,7 +52,7 @@ class _ReportReasonSheetState extends State<_ReportReasonSheet> {
     return Padding(
       padding: EdgeInsets.fromLTRB(
         AppSpacing.s16,
-        AppSpacing.s16,
+        0,
         AppSpacing.s16,
         MediaQuery.viewInsetsOf(context).bottom + AppSpacing.s16,
       ),

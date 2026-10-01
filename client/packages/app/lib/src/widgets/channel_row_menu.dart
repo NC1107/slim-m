@@ -129,7 +129,7 @@ List<Widget> channelRowMenuItems(
       onTap: () => toggle(api.NotificationPreference.mentions),
     ),
     AppMenuItem(
-      label: 'Notify me off hours here',
+      label: 'Notify me off hours',
       leading: AppIcons.notificationsOn,
       selected: allowedOffHours,
       onTap: toggleOffHours,
