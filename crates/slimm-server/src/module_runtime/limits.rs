@@ -4,6 +4,8 @@
 
 use std::time::Duration;
 
+use wasmi::{StoreLimits, StoreLimitsBuilder};
+
 use crate::store::ModuleRuntimeLimits;
 
 /// Applied when a manifest's `runtime.limits` leaves memory unset: 16 MiB is
@@ -31,9 +33,30 @@ pub const MAX_MEMORY_MB: u64 = 256;
 /// request-response call the caller waits on, so ten seconds is already long.
 pub const MAX_WALL_MS: u64 = 10_000;
 /// The largest fuel budget a manifest may declare, forty times the default:
-/// the blocking task is not killed at the wall-clock deadline, only abandoned,
-/// so fuel is what actually ends a runaway run and must stay bounded too.
+/// fuel is the other bound on a runaway run, and it must stay finite.
 pub const MAX_FUEL: u64 = 2_000_000_000;
+
+/// The largest response a module may return. The output is copied out of the
+/// guest, parsed and sent whole to the caller, so it is bounded on its own
+/// rather than by the (up to 256 MiB) memory ceiling.
+pub const MAX_RESPONSE_BYTES: usize = 1024 * 1024;
+/// Bytes of the memory ceiling one declared table element is charged, so a
+/// table is paid for out of the same budget as linear memory (16 MiB allows
+/// one million elements) instead of being a free allocation.
+const TABLE_ELEMENT_BYTES: usize = 16;
+
+/// The store limiter for one run: linear memory, plus tables, memories and
+/// instances, all of which wasmi allocates at instantiation before any fuel is
+/// charged. A v1 module has one memory and one table and is one instance.
+pub fn store_limits(memory_bytes: usize) -> StoreLimits {
+    StoreLimitsBuilder::new()
+        .memory_size(memory_bytes)
+        .table_elements(memory_bytes / TABLE_ELEMENT_BYTES)
+        .memories(1)
+        .tables(1)
+        .instances(1)
+        .build()
+}
 
 /// The concrete caps one `run` call is held to, resolved from a manifest's
 /// (possibly partial) `runtime.limits` against the defaults above.
