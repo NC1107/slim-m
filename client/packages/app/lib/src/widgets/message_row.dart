@@ -437,6 +437,7 @@ class MessageRow extends StatelessWidget {
                                         ),
                                     if (!_unsent)
                                       ReactionsRow(
+                                        messageId: message.id,
                                         reactions: reactions,
                                         onReactionTap: onReactionTap,
                                         onPickReaction: onPickReaction,

@@ -47,4 +47,6 @@ A precomputed tally fanned out unfiltered once let a live reaction quietly undo 
 - Reacting reads as lower commitment than posting, and it is now attributable by anyone in the channel.
   That is what the owner asked for and what Discord does.
   A reaction can still be removed at any time, and removing it removes the person from the list.
-- The client surfaces are a sheet on phone-width layouts and a hover summary plus a right-click list on wide ones, per `docs/design/desktop-vs-mobile.md`.
+- The client surface is rule 3 of `docs/design/desktop-vs-mobile.md` (info about a thing): a bottom sheet below 600, an anchored popover beside the chip from 600 up.
+  Holding a chip opens it at any width, and so does a right-click.
+  Resting a mouse on a chip shows a tooltip with the first names, which is only a hint: the list is always one hold away, so no touch user loses anything (law 3).
