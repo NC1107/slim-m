@@ -330,8 +330,15 @@ class UniformGrid {
     _stamp = stamps;
   }
 
-  /// Two 32-bit signed cell coordinates packed into one 64-bit VM int, so a
-  /// bucket lookup hashes a scalar rather than an allocated point.
+  /// Two signed cell coordinates packed into one int, so a bucket lookup
+  /// hashes a scalar rather than an allocated point.
+  ///
+  /// Twenty-six bits each and a multiply rather than a 32-bit shift: compiled
+  /// to JavaScript a shift past 31 is zero, which made every cell in a row
+  /// one bucket on the web, and fifty-two bits is still exact in a double.
+  /// Twenty-six bits of cells is far past the bounded world at any cell size.
   static int _key(int cx, int cy) =>
-      (cx & 0xffffffff) << 32 | (cy & 0xffffffff);
+      (cx & _coordinateMask) * (_coordinateMask + 1) + (cy & _coordinateMask);
+
+  static const int _coordinateMask = 0x3ffffff;
 }
