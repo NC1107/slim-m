@@ -116,7 +116,7 @@ class _TurnOnRow extends ConsumerWidget {
               'yet. Starting again gives you a fresh key.'
         : null,
     onTap: () async {
-      final done = await showTotpEnrolSheet(context);
+      final done = await showTotpEnrolSheet(context, ref);
       if (done == true) ref.invalidate(totpStatusProvider);
     },
   );

@@ -97,6 +97,7 @@ mod reaction_emoji;
 mod reactions;
 mod read_states;
 mod read_sync;
+mod reauth;
 mod recovery;
 mod reports;
 mod reports_cursor;

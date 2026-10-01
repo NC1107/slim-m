@@ -213,7 +213,7 @@ void main() {
       displayName: 'Delete Client',
     );
     api = throwaway;
-    await api.deleteAccount();
+    await api.deleteAccount(password: 'hunter2hunter2');
     expect(api.session.isSignedIn, isFalse);
 
     await expectLater(

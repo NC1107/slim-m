@@ -48,16 +48,32 @@ const _codes = ['zzz-code-one', 'zzz-code-two', 'zzz-code-three'];
 /// Every request the section and its sheets make, with a per-path record so a
 /// test can assert what was and was not called.
 class _Server {
-  _Server({this.statusBody, this.confirmStatus = 200});
+  _Server({this.statusBody, this.confirmStatus = 200, this.passwordOk = true});
 
   final String? statusBody;
   final int confirmStatus;
+
+  /// False answers enrol and confirm like a server that refuses the password.
+  final bool passwordOk;
   final List<String> calls = [];
+
+  /// The JSON body of each enrol and confirm, in order.
+  final List<Map<String, dynamic>> bodies = [];
 
   MockClient get client => MockClient((request) async {
     final path = request.url.path;
     calls.add('${request.method} $path');
     final json = {'content-type': 'application/json'};
+    if (path == '/auth/totp/enrol' || path == '/auth/totp/confirm') {
+      bodies.add(jsonDecode(request.body) as Map<String, dynamic>);
+      if (!passwordOk) {
+        return http.Response(
+          jsonEncode({'error': 'that password is not correct'}),
+          403,
+          headers: json,
+        );
+      }
+    }
     return switch ((request.method, path)) {
       ('GET', '/auth/totp') => http.Response(
         statusBody ?? _status(),
@@ -137,6 +153,17 @@ Future<void> _tapSubmit(WidgetTester tester, String label) async {
   await tester.pumpAndSettle();
 }
 
+/// Taps the turn-on row and gets past the password step, which is the first
+/// thing the flow asks for.
+Future<void> _startEnrolment(WidgetTester tester) async {
+  await tester.tap(find.text('Turn on two-factor authentication'));
+  await tester.pumpAndSettle();
+  await tester.enterText(find.byType(TextField), 'correct horse');
+  await tester.pumpAndSettle();
+  await tester.tap(find.widgetWithText(AppButton, 'Continue'));
+  await tester.pumpAndSettle();
+}
+
 void main() {
   testWidgets('an account with no factor is offered one', (tester) async {
     await _pump(tester, _Server());
@@ -211,8 +238,7 @@ void main() {
     final server = _Server();
     await _pump(tester, server);
 
-    await tester.tap(find.text('Turn on two-factor authentication'));
-    await tester.pumpAndSettle();
+    await _startEnrolment(tester);
 
     expect(
       find.text('JBSWY3DPEHPK3PXP'),
@@ -241,14 +267,18 @@ void main() {
   ) async {
     final server = _Server();
     await _pump(tester, server);
-    await tester.tap(find.text('Turn on two-factor authentication'));
-    await tester.pumpAndSettle();
+    await _startEnrolment(tester);
 
     await tester.enterText(find.byType(TextField), '123456');
     await tester.pumpAndSettle();
     await _tapSubmit(tester, 'Turn on');
 
     expect(server.calls, contains('POST /auth/totp/confirm'));
+    expect(
+      server.bodies,
+      everyElement(containsPair('password', 'correct horse')),
+      reason: 'enrol and confirm both carry the password',
+    );
     for (final code in _codes) {
       expect(
         find.textContaining(code),
@@ -264,8 +294,7 @@ void main() {
   testWidgets('a refused code leaves the enrolment sheet open', (tester) async {
     final server = _Server(confirmStatus: 400);
     await _pump(tester, server);
-    await tester.tap(find.text('Turn on two-factor authentication'));
-    await tester.pumpAndSettle();
+    await _startEnrolment(tester);
 
     await tester.enterText(find.byType(TextField), '000000');
     await tester.pumpAndSettle();
@@ -277,5 +306,21 @@ void main() {
       findsOneWidget,
       reason: 'the same secret is still on screen to try again against',
     );
+  });
+
+  /// A session token alone must not start an enrolment: a wrong password is
+  /// told so, persistently, and the secret is never shown.
+  testWidgets('a wrong password keeps the password step open with the reason', (
+    tester,
+  ) async {
+    final server = _Server(passwordOk: false);
+    await _pump(tester, server);
+    await _startEnrolment(tester);
+
+    expect(find.text('That password is not correct.'), findsOneWidget);
+    expect(find.byType(AppErrorState), findsOneWidget);
+    expect(find.byType(SnackBar), findsNothing);
+    expect(find.text('JBSWY3DPEHPK3PXP'), findsNothing);
+    expect(find.widgetWithText(AppButton, 'Continue'), findsOneWidget);
   });
 }
