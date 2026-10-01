@@ -128,7 +128,8 @@ pub(super) async fn deliver(
 
     // Only when a device actually asked, so nobody opting in costs nothing.
     let preview = if targets.iter().any(|target| target.include_content) {
-        message_preview(&store, channel_id, author_id, &content).await
+        let text = super::preview_text::preview_text(&store, message_id, &content).await;
+        message_preview(&store, channel_id, author_id, &text).await
     } else {
         None
     };
