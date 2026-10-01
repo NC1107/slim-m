@@ -60,14 +60,8 @@ async fn issue(
     State(state): State<AppState>,
 ) -> Result<Json<ResetCodeIssued>, ApiError> {
     enforce(&state, &parts, Some(&ctx), Class::Write)?;
-    if !state
-        .store
-        .base_permissions(ctx.user_id)
-        .await?
-        .contains(Permissions::ADMINISTRATOR)
-    {
-        return Err(ApiError::Forbidden);
-    }
+    super::extract::require_base_permission(&state, ctx.user_id, Permissions::ADMINISTRATOR)
+        .await?;
 
     let user_id = UserId(parse_uuid(&user_id)?);
     match state.store.issue_reset_code(ctx.user_id, user_id).await {

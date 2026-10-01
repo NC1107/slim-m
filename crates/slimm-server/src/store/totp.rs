@@ -165,6 +165,20 @@ impl Store {
         Ok(found.is_some())
     }
 
+    /// Whether `required_for_elevated` is on and this person, who can enrol, has not.
+    ///
+    /// A bot is never owed one: it has no way to enrol, and a missing
+    /// permission that disables a bot is a bug.
+    pub async fn elevated_factor_missing(&self, user_id: UserId) -> anyhow::Result<bool> {
+        if self.totp_policy().await? != TotpPolicy::RequiredForElevated {
+            return Ok(false);
+        }
+        if self.is_bot(user_id).await? {
+            return Ok(false);
+        }
+        Ok(!self.totp_is_enabled(user_id).await?)
+    }
+
     /// Starts an enrolment: mints a secret and stores it unconfirmed.
     ///
     /// Replaces an existing *unconfirmed* enrolment, since a member who
