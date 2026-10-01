@@ -37,10 +37,10 @@ mod canvas_ops_sweep;
 mod canvas_ops_write;
 mod categories;
 mod channel_create;
-mod channel_join_muted;
 mod channel_notification_prefs;
 mod channel_order;
 mod channel_restricted;
+mod channel_settings;
 mod channel_slow_mode;
 mod channels;
 mod code_runs;
@@ -137,6 +137,7 @@ pub use canvas_ops_write::{CanvasOpRequest, MAX_REMOVE_IDS_PER_OP, SubmitOpError
 pub use categories::CreatedCategory;
 pub use channel_create::{CreateChannelError, CreatedChannel};
 pub use channel_order::{ChannelOrderGroup, ReorderChannelsError, ReorderOutcome};
+pub use channel_settings::ChannelPatch;
 pub use channels::DeleteChannelError;
 pub use code_runs::{CodeRunSummary, MAX_SHARED_OUTPUT_BYTES, clamp_output};
 pub(crate) use dms::DM_CHANNEL_KIND;
@@ -261,7 +262,7 @@ pub struct Channel {
     pub slow_mode_seconds: i64,
     /// Voice-channel default that every client opens its mic off on join. A
     /// default, not a lock: SPEAK overwrites are what restrict speaking. See
-    /// [`super::channel_join_muted::Store::update_channel_join_muted`].
+    /// [`super::channel_settings::Store::update_channel_settings`].
     pub join_muted: bool,
 }
 

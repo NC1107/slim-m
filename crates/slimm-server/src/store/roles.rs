@@ -291,10 +291,15 @@ impl Store {
         name: Option<&str>,
         permissions: Option<Permissions>,
         mentionable: Option<bool>,
+        hoist: Option<bool>,
     ) -> Result<Option<Role>, RoleGuardError> {
         let mut tx = self.begin_write().await?;
 
-        let affected: u64 = if name.is_none() && permissions.is_none() && mentionable.is_none() {
+        let affected: u64 = if name.is_none()
+            && permissions.is_none()
+            && mentionable.is_none()
+            && hoist.is_none()
+        {
             let exists = sqlx::query_scalar!(
                 r#"SELECT 1 AS "one!: i64" FROM roles WHERE id = ?"#,
                 role_id
@@ -323,6 +328,13 @@ impl Store {
                 builder
                     .push("mentionable = ")
                     .push_bind(i64::from(mentionable));
+                first = false;
+            }
+            if let Some(hoist) = hoist {
+                if !first {
+                    builder.push(", ");
+                }
+                builder.push("hoist = ").push_bind(i64::from(hoist));
             }
             builder.push(" WHERE id = ").push_bind(role_id);
             builder.build().execute(&mut *tx).await?.rows_affected()

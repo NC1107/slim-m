@@ -175,7 +175,7 @@ async fn create(
     if created.fresh && req.mentionable.unwrap_or(false) {
         state
             .store
-            .update_role(created.id, None, None, Some(true))
+            .update_role(created.id, None, None, Some(true), None)
             .await
             .map_err(role_guard_error)?;
     }
@@ -222,14 +222,11 @@ async fn update(
         )?;
     }
 
+    // Hoist cannot remove an administrator, so it needs no guard of its own.
     let updated = state
         .store
-        .update_role(role_id, name, permissions, req.mentionable)
+        .update_role(role_id, name, permissions, req.mentionable, req.hoist)
         .await;
-    // A second write, as on create; hoist cannot remove an administrator so it needs no guard.
-    if let (Ok(Some(_)), Some(hoist)) = (&updated, req.hoist) {
-        state.store.set_role_hoist(role_id, hoist).await?;
-    }
     match updated {
         Ok(Some(role)) => {
             let role = state.store.role(role.id).await?.ok_or(ApiError::Internal)?;
