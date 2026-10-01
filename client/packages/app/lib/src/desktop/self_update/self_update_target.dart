@@ -12,6 +12,7 @@ import 'linux_install.dart' as linux;
 import 'linux_layout.dart';
 import 'macos_install.dart' as macos;
 import 'macos_layout.dart';
+import 'rollback_record.dart';
 import 'self_update.dart';
 import 'update_manifest.dart';
 import 'windows_install.dart' as windows;
@@ -30,6 +31,10 @@ abstract interface class SelfUpdateTarget {
   Future<void> install(VerifiedUpdate update, {linux.Unpack? unpack});
   void confirmCleanStart();
   String? takeRollbackNotice();
+
+  /// The highest version ever rolled back from, which must never be offered
+  /// again; unlike the notice, reading it consumes nothing.
+  String? failedVersion();
 
   /// Counts this start and, where the app is its own launcher, puts the
   /// previous version back when the new one keeps failing. True means it did
@@ -98,6 +103,11 @@ class _LinuxTarget implements SelfUpdateTarget {
   @override
   String? takeRollbackNotice() => linux.takeRollbackNotice(layout);
   @override
+  String? failedVersion() => failedVersionFloor(
+    rolledBack: File(layout.path(LayoutNames.rolledBack)),
+    record: File(layout.path(LayoutNames.failedVersion)),
+  );
+  @override
   bool rollBackIfStuck() => false;
 }
 
@@ -130,6 +140,11 @@ class _WindowsTarget implements SelfUpdateTarget {
   @override
   String? takeRollbackNotice() => windows.takeWindowsRollbackNotice(layout);
   @override
+  String? failedVersion() => failedVersionFloor(
+    rolledBack: File(layout.path(LayoutNames.rolledBack)),
+    record: File(layout.path(LayoutNames.failedVersion)),
+  );
+  @override
   bool rollBackIfStuck() => false;
 }
 
@@ -161,6 +176,11 @@ class _MacosTarget implements SelfUpdateTarget {
 
   @override
   String? takeRollbackNotice() => macos.takeMacosRollbackNotice(layout);
+  @override
+  String? failedVersion() => failedVersionFloor(
+    rolledBack: File(layout.path(MacosNames.rolledBack)),
+    record: File(layout.path(MacosNames.failedVersion)),
+  );
 
   @override
   bool rollBackIfStuck() => macos.rollBackMacosIfStuck(layout);

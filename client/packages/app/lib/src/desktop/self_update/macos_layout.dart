@@ -14,6 +14,7 @@ abstract final class MacosNames {
   static const pending = 'pending';
   static const pendingTries = 'pending.tries';
   static const rolledBack = 'rolled-back';
+  static const failedVersion = 'failed-version';
   static const staging = '.staging';
   static const appSuffix = '.app';
 }
