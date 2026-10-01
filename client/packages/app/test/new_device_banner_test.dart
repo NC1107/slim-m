@@ -8,6 +8,7 @@ library;
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
@@ -122,6 +123,48 @@ void main() {
 
     expect(find.byType(NewDeviceSignInBanner), findsNothing);
     expect(find.text('shell'), findsOneWidget);
+  });
+
+  group('the sign-in time reads as the rest of the app does', () {
+    final signedIn = DateTime(2026, 9, 30, 21, 25).millisecondsSinceEpoch;
+    final now = DateTime(2026, 9, 30, 21, 40);
+
+    test('today, yesterday and an older day follow the transcript wording', () {
+      expect(
+        signInWhen(signedIn, use24Hour: false, now: now),
+        'today at 9:25\u00A0PM',
+      );
+      expect(signInWhen(signedIn, use24Hour: true, now: now), 'today at 21:25');
+      expect(
+        signInWhen(signedIn, use24Hour: false, now: DateTime(2026, 10, 1)),
+        'yesterday at 9:25\u00A0PM',
+      );
+      expect(
+        signInWhen(signedIn, use24Hour: false, now: DateTime(2026, 11, 3)),
+        'on September 30 at 9:25\u00A0PM',
+      );
+    });
+  });
+
+  testWidgets('at phone width the banner shows no ISO date and keeps the '
+      'time on one line', (tester) async {
+    final harness = await _pump(tester);
+    await _emit(tester, harness);
+
+    final line = find.textContaining('New sign-in:');
+    final text = tester.widget<Text>(line).data!;
+    expect(text, isNot(matches(RegExp(r'\d{4}-\d{2}-\d{2}'))));
+    final time = RegExp(r'\d{1,2}:\d{2}\u00A0[AP]M').firstMatch(text)!;
+
+    final paragraph = tester.renderObject<RenderParagraph>(line);
+    final boxes = paragraph.getBoxesForSelection(
+      TextSelection(baseOffset: time.start, extentOffset: time.end),
+    );
+    expect(
+      boxes,
+      hasLength(1),
+      reason: 'the clock time wraps across two lines: $text',
+    );
   });
 
   const viewports = {'phone': Size(390, 844), 'desktop': Size(1400, 880)};

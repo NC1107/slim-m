@@ -17,6 +17,7 @@ import '../format.dart';
 import '../providers/display_preferences.dart';
 import '../providers/new_device_alert.dart';
 import '../routing/routes.dart';
+import 'message_row_identity.dart' show formatMessageDay;
 
 class NewDeviceBannerHost extends ConsumerWidget {
   const NewDeviceBannerHost({super.key, required this.child});
@@ -56,7 +57,7 @@ class NewDeviceSignInBanner extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final when = formatDateTime(
+    final when = signInWhen(
       alert.signedInAt,
       use24Hour: watchUse24Hour(ref, context),
     );
@@ -68,7 +69,7 @@ class NewDeviceSignInBanner extends ConsumerWidget {
         children: [
           Text(
             'New sign-in: ${newDeviceLabel(alert)} signed in to your account '
-            'at $when.',
+            '$when.',
           ),
           Wrap(
             spacing: AppSpacing.s8,
@@ -94,6 +95,22 @@ class NewDeviceSignInBanner extends ConsumerWidget {
       ),
     );
   }
+}
+
+/// "today at 9:25 PM", "yesterday at ...", or "on September 30 at ...": the
+/// day wording the transcript's dividers use, with the user's clock choice.
+String signInWhen(int epochMs, {required bool use24Hour, DateTime? now}) {
+  final day = formatMessageDay(epochMs, now: now);
+  final dayPhrase = switch (day) {
+    'Today' => 'today',
+    'Yesterday' => 'yesterday',
+    _ => 'on $day',
+  };
+  final clock = formatClock(
+    DateTime.fromMillisecondsSinceEpoch(epochMs),
+    use24Hour: use24Hour,
+  );
+  return '$dayPhrase at $clock';
 }
 
 /// The device's name, with the platform it reported when that adds something.
