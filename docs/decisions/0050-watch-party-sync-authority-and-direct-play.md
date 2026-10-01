@@ -1,6 +1,6 @@
 # 0050 - The watch party keeps its shared track and gains per-viewer direct play
 
-Status: accepted (a design decision; nothing here is built)
+Status: accepted (a design decision); stage 1, the durable watch session and the position readout, is built (#1527), and stages 2 to 5 are not
 Date: 2026-09-30
 Extends: 0035 (module or bot), 0045 (bot-contributed UI), 0014 (canvas video subscription culling)
 Relates to: 0021 (module ABI), 0023 (mediated host capabilities), 0043 (scene timeline), 0010 (canvas media tiles)

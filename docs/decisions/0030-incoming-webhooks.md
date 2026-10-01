@@ -1,6 +1,6 @@
 # 0030 - Incoming webhooks, and the authorship model they force
 
-Status: proposed (design; nothing here is built, and the open questions at the end are the owner's)
+Status: accepted; built (delivery, embeds, the admin surface and rotation are live, see the addenda, and the owner answered the open questions)
 Date: 2026-09-23
 
 ## The gap

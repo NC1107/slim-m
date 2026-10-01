@@ -1,7 +1,7 @@
 # 0041 - Per-user installs and signed self-update
 
 Date: 2026-09-28
-Status: proposed; the design, the CI signing, the verified download and the Linux, Windows and macOS appliers are built; the macOS one has never run on a real Mac
+Status: accepted; the design, the CI signing, the verified download and the Linux, Windows and macOS appliers are built; the macOS one has never run on a real Mac
 
 ## Context
 

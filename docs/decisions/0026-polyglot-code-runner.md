@@ -1,7 +1,7 @@
 <!-- SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0 -->
 # 0026 - One runner service for the common languages, modules for the odd ones
 
-Status: proposed, 2026-09-16.
+Status: accepted, 2026-09-16; the server broker and the client Run button are built, and the runner itself stays an optional Piston instance set with `SLIMM_CODE_RUNNER_URL`.
 Amended the same day.
 The runner is not ours to build and it is not WebAssembly; see "What changed, and why" at the end.
 Raised by the owner after finding that a python code block offered a Run button and answered with a JavaScript engine's `ReferenceError`.

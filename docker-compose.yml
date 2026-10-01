@@ -45,6 +45,8 @@ services:
       # unauthenticated caller in one rate-limit bucket; deploy/README.md.
       SLIMM_TRUST_PROXY_HOPS: ${SLIMM_TRUST_PROXY_HOPS:-1}
       SLIMM_MAX_TOTAL_ATTACHMENT_BYTES: ${SLIMM_MAX_TOTAL_ATTACHMENT_BYTES:-}
+      # Empty means no floor; the server reads an empty value as unset.
+      SLIMM_MIN_CLIENT_VERSION: ${SLIMM_MIN_CLIENT_VERSION:-}
       # Both unset means no GIF search at all, and no client-facing button for
       # it; deploy/README.md.
       SLIMM_GIF_PROVIDER: ${SLIMM_GIF_PROVIDER:-}

@@ -1,6 +1,6 @@
 # 0047 - The call dock
 
-Status: accepted (a design review; nothing here is built yet except where a section says so)
+Status: accepted (a design review); points 1, 2, 4 and 11 are built (#1517), the rest is not built yet except where a section says so
 Date: 2026-09-30
 Extends: 0004 (canvas tools are same-level, one-tap buttons), 0040 (mini-player and pop-out)
 
