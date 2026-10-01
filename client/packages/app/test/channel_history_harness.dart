@@ -21,6 +21,7 @@ import 'package:http/testing.dart';
 import 'package:slimm_api/api.dart' as api;
 import 'package:slimm_app/src/providers/message_page_size.dart';
 import 'package:slimm_app/src/providers/providers.dart';
+import 'package:slimm_app/src/providers/rate_limit_retry.dart';
 import 'package:slimm_app/src/providers/sync_controller.dart';
 import 'package:slimm_app/src/routing/routes.dart';
 import 'package:slimm_app/src/screens/channel_screen.dart';
@@ -114,6 +115,8 @@ class HistoryHarness {
     required this.store,
     required this.container,
     required this.historyRequests,
+    required this.userRequests,
+    required this.rateLimitWaits,
     required Completer<void>? gate,
   }) : _gate = gate;
 
@@ -124,6 +127,13 @@ class HistoryHarness {
   /// Every `GET .../messages` this screen made, in order, so a test can say
   /// what was asked for as well as what came back.
   final List<Uri> historyRequests;
+
+  /// Every `GET /users` and `GET /users/{id}` this screen made, so a test can
+  /// count what resolving a page of authors cost.
+  final List<Uri> userRequests;
+
+  /// How long each rate-limit retry was asked to wait; nothing really sleeps.
+  final List<Duration> rateLimitWaits;
 
   final Completer<void>? _gate;
 
@@ -171,6 +181,9 @@ Future<HistoryHarness> mountChannel(
   MessageStore Function(SlimmDatabase db)? storeFactory,
   List<Map<String, dynamic>> searchHits = const [],
   MessagePageSize messagePageSize = defaultMessagePageSize,
+  String Function(int seq)? authorFor,
+  int olderPageRateLimits = 0,
+  int? rateLimitRetryAfter,
 }) async {
   tester.view.physicalSize = const Size(500, 800);
   tester.view.devicePixelRatio = 1;
@@ -183,11 +196,29 @@ Future<HistoryHarness> mountChannel(
     const api.Channel(id: 'c1', name: 'general', kind: 'text', createdAt: 0),
   ]);
   await store.applyMessages(
-    seededSeqs.map((seq) => channelMessage(seq, authorId: messageAuthorId)),
+    seededSeqs.map(
+      (seq) => channelMessage(
+        seq,
+        authorId: authorFor?.call(seq) ?? messageAuthorId,
+      ),
+    ),
   );
 
   final requests = <Uri>[];
-  final gate = holdOlderPages ? Completer<void>() : null;
+  final userRequests = <Uri>[];
+  final waits = <Duration>[];
+  final server = _FakeServer(
+    serverSeqs: serverSeqs,
+    requests: requests,
+    userRequests: userRequests,
+    gate: holdOlderPages ? Completer<void>() : null,
+    olderPagesFail: olderPagesFail,
+    olderPageRateLimits: olderPageRateLimits,
+    rateLimitRetryAfter: rateLimitRetryAfter,
+    authorFor: authorFor ?? (_) => messageAuthorId,
+    blockedUserIds: blockedUserIds,
+    searchHits: searchHits,
+  );
   final container = ProviderContainer(
     overrides: [
       keyStoreProvider.overrideWithValue(InMemoryKeyStore()),
@@ -196,6 +227,7 @@ Future<HistoryHarness> mountChannel(
         (ref) => MessagePageSizeController(ref, messagePageSize),
       ),
       storeProvider.overrideWith((ref) async => store),
+      rateLimitWaitProvider.overrideWithValue((d) async => waits.add(d)),
       syncControllerProvider.overrideWith(
         (ref) => _NoopSyncController(ref, syncStatus),
       ),
@@ -203,18 +235,7 @@ Future<HistoryHarness> mountChannel(
         final client = api.SlimmApi(
           baseUrl: Uri.parse('http://localhost:8080'),
           session: ref.watch(sessionProvider),
-          httpClient: MockClient(
-            (request) => _answer(
-              request,
-              serverSeqs,
-              requests,
-              gate,
-              olderPagesFail,
-              messageAuthorId,
-              blockedUserIds,
-              searchHits,
-            ),
-          ),
+          httpClient: MockClient(server.answer),
         );
         ref.onDispose(client.close);
         return client;
@@ -254,52 +275,93 @@ Future<HistoryHarness> mountChannel(
     store: store,
     container: container,
     historyRequests: requests,
-    gate: gate,
+    userRequests: userRequests,
+    rateLimitWaits: waits,
+    gate: server.gate,
   );
 }
 
-Future<http.Response> _answer(
-  http.Request request,
-  List<int> serverSeqs,
-  List<Uri> requests,
-  Completer<void>? gate,
-  bool olderPagesFail,
-  String messageAuthorId,
-  List<String> blockedUserIds,
-  List<Map<String, dynamic>> searchHits,
-) async {
-  final path = request.url.path;
-  if (request.method == 'GET' && path == '/channels/c1/messages/search') {
-    return _jsonBody(searchHits);
-  }
-  if (request.method == 'GET' && path == '/channels/c1/messages') {
-    requests.add(request.url);
-    final older = request.url.queryParameters.containsKey('before');
-    if (gate != null && older) await gate.future;
-    if (olderPagesFail && older) {
-      return http.Response(
-        jsonEncode({'error': 'nope'}),
-        500,
-        headers: {'content-type': 'application/json'},
-      );
+/// The fake server behind [mountChannel]; a class so a new behaviour is a
+/// field, not another positional parameter.
+class _FakeServer {
+  _FakeServer({
+    required this.serverSeqs,
+    required this.requests,
+    required this.userRequests,
+    required this.gate,
+    required this.olderPagesFail,
+    required this.olderPageRateLimits,
+    required this.rateLimitRetryAfter,
+    required this.authorFor,
+    required this.blockedUserIds,
+    required this.searchHits,
+  });
+
+  final List<int> serverSeqs;
+  final List<Uri> requests;
+  final List<Uri> userRequests;
+  final Completer<void>? gate;
+  final bool olderPagesFail;
+  final int olderPageRateLimits;
+  final int? rateLimitRetryAfter;
+  final String Function(int seq) authorFor;
+  final List<String> blockedUserIds;
+  final List<Map<String, dynamic>> searchHits;
+  int _rateLimited = 0;
+
+  Future<http.Response> answer(http.Request request) async {
+    final path = request.url.path;
+    if (request.method == 'GET' && path.startsWith('/users')) {
+      userRequests.add(request.url);
     }
-    return _jsonBody(_page(request.url, serverSeqs, messageAuthorId));
+    if (request.method == 'GET' && path == '/channels/c1/messages/search') {
+      return _jsonBody(searchHits);
+    }
+    if (request.method == 'GET' && path == '/channels/c1/messages') {
+      requests.add(request.url);
+      final older = request.url.queryParameters.containsKey('before');
+      if (gate != null && older) await gate!.future;
+      if (older && _rateLimited < olderPageRateLimits) {
+        _rateLimited++;
+        return http.Response(
+          jsonEncode({
+            'error': 'rate limited',
+            if (rateLimitRetryAfter != null)
+              'retry_after_seconds': rateLimitRetryAfter,
+          }),
+          429,
+          headers: {
+            'content-type': 'application/json',
+            if (rateLimitRetryAfter != null)
+              'retry-after': '$rateLimitRetryAfter',
+          },
+        );
+      }
+      if (olderPagesFail && older) {
+        return http.Response(
+          jsonEncode({'error': 'nope'}),
+          500,
+          headers: {'content-type': 'application/json'},
+        );
+      }
+      return _jsonBody(_page(request.url, serverSeqs, authorFor));
+    }
+    if (request.method == 'GET' && path == '/me') return _jsonBody(_meJson());
+    if (request.method == 'GET' && path == '/blocks') {
+      return _jsonBody(blockedUserIds);
+    }
+    if (request.method == 'PUT' && path == '/channels/c1/read') {
+      return _jsonBody({'last_read_seq': 0, 'unread': 0});
+    }
+    if (_answersEmpty(request.method, path)) {
+      return _jsonBody(const <Object>[]);
+    }
+    throw StateError(
+      'channel_history_harness._FakeServer has no route for ${request.method} '
+      '$path - add it to _answersEmpty if an empty body is legitimate, or '
+      'answer it explicitly if a test now depends on its content',
+    );
   }
-  if (request.method == 'GET' && path == '/me') return _jsonBody(_meJson());
-  if (request.method == 'GET' && path == '/blocks') {
-    return _jsonBody(blockedUserIds);
-  }
-  if (request.method == 'PUT' && path == '/channels/c1/read') {
-    return _jsonBody({'last_read_seq': 0, 'unread': 0});
-  }
-  if (_answersEmpty(request.method, path)) {
-    return _jsonBody(const <Object>[]);
-  }
-  throw StateError(
-    'channel_history_harness._answer has no route for ${request.method} '
-    '$path - add it to _answersEmpty if an empty body is legitimate, or '
-    'answer it explicitly if a test now depends on its content',
-  );
 }
 
 /// Routes this harness legitimately answers empty for: side-channel lookups
@@ -329,7 +391,7 @@ bool _answersEmpty(String method, String path) {
 List<Map<String, dynamic>> _page(
   Uri url,
   List<int> serverSeqs,
-  String authorId,
+  String Function(int seq) authorFor,
 ) {
   final before = int.tryParse(url.queryParameters['before'] ?? '');
   final limit = int.tryParse(url.queryParameters['limit'] ?? '') ?? 50;
@@ -337,7 +399,7 @@ List<Map<String, dynamic>> _page(
     ..sort((a, b) => b.compareTo(a));
   return [
     for (final seq in seqs.take(limit))
-      _messageJson(channelMessage(seq, authorId: authorId)),
+      _messageJson(channelMessage(seq, authorId: authorFor(seq))),
   ];
 }
 

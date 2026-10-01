@@ -44,6 +44,7 @@ import 'package:slimm_data/data.dart';
 import 'message_extras.dart';
 import 'message_page_size.dart';
 import 'providers.dart';
+import 'rate_limit_retry.dart';
 import 'retention_policy.dart';
 
 /// The transcript's opening window, matching [MessageStore.watchChannel]'s
@@ -134,6 +135,10 @@ class ChannelHistoryController extends StateNotifier<ChannelHistory> {
   /// joins this session's live-watched window. A null or zero cursor means
   /// nothing delivered is loaded yet, so there is no keyset to page from.
   ///
+  /// A page the server refuses for rate limiting is retried quietly, after
+  /// the wait it names, while [ChannelHistory.loading] stays set; only a
+  /// refusal that outlasts the retry budget becomes [ChannelHistory.failed].
+  ///
   /// The page size is the user's [messagePageSizeControllerProvider] choice,
   /// read once here so the number asked for and the number that decides
   /// [ChannelHistory.atStart] are the same: a page shorter than requested is
@@ -146,9 +151,12 @@ class ChannelHistoryController extends StateNotifier<ChannelHistory> {
     final pageSize = _ref.read(messagePageSizeControllerProvider).rows;
     state = state.copyWith(loading: true);
     try {
-      final older = await _ref
-          .read(apiProvider)
-          .listMessages(_channelId, before: oldest, limit: pageSize);
+      final older = await retryWhenRateLimited(
+        () => _ref
+            .read(apiProvider)
+            .listMessages(_channelId, before: oldest, limit: pageSize),
+        wait: _ref.read(rateLimitWaitProvider),
+      );
       final store = await _ref.read(storeProvider.future);
       await store.applyMessages(older);
       if (!mounted) return;

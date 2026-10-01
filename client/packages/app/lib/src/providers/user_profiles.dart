@@ -4,11 +4,11 @@
 /// and needs the avatar cache key ([api.UserProfile.avatarUpdatedAt]) that
 /// comes with it.
 ///
-/// A direct fetch rather than a shortcut through the member pane's
-/// already-loaded list: that would make this file depend on a widget-layer
-/// provider, and the family cache below already means a given author is
-/// only ever fetched once per session regardless of how many of their
-/// messages are on screen.
+/// Fetched rather than taken from the member pane's already-loaded list: that
+/// would make this file depend on a widget-layer provider. The batch cache
+/// below means a given author is only ever fetched once per session
+/// regardless of how many of their messages are on screen, and the ids of one
+/// frame's rows share a single request.
 ///
 /// [BatchProfilesController]'s map is left uncapped, deliberately rather than
 /// by oversight (see `retention_policy.dart` for the sibling caches this was
@@ -29,17 +29,20 @@ import 'package:slimm_api/api.dart' as api;
 import '../widgets/author_label.dart' show AuthorResolution;
 import 'live_events.dart';
 import 'providers.dart';
+import 'rate_limit_retry.dart';
 
 /// Null for a deleted or anonymized account (a 404), exactly like
-/// [api.SlimmApiUsers.getUser] itself.
+/// [api.SlimmApi.listUsers] itself.
+///
+/// Answered from [batchProfilesControllerProvider], so the avatars and name
+/// labels of a page of messages ask `GET /users?ids=` once between them
+/// rather than `GET /users/{id}` once each, and an author already held is
+/// never asked for again.
 final userProfileProvider = FutureProvider.autoDispose
-    .family<api.UserProfile?, String>((ref, userId) async {
-      try {
-        return await ref.watch(apiProvider).getUser(userId);
-      } on api.NotFoundException {
-        return null;
-      }
-    });
+    .family<api.UserProfile?, String>(
+      (ref, userId) =>
+          ref.read(batchProfilesControllerProvider.notifier).profile(userId),
+    );
 
 /// Resolves several ids in one round trip, for a caller that needs more than
 /// one at a time (a report card needs its reporter and, for a user report,
@@ -69,19 +72,71 @@ class BatchProfilesController
   final Ref _ref;
   late final StreamSubscription<api.ServerEvent> _sub;
 
+  /// Ids asked for and not yet answered, each with the callers waiting on it.
+  final Map<String, Completer<api.UserProfile?>> _waiting = {};
+
+  /// The subset of [_waiting] not yet sent: what the next flush batches.
+  final Set<String> _unsent = {};
+  bool _flushScheduled = false;
+
+  /// [id]'s profile, from the cache or from the next batch.
+  ///
+  /// Every id asked for before the current frame's build pass ends rides one
+  /// request (a microtask flush), and an id already in flight is joined, not
+  /// asked again. Null for an account that is gone; throws what the request
+  /// threw, leaving the id uncached so a later ask retries.
+  Future<api.UserProfile?> profile(String id) {
+    if (state.containsKey(id)) return Future.value(state[id]);
+    final existing = _waiting[id];
+    if (existing != null) return existing.future;
+    final waiter = _waiting[id] = Completer<api.UserProfile?>();
+    _unsent.add(id);
+    if (!_flushScheduled) {
+      _flushScheduled = true;
+      scheduleMicrotask(_flush);
+    }
+    return waiter.future;
+  }
+
+  void _flush() {
+    _flushScheduled = false;
+    final ids = _unsent.toList(growable: false);
+    _unsent.clear();
+    if (ids.isNotEmpty) unawaited(_fetch(ids));
+  }
+
+  /// One request, split by the api layer only if it passes the server's cap,
+  /// and retried after the server's own hint when it is rate limited.
+  Future<void> _fetch(List<String> ids) async {
+    try {
+      final client = _ref.read(apiProvider);
+      final found = await retryWhenRateLimited(
+        () => client.listUsers(ids),
+        wait: _ref.read(rateLimitWaitProvider),
+      );
+      final byId = {for (final profile in found) profile.id: profile};
+      if (mounted) state = {...state, for (final id in ids) id: byId[id]};
+      for (final id in ids) {
+        _waiting.remove(id)?.complete(byId[id]);
+      }
+    } catch (error, stack) {
+      for (final id in ids) {
+        _waiting.remove(id)?.completeError(error, stack);
+      }
+    }
+  }
+
   /// Fetches whichever of [ids] are not already known. Best-effort: a failed
   /// call leaves those ids unresolved rather than wrongly reading a network
   /// error as "account deleted".
   Future<void> resolve(Iterable<String> ids) async {
     final missing = ids.where((id) => !state.containsKey(id)).toSet();
     if (missing.isEmpty) return;
-    try {
-      final found = await _ref.read(apiProvider).listUsers(missing.toList());
-      final byId = {for (final profile in found) profile.id: profile};
-      state = {...state, for (final id in missing) id: byId[id]};
-    } on api.ApiException {
-      // Left unresolved; whoever asked can retry on the next build.
-    }
+    await Future.wait(
+      missing.map(
+        (id) => profile(id).then<void>((_) {}, onError: (Object _) {}),
+      ),
+    );
   }
 
   /// Forgets every cached profile, for a session that may have missed
