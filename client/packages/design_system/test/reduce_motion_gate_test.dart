@@ -60,7 +60,11 @@ class _Rule {
 }
 
 final _rules = [
-  _Rule('showDialog', RegExp(r'\bshowDialog(<[^>]*>)?\('), 'animationStyle:'),
+  _Rule(
+    'showInWindowDialog',
+    RegExp(r'\bshowInWindowDialog(<[^>]*>)?\('),
+    'animationStyle:',
+  ),
   _Rule(
     'showModalBottomSheet',
     RegExp(r'\bshowModalBottomSheet(<[^>]*>)?\('),
