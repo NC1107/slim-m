@@ -9,6 +9,12 @@ The Voice Canvas, the signature feature, gets a dedicated de-risking spike phase
 
 Sizing is relative effort only (S, M, L, XL), never a calendar estimate.
 
+**Where things stand, 2026-09-30.**
+The per-phase status lines below were last written between 2026-07-28 and 2026-07-31 and have not been updated since, so read them as history.
+For what has shipped, read `client/CHANGELOG.md`, `crates/slimm-server/CHANGELOG.md` and the [decision records](decisions/README.md).
+Work that the phase text below does not mention: the module runtime and the Dock (0021 to 0023, 0046), bot accounts and bot command registration (0028, 0031), incoming webhooks (0030), rich presence (0044), TOTP two-factor (0048), and per-user desktop installs with signed self-update (0041).
+Windows, macOS, Android apk, COPR and web-image artifacts are also released, which the release-readiness phase below does not name.
+
 Two identity terms recur throughout.
 "UUIDv7" means the client-generatable, globally unique event identity used for optimistic local echo and retry idempotency.
 "Per-scope sequence" means the server-assigned, strictly monotonic 64-bit number that is the authoritative total order and sync cursor within one ordered stream (a channel's messages, a DM conversation, or a channel's canvas ops), where each stream has its own independent counter.

@@ -5,6 +5,9 @@ Six files, one per supported OS: [windows_backlog.md](windows_backlog.md), [maco
 Each collects the platform-specific issues this project already knows about, or reasonably expects, for that OS.
 Added 2026-08-04 at the owner's request, after a run of real-device findings (the volume-slider platform split, the iOS broadcast-extension saga, the Wayland segfault) kept surfacing as scattered dated entries in `CLAUDE.md` with no single place naming, per platform, what to check before trusting a build on it.
 
+Quoted section headings of "the pre-trim `CLAUDE.md`" in these files refer to text that was moved out when `CLAUDE.md` was shortened.
+Recover one with `git log -S'<heading>' -- CLAUDE.md` and `git show <commit>:CLAUDE.md`.
+
 ## Why this exists alongside two other backlog files
 
 `docs/BACKLOG.md` is the **feature** backlog: accepted extras, architectural hooks worth preserving, and features declined on purpose.
@@ -35,7 +38,7 @@ If a claim could not be verified and could not be traced to a specific piece of 
 ## How an entry is written
 
 Each entry says what breaks (or would break), how it is known, and what it implies for whoever picks the platform up next - not just the symptom, but the action.
-Where an entry is a rule that prevents a mistake from recurring rather than a live bug to fix, it is written as a rule, in the imperative, so it reads the same way the durable rules already scattered through `CLAUDE.md` do (for example: "never write a category on a class resolved through `NSClassFromString`").
+Where an entry is a rule that prevents a mistake from recurring rather than a live bug to fix, it is written as a rule, in the imperative, so it reads the same way the durable rules already scattered through the pre-trim `CLAUDE.md` do (for example: "never write a category on a class resolved through `NSClassFromString`").
 Within each section, entries that would block a first build or a first successful run come before polish.
 
 ## Keeping these current

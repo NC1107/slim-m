@@ -54,8 +54,7 @@ If the spec's `Version:` is a macro rather than a literal, add `-D 'app_version 
 ## Creating the COPR project
 
 One-time, and it needs a browser login, so it cannot be scripted from here.
-The full step-by-step, including which chroots to tick and where the API token comes from, is in `human-todos.md` at the repo root under "Create the COPR project".
-That file is deliberately untracked, so the short version, for anyone who is not the owner:
+The steps:
 
 - Project name `slim-m` under the account that owns the package.
 - Chroots `fedora-43-x86_64`, `fedora-44-x86_64`, `fedora-rawhide-x86_64`, with "follow Fedora branching" on so a new Fedora release adds itself. That is exactly what `nc1107/sink` has enabled.

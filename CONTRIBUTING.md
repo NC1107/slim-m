@@ -19,6 +19,47 @@ Pull request titles follow [Conventional Commits](https://www.conventionalcommit
 The repository squash-merges, using the PR title as the commit message, and release-please turns those titles into versions and changelogs.
 Server and client are versioned independently; a change to `schema/` bumps both.
 
+## Definition of done
+
+Run the gates last, on the branch, after `git add`: several of them read only tracked files and report success on an untracked one.
+[CLAUDE.md](CLAUDE.md) and `.github/workflows/hygiene.yml` are the authority; [docs/ci.md](docs/ci.md) explains each workflow.
+A change is done when every line that applies to it holds.
+
+Every change:
+
+- [ ] The PR title is a conventional commit, and commits are signed off (`git commit -s`).
+- [ ] No emoji in client sources and no em dash anywhere; icons are Lucide.
+- [ ] A new Rust or Dart source file starts with the SPDX header on its first line.
+- [ ] No file passes 500 lines (`scripts/check-file-budget.sh`, which warns at 300), and plain `//` or `#` comments are one line (`scripts/check-comment-cap.sh`).
+- [ ] A function takes at most seven positional parameters.
+- [ ] A product or architecture decision has a record in `docs/decisions/` under the next free number, with a row in its README.
+- [ ] A new workflow has a row in the `docs/ci.md` table that names every trigger it has (`scripts/check-ci-docs.py`, `scripts/lib/test_ci_docs_triggers.py`).
+- [ ] The `scripts/lib` unit tests pass: `(cd scripts/lib && python3 -m unittest discover -p 'test_*.py')`.
+
+Server changes:
+
+- [ ] `cargo fmt --all --check`, `cargo clippy --all-targets --all-features -- -D warnings` and the tests pass, with `SQLX_OFFLINE=true`.
+  CI runs the suite under `cargo nextest`, which is much faster locally too.
+- [ ] A new migration is numbered by the next free version, never edits an applied one, and its checksum is recorded with `scripts/lock-migrations.py`.
+  `scripts/check-migration-versions.py` and `scripts/lib/test_migrations_are_immutable.py` check both.
+- [ ] After a change to a `query!` or `query_as!`, regenerate `.sqlx/` with `cargo sqlx prepare --workspace -- --all-targets`, and look at `git status` for deleted cache files.
+- [ ] A new or changed route has its entry in `schema/openapi.yaml`.
+  `tests/openapi_contract.rs` fails on drift, and the additive-only OpenAPI check (`oasdiff breaking`) fails on a breaking change.
+- [ ] A new route also has a client binding in `client/packages/api`; the `schema_coverage` and `app_reachability` tests fail without one.
+- [ ] Server integration tests use `support::TestDbGuard` and `support::TestDirGuard`, never an unguarded temp path and never `:memory:`.
+
+Client changes:
+
+- [ ] `flutter pub get --enforce-lockfile`, `dart analyze` and `dart format --output=none --set-exit-if-changed .` are clean, and `flutter test` passes in every package that has tests.
+- [ ] A user-visible change adds an entry to `client/packages/app/lib/src/whats_new/whats_new_content.dart`; `whats_new_freshness_test.dart` fails after a few releases without one.
+- [ ] Errors from the API are shown with the persistent `AppErrorState`, never a SnackBar (`scripts/check-error-surface.py`).
+- [ ] `MediaQuery` is read through the scoped accessors (`scripts/check-media-query-scope.py`).
+- [ ] `Message` stays a plain DTO at the `data` boundary (`scripts/check-message-dto-boundary.py`).
+- [ ] UI follows [docs/design/design-language.md](docs/design/design-language.md), and a surface that differs between desktop and mobile follows [docs/design/desktop-vs-mobile.md](docs/design/desktop-vs-mobile.md), with the rule number in the PR.
+- [ ] Removing or renaming a settings control updates `scripts/lib/e2e_labels.py`, because the e2e harness drives the app by those names.
+- [ ] A conditional import (`dart.library.js_interop` and the like) is checked with `(cd client/packages/app && flutter build web --release)`, since `dart analyze` does not resolve those branches.
+- [ ] Do not commit regenerated goldens made on a local machine; let CI regenerate them.
+
 ## Componentization
 
 - The server is a Rust workspace of crates with narrow public surfaces; the client is a Dart pub workspace of small packages.

@@ -50,8 +50,9 @@ Left open rather than built here, and named so the next contributor building the
 `windows/runner/resources/app_icon.ico` is exactly what `flutter create` writes for every new project; nothing in this pass replaced it with the lattice mark `packaging/linux/icons/` carries for Linux, since building or converting a Windows `.ico` was outside a compile-only scaffold's scope.
 Cosmetic rather than functional - the app compiles and runs with it - but named here rather than left for someone to notice by screenshot, matching this project's own "no stray boilerplate" instruction for the rest of the scaffold.
 
-**No Windows packaging exists, and none is documented as planned.**
-Confirmed: `packaging/` holds `fedora/`, `linux/` and `rpm/` only.
+~~**No Windows packaging exists, and none is documented as planned.**~~
+Superseded: `desktop-clients.yml` builds a Windows zip with `install.cmd`, `install.ps1` and a `slim-m.exe` launcher, a per-user install that updates itself; see `packaging/windows/README.md` and decision 0041.
+What follows is the original finding, kept as history: `packaging/` held `fedora/`, `linux/` and `rpm/` only.
 `docs/ROADMAP.md`'s Phase 9 (release readiness) names "Linux artifacts (Flatpak primary, rpm alongside) and the iOS TestFlight-to-production path" as its packaging deliverable and does not name an MSI, an installer, a winget manifest, or any other Windows artifact anywhere in the document.
 This is worth stating plainly rather than assuming it is simply unwritten yet: no phase in the roadmap currently has a Windows packaging deliverable at all.
 
@@ -62,8 +63,8 @@ Its own text: "this was never a Windows-only concern: those libraries type-check
 Check `docs/dependencies.md` before touching `file_picker`, `device_info_plus`, `package_info_plus`, or `flutter_secure_storage`.
 
 **`audioplayers_windows` is already resolved in the committed lockfile.**
-Confirmed by grepping `client/pubspec.lock`: `audioplayers_windows` is a resolved transitive dependency of `audioplayers`, the package `docs/dependencies.md` documents choosing for the notification-sound slice (`CLAUDE.md`, "The seven sounds finally play: the in-app slice").
-This means the dependency graph is already Windows-capable for audio playback in principle; it does not mean playback has ever been exercised on Windows, since nothing builds for it yet.
+Confirmed by grepping `client/pubspec.lock`: `audioplayers_windows` is a resolved transitive dependency of `audioplayers`, the package `docs/dependencies.md` documents choosing for the notification-sound slice (the pre-trim `CLAUDE.md`, "The seven sounds finally play: the in-app slice").
+This means the dependency graph is already Windows-capable for audio playback in principle; it does not mean playback has ever been exercised on Windows (a Windows zip does build now, via `desktop-clients`).
 
 ~~**The bundled notification-sound assets are a git symlink, and CLAUDE.md's own reasoning for why that is safe explicitly excludes Windows.**~~
 Fixed 2026-08-12, and a second symlink with the identical trap was found and fixed alongside it.
@@ -72,7 +73,7 @@ A checked-in copy rather than a build-time copy step, because this job's own sco
 Drift between the checked-in copy and `assets/audio/generate.py`'s canonical output is caught by `assets/audio/test_client_bundle.py`, a new module `audio-ci.yml`'s existing `python3 -m unittest discover -s assets/audio` step already picks up with no workflow edit, asserting byte-for-byte equality file by file and that the copy carries no extra or missing file; the icon has no generator to diff against; mutation-tested both ways (a flipped byte, an extra stray file), each caught and each restored by hand to a confirmed byte-identical state.
 
 **`Helper.setVolume` (per-participant call volume) is documented as throwing on Windows, and the client already guards against calling it there.**
-Confirmed from `CLAUDE.md`'s "Moderating a member" section: Windows and Linux share flutter_webrtc's `common/cpp` native layer, whose track lookup only scans a `remote_streams_` map filled by the Plan B `OnAddStream` callback; LiveKit uses Unified Plan, so that map is always empty and the call throws "Unable to find provided track".
+Confirmed from the pre-trim the pre-trim `CLAUDE.md`'s "Moderating a member" section: Windows and Linux share flutter_webrtc's `common/cpp` native layer, whose track lookup only scans a `remote_streams_` map filled by the Plan B `OnAddStream` callback; LiveKit uses Unified Plan, so that map is always empty and the call throws "Unable to find provided track".
 `client/packages/rtc/lib/src/audio_gain.dart`'s `supportsParticipantVolume` is already gated to Android, iOS and macOS only (`lk.lkPlatformIs` checks for those three, confirmed by reading the file), so Windows is already correctly excluded and the slider will not render there once the platform exists.
 *The rule to keep*: never add a call path that reaches `Helper.setVolume` without going through this same platform gate.
 
@@ -100,7 +101,7 @@ Nothing in this repository, any CI workflow, or any research document exercises 
 `client/packages/rtc/lib/src/desktop_sources.dart`'s own doc comment notes, in passing, that "macOS and Windows have no such native picker of their own, so this app's sheet stays their only one" - meaning the app's own source-selection sheet (not an OS compositor picker) is expected to be the only chooser on Windows, unlike the Wayland case where the portal supplies one.
 That is read from source, not observed running, so it is suspected rather than confirmed: whether `flutter_webrtc`'s Windows desktop capturer enumerates and captures correctly at all has never been checked in this project.
 Narrowed 2026-08-12, not closed: `windows/` is scaffolded now and `flutter_webrtc`'s Windows plugin registers cleanly in `generated_plugin_registrant.cc` (see the confirmed entry above), so the blocker to *running* the probe this entry names is gone, but nothing in this environment (no Windows machine, and this job's own CI addition is compile-only) has actually run it.
-*What would confirm or refute this*: the same enumerate-then-capture probe CLAUDE.md describes doing for Fedora ("enumerating screens returns one source... capture with that id publishes a track"), run on a real Windows machine or a `windows-latest` runner extended to actually launch the built binary - `client-windows-ci.yml` does not do this, matching `linux-compiles`' own split from `linux-desktop-shell-smoke` in `client-ci.yml`, which this file's compile-only job has no Xvfb-equivalent counterpart for yet.
+*What would confirm or refute this*: the same enumerate-then-capture probe the pre-trim the pre-trim CLAUDE.md describes doing for Fedora ("enumerating screens returns one source... capture with that id publishes a track"), run on a real Windows machine or a `windows-latest` runner extended to actually launch the built binary - `client-windows-ci.yml` does not do this, matching `linux-compiles`' own split from `linux-desktop-shell-smoke` in `client-ci.yml`, which this file's compile-only job has no Xvfb-equivalent counterpart for yet.
 
 **`tflite_flutter`'s Windows native build path is unverified, and the package's own README frames desktop support as meaningfully different from mobile support.**
 `docs/research/background-blur-spike.md`'s survey table lists `tflite_flutter` as covering Windows "with manual native build" versus "automatic" on Android/iOS, and the document states directly: "I did not attempt to build `tflite_flutter`'s desktop path in this environment... Whether it actually links on this project's own Fedora KDE Wayland target is unverified," with the same uncertainty extended explicitly to "Windows/macOS CI runners" in the spike's own "what this spike did not settle" section.

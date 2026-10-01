@@ -481,7 +481,7 @@ Accepted risks: a real-device-only iOS regression can sit in main until the peri
 ### UX and Design Direction
 
 Decision: one deployment is one community, so the leftmost rail is both account switcher and community switcher, with channels and DMs in one sidebar beneath it.
-See [research/ux.md](research/ux.md) and [research/design-language.md](research/design-language.md).
+See [research/ux.md](research/ux.md) and [design/design-language.md](design/design-language.md).
 Layout is responsive by window width (Material compact, medium, and expanded classes via a LayoutBuilder-driven adaptive shell), never by Platform.isX, so a resized Linux window or rotated iPad reflows live.
 
 Visual direction: a neutral-first cool slate UI with one restrained accent, not a brand-saturated palette, in the durable lineage of Linear, GitHub, and VS Code.
@@ -685,4 +685,4 @@ Summary:
 ## Reference Research
 
 The foundational server stack is decided in [research/stack-decision.md](research/stack-decision.md), weighing three independent proposals: [lean](research/stack-proposal-lean.md), [maintainable](research/stack-proposal-maintainable.md), and [safe](research/stack-proposal-safe.md).
-The domain decisions above draw on the fresh, independently derived specialist reports [flutter-client](research/flutter-client.md), [realtime-sync](research/realtime-sync.md), [database](research/database.md), [devops](research/devops.md), and [oss](research/oss.md), and on the preserved reports [voice-canvas](research/voice-canvas.md) (the one region informed by echo-messenger), [networking-relay](research/networking-relay.md) (informed by check-in-relay), [security](research/security.md), [media](research/media.md), [performance](research/performance.md), [ux](research/ux.md), [design-language](research/design-language.md), [audio](research/audio.md), and [appstore](research/appstore.md), each with a matching `*-review.md` critique.
+The domain decisions above draw on the fresh, independently derived specialist reports [flutter-client](research/flutter-client.md), [realtime-sync](research/realtime-sync.md), [database](research/database.md), [devops](research/devops.md), and [oss](research/oss.md), and on the preserved reports [voice-canvas](research/voice-canvas.md) (the one region informed by echo-messenger), [networking-relay](research/networking-relay.md) (informed by check-in-relay), [security](research/security.md), [media](research/media.md), [performance](research/performance.md), [ux](research/ux.md), [design-language](design/design-language.md), [audio](research/audio.md), and [appstore](research/appstore.md), each with a matching `*-review.md` critique.

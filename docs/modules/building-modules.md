@@ -25,8 +25,8 @@ Today a module can:
 - Offer an **app** a member launches into a channel as a live, shared surface.
 - Draw an interactive **scene** (a board, a chart, a small game) as its output, instead of plain text.
 
-A module cannot, yet, post a message on its own, store state between calls on the host, or react to an event.
-Those need mediated host capabilities, which are deferred by design - see [Limits and the security model](#limits-and-the-security-model).
+With an admin's approval a module can also store a little state on the host (`kv.store`) and post a message as the person who ran it (`message.post`).
+A module cannot react to an event or post on its own; see [Host capabilities](#host-capabilities).
 
 ## Quickstart
 
@@ -134,10 +134,10 @@ A module that runs at all was already allowed to by its permission, so "does the
 
 The field is additive and the ABI stays v1.
 Read the fields you need and ignore the rest, so a module built before `caller` existed keeps working.
-A module cannot remember ids between runs until `kv.store` is enforced, so keep them in the state you round-trip through `input`.
+A module cannot remember ids between runs unless an admin approved `kv.store` for it, so keep them in the state you round-trip through `input` or ask for that approval.
 
 This is separate from the call context in [0023](../decisions/0023-mediated-host-capabilities.md).
-That context (module, space, invoking user, channel) is what the host holds to gate a deferred `host_call` capability, and it is never handed to the module.
+That context (module, space, invoking user, channel) is what the host holds to gate a `host_call` capability, and it is never handed to the module.
 The reasoning is in [0038](../decisions/0038-module-caller-id.md).
 
 The **response** the module returns is a JSON object, one of two shapes:
@@ -201,7 +201,8 @@ Field by field:
 - `permissions` are the permission keys this module introduces.
   A deployment's admins grant these to roles; nobody, not even an administrator, holds a module's permission implicitly.
 - `capabilities` are strings a module declares it wants.
-  They are stored on install but not yet enforced (see [Limits](#limits-and-the-security-model)); declare only what you actually intend to use.
+  The host implements two, `kv.store` and `message.post`, and an admin approves each one per install; see [Host capabilities](#host-capabilities).
+  Declare only what you actually intend to use.
 - `extension_points` are what the module offers, covered next.
 
 ## Extension-point kinds
@@ -462,9 +463,9 @@ The Game of Life reference module (`slim-addons/modules/game-of-life`) is the wo
 
 ## Limits and the security model
 
-A module is pure compute with zero host imports.
+A module that has no approved capability is pure compute with zero host imports.
 It receives an input and returns an output and can reach nothing else - not the network, not the filesystem, not other modules, not slim's own state.
-This is deliberate and is the entire v1 security model.
+This is deliberate and is the base of the security model; [Host capabilities](#host-capabilities) says what an admin's approval adds.
 
 Every `run` call is held to resource limits, taken from the manifest's `runtime.limits` or these defaults when unset:
 
@@ -494,10 +495,27 @@ The host caps a manifest at 2,000,000,000 fuel (`MAX_FUEL`), 40 times the defaul
 
 Set them higher in the manifest if your module genuinely needs it (Game of Life uses 64 MB / 2 s), but a shared row that rides fan-out is capped well below whatever a module can produce, so enormous output is truncated regardless.
 
-`capabilities` a module declares (`message.post`, `kv.store`, ...) are stored on install but **not yet enforced or granted**.
-The classes that need them - a module that posts a message, stores state on the host, or reacts to an event - need *mediated host capabilities*, a future phase that adds specific, capability-gated host functions rather than ambient access.
-The manifest slots for this exist now so a module can declare its intent; the enforcement and the host functions are deferred.
-Do not rely on a capability doing anything today.
+## Host capabilities
+
+A module with no approved capability runs on the import-free ABI and can import nothing from the host.
+The host implements two capabilities (`HOST_CAPABILITIES` in `crates/slimm-server/src/http/module_host.rs`), both in the module's `capabilities` list and both reached through `slim.host_call`.
+A run may use a capability only when it is declared in the manifest, approved by an admin for that install, and implemented by the host.
+Anything else gets a clean `{ "ok": false, "error": ... }` response, never a trap (`module_runtime/capabilities.rs`).
+
+- `kv.store`: a key-value store private to the module, durable across runs.
+  Keys are at most 256 bytes, values 4 KiB, a module holds at most 256 entries and 64 KiB, and one run makes at most 64 calls.
+  Uninstalling the module wipes its data; a reinstall or upgrade keeps it.
+- `message.post`: posts a message as the person who ran the module, into the channel they ran it from.
+  The invoker needs view and send permission there, and slow mode and rate limits apply as for any send.
+  A run may attempt three posts, and a message carries a `via <module name>` footer.
+  Runs started from a code block (`code-block-runner`) get no `message.post`, because the input there is whoever wrote the message, not whoever clicked Run.
+
+The Dock install screen lists each capability with a switch that starts off.
+Approval is per install, and an update that names no approvals keeps the earlier ones.
+The exception is `message.post`: a new build of the wasm has to be approved for it again, while `kv.store` carries over.
+A module installed before the approval column existed started with none.
+Decision [0023](../decisions/0023-mediated-host-capabilities.md) has the reasoning and its 2026-09-29 addendum has the details.
+An unknown capability string is still accepted and ignored, so declare only the two above.
 
 ## Publishing a module
 

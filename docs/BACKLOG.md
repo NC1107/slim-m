@@ -27,7 +27,7 @@ Each item is a real backlog entry with the segments that asked for it and a roug
 | Operator observability plus one-command backup, restore, and export CLI | Power | M | Administration and metrics, DevOps |
 | Temporary member mute or timeout with auto-expiry | Community | S | Administration and moderation |
 | Color-blind-safe redundant cues and an adjustable UI density setting | Accessibility | S | Foundations, design system |
-| Webhooks, inbound and outbound, tightly scoped | Teams, power | M | Administration, extensibility |
+| Webhooks, inbound and outbound, tightly scoped (inbound shipped, outbound not built) | Teams, power | M | Administration, extensibility |
 | Tap-to-add: bring two phones together to swap an invite or open a DM | Community, owner idea | M | Client, after invites settle |
 
 **Swept 2026-08-11, because "none are scheduled yet" above had stopped being true and a table of thirteen unbuilt features that is really a table of six is worse than no table.**
@@ -46,7 +46,16 @@ Not started, checked rather than assumed: low-bandwidth and data-saver mode, web
 - *Advanced search operators* are built. `http::search` parses `from:`, `in:`, `has:` and `before:`/`after:`, with `in:` and `from:` carrying an oracle-safety obligation the module documents; `tests/message_search/` splits its coverage along that same line. Only `filename:` from the original row is absent.
 - *Message edit history* is built, both halves: `store::message_history` holds the revisions and `edit_history_sheet.dart` shows them behind the "(edited)" marker.
 
-What that leaves genuinely unbuilt from this table: low-bandwidth/data-saver mode, webhooks, `filename:` search, screen-share *audio* capture, and tap-to-add.
+What that leaves genuinely unbuilt from this table: low-bandwidth/data-saver mode, ~~webhooks~~ (inbound shipped, see below; outbound is not built), `filename:` search, screen-share *audio* capture, and tap-to-add.
+
+**Swept 2026-09-30.** Four entries below had shipped, and three of them were filed under "deliberately out of scope".
+That is the kind of stale that sends nobody to build a second copy but tells a reader the product refused something it has.
+
+- *Inbound webhooks* are built: `http/webhooks.rs` and `http/webhooks_admin.rs`, decision [0030](decisions/0030-incoming-webhooks.md), with a user page in [webhooks/pointing-tools-at-slim-m.md](webhooks/pointing-tools-at-slim-m.md).
+  Outbound webhooks are not built.
+- *Rich presence* is built: `PUT /presence/activity`, decision [0044](decisions/0044-rich-presence.md).
+- *Slash-command registration* is built for bots: `http/bot_commands.rs`, decision [0031](decisions/0031-bot-command-registration.md).
+- *Server-side link previews* are built as the opt-in this file asked for: off unless `SLIMM_LINK_PREVIEWS=true`, behind an SSRF guard, decision [0019](decisions/0019-link-unfurling-and-ssrf-defense.md).
 
 ### Tap-to-add, in more detail
 
@@ -91,15 +100,15 @@ Every relevant phase must honor them.
 Recorded so they are not re-litigated.
 Each can be revisited if the product's direction changes, but the default answer is no.
 
-- Rich presence and game status: per-OS process detection and a maintained games database is a privacy and upkeep burden that drifts into Discord-clone territory.
+- ~~Rich presence and game status:~~ Shipped, see decision [0044](decisions/0044-rich-presence.md), and see the 2026-09-30 sweep above. Original reasoning kept: per-OS process detection and a maintained games database is a privacy and upkeep burden that drifts into Discord-clone territory.
 - Soundboard for short audio clips: clip storage, call mixing, and upload moderation is non-essential ritual against the not-a-clone principle.
 - Heavy machine-learning noise suppression: a native DSP or ML dependency adds CPU cost while gaming; enable WebRTC's built-in echo cancellation and basic noise filter instead.
 - Client plugin or scripting system: a heavy maintenance and security surface with no viable sideloaded-code story under App Store rules; webhooks and the future bot API are the sanctioned path.
   Note this is about code running inside the *app*, and does not cover server-side extensions an operator runs themselves; see [0007](decisions/0007-extensions-and-untrusted-execution.md).
 - Running user-submitted code on the server as a built-in: declined 2026-08-03, because a built-in is opt-out per operator and this needs to be opt-in per install.
   Not declined as an idea - [0007](decisions/0007-extensions-and-untrusted-execution.md) records the extension-broker shape it would have to take, where the server brokers and never executes, an extension is always a separate process, and a marketplace is a directory an operator chooses from rather than anything that pushes code at a running deployment.
-- Slash-command registration framework: Slack-app-platform scope creep; the command palette and webhooks cover the real need.
-- Server-side link previews and URL unfurling: a lightweight self-host fetching arbitrary URLs can leak access to its internal network; only ever add as an opt-in, egress-sandboxed fetcher.
+- ~~Slash-command registration framework:~~ Shipped for bots, see decision [0031](decisions/0031-bot-command-registration.md). Original reasoning kept: Slack-app-platform scope creep; the command palette and webhooks cover the real need.
+- ~~Server-side link previews and URL unfurling:~~ Shipped as the opt-in, see decision [0019](decisions/0019-link-unfurling-and-ssrf-defense.md). Original reasoning kept: a lightweight self-host fetching arbitrary URLs can leak access to its internal network; only ever add as an opt-in, egress-sandboxed fetcher.
 - Events with RSVP and a calendar subsystem: a real subsystem beyond chat; polls, pins, scheduled messages, and a webhook calendar integration cover the coordination need.
 - Scheduled or recurring pings that store PII such as birthdays: recurring scheduler plus PII storage is bot-like scope creep that belongs in the automation API.
 - Shared media gallery view: a non-essential convenience; because it is only a filtered query over the existing attachment store it can be added later at essentially zero design cost.

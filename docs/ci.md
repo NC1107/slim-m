@@ -227,7 +227,7 @@ It matches text sources only and passes `--binary-files=without-match`, so a com
 ### SPDX headers on Rust source
 
 Every file under `crates/` needs an `SPDX-License-Identifier` header on its first line; this step fails and names the file otherwise.
-CLAUDE.md's own contribution rule says "a CI gate checks the Rust ones," and `find crates -name '*.rs'` is that scope exactly, not a gap - widening it to the Dart, Swift and Kotlin sources that also lack headers is a separate, smaller decision nobody has made yet.
+the pre-trim CLAUDE.md's own contribution rule says "a CI gate checks the Rust ones," and `find crates -name '*.rs'` is that scope exactly, not a gap - widening it to the Dart, Swift and Kotlin sources that also lack headers is a separate, smaller decision nobody has made yet.
 
 ### The file-size budget
 
@@ -283,7 +283,8 @@ Three package-level exceptions, each named one package at a time rather than all
 - `dbus` and `nm` are allowed `MPL-2.0`. MPL-2.0 is per-file copyleft: the obligation reaches modifications to those packages' own files and not the application that links them, so it is compatible with shipping an Apache-2.0 client. That is a decision rather than a default, which is why it is two named entries and not a line in `allow`; a new MPL dependency still stops the gate. Both are Linux desktop transitives reached through `connectivity_plus`.
 
 Advisories and bans are deliberately not configured here, so this is `cargo deny check licenses` and not `check all`.
-A CVE published upstream would turn every unrelated pull request red through no fault of its own, which is a different job wanting a different trigger; `docs/STRATEGY.md` names `cargo audit` and `osv-scanner` for it and neither is wired yet.
+A CVE published upstream would turn every unrelated pull request red through no fault of its own, which is a different job wanting a different trigger; `docs/STRATEGY.md` names `cargo audit` and `osv-scanner` for it.
+Advisories are checked daily by `advisory-watchdog` (cargo-deny `check advisories`, which gates nothing and opens an issue); `osv-scanner` is not wired.
 
 `-A license-exception-not-encountered` is passed because the allow list is shared: `dbus` and `nm` are pub packages, so cargo-deny correctly reports never having seen them, and that is not a finding.
 `unused-allowed-license = "allow"` in the config is there for the same reason in the other direction.
@@ -535,7 +536,7 @@ workflow_run cannot close this gap.
 It fires only when a named workflow completes for the event that triggered it, and none of `server-ci`, `client-ci`, `client-ios-ci`, `hygiene` or `licenses` trigger on a tag push at all, by design, so that a ref that already ran CI on `main` does not run it again.
 A tag push therefore raises no `workflow_run` event for any of them, which rules out the one mechanism that otherwise looks like the obvious fit.
 
-The gate resolves the caller's `ref` (a tag on the release-please path, `github.sha` on the tag-push path) to a commit SHA once, then polls `GET /repos/{owner}/{repo}/commits/{sha}/check-runs` for that SHA and requires each listed check-run name to show `status: completed` and `conclusion: success`, retrying for up to 180 minutes before failing on a timeout.
+The gate resolves the caller's `ref` (a tag on the release-please path, `github.sha` on the by-hand dispatch on a tag ref) to a commit SHA once, then polls `GET /repos/{owner}/{repo}/commits/{sha}/check-runs` for that SHA and requires each listed check-run name to show `status: completed` and `conclusion: success`, retrying for up to 180 minutes before failing on a timeout.
 A check run is attached to the commit rather than to the event that produced it, so this answers both paths uniformly: the SHA a tag points at is normally already on `main` and already carries the check runs its original push or PR produced, so re-pushing a tag to the same SHA still finds them and still republishes, which is the documented re-publish capability above.
 A required name **absent** from the response is treated the same as one that failed, never as a pass, so a commit that never went through CI at all (never pushed to `main`, never opened as a PR) times out and fails closed instead of silently succeeding on an empty result - unless something is still queued for that commit, in which case it keeps waiting past the grace period rather than giving up on a slow runner.
 A `cancelled` check is pinned as a hard failure too, on purpose: see client-ios-ci.yml's own header on the concurrency group that used to cancel it on every push to `main`.
@@ -605,7 +606,7 @@ See PR #250 ("A release can succeed and still ship no store build") for the full
 
 The SHA-keyed group stops a run from being silently cancelled, but nothing before this watched for the state that cancellation already produced once: a release-please manifest bumped to a new version, meaning its release PR merged, with no tag ever following it.
 A push-triggered check cannot close this on its own, because the push that should have cut the tag is the same one that did not - there is no later event to hang a check on.
-`release-tag-watchdog.yml` runs on a 15-minute schedule instead (plus `workflow_dispatch`) and asks a plain question of git history: for each package, does the current manifest version have a matching `<component>-v<version>` tag, and if not, how long has the manifest read that version?
+`release-tag-watchdog.yml` runs hourly instead (plus `workflow_dispatch`) and asks a plain question of git history: for each package, does the current manifest version have a matching `<component>-v<version>` tag, and if not, how long has the manifest read that version?
 The workflow has no concurrency group on purpose: it shipped with `cancel-in-progress: true`, and a run slower than the cron interval was cancelled by the next one, three times in the first hour.
 A cancelled run never asks the question, so the silent failure it exists to catch could pass underneath it; the job is read-only and idempotent, so overlap costs nothing.
 `scripts/check-release-tag-lag.sh` does the check itself, pulled out so `scripts/lib/test_check_release_tag_lag.py` can drive it against a real temp git repo rather than the live one; a missing tag inside a 15-minute grace window is normal (the same run that merges a release PR usually tags it within its own run) and a missing tag past it is reported with `::error::`, naming the tag, the version, and how long it has been missing.
@@ -816,7 +817,7 @@ Before it existed, the tag path published unconditionally with no test workflow 
 `workflow_run` cannot do this job: it fires only when a named workflow completes for the event that triggered it, and none of `server-ci`, `client-ci`, `client-ios-ci`, `hygiene` or `licenses` trigger on a tag push, deliberately, to avoid re-running CI on a ref that already ran it on `main`.
 
 The `ref` input carries the sharp edge.
-It defaults to `github.sha`, which is right for the tag-push path, but the release-please path must pass the created tag instead: release-please acts on the repository's current state while `github.sha` is whatever commit started the run, and the two diverge whenever a release merge lands while an earlier run is still going.
+It defaults to `github.sha`, which is right for the by-hand dispatch on a tag ref, but the release-please path must pass the created tag instead: release-please acts on the repository's current state while `github.sha` is whatever commit started the run, and the two diverge whenever a release merge lands while an earlier run is still going.
 Verifying `github.sha` then waits on a check a path filter correctly skipped, times out, and skips every publish job behind it, which is what happened to server 0.23.0 on 2026-08-01.
 A check run is attached to the commit, not to the event, so polling the commit's check-runs answers both trigger paths the same way.
 The names in `required_checks` are matched exactly, so a job renamed in `server-ci` or `client-ci` without the matching edit here blocks every release, which is the safe direction to fail.
@@ -842,6 +843,7 @@ The page polls `version.json` and shows a reload pill when the id differs (decis
 
 Linking a Spotify account needs a client id, which is the compile-time define `SLIMM_SPOTIFY_CLIENT_ID`.
 The id is the repository variable of the same name, not a secret, and it is read as `vars.SLIMM_SPOTIFY_CLIENT_ID`.
+A composite action cannot read `vars`, so the `linux-tarball` action takes it as the input `spotify_client_id` and its callers pass the variable in (PR #1531, [CHANGING-CI.md](CHANGING-CI.md)).
 Every build a user installs passes it: the Android, iOS and Linux jobs in `release` and `main-builds`, the `linux-tarball` action (so `copr-catch-up` too), `desktop-clients`, and the web image through a build arg.
 The test builds (`client-ci`, `client-ios-ci`, `client-macos-ci`, `client-windows-ci`, `flatpak-ci`) do not, because nothing runs or ships what they produce.
 The release flatpak and rpm repackage the Linux bundle, so they carry whatever that build was given.
@@ -971,7 +973,7 @@ Worth naming rather than assuming away: `release.yml` and `main-builds.yml` are 
 No such collision has been observed, and `release.yml` runs on every push to `main` regardless of path while this workflow only runs on a subset of those pushes, which keeps its counter behind; if that ever stops holding, the fix is to derive the build number from something workflow-independent, such as a count of commits.
 
 The server side pushes one native `linux/amd64` image to GHCR, tagged `sha-<commit>`, `main` and `latest`, with no arm64 build, no digest-then-merge manifest assembly and no cosign signing.
-amd64 only because nothing consumes an arm64 image from this path: the owner's live instance (`CLAUDE.md`'s "Running deployment" section) is an amd64 Ubuntu Docker host, and a released version still gets the full signed multi-arch manifest `release.yml` builds.
+amd64 only because nothing consumes an arm64 image from this path: the owner's live instance (the pre-trim `CLAUDE.md`'s "Running deployment" section) is an amd64 Ubuntu Docker host, and a released version still gets the full signed multi-arch manifest `release.yml` builds.
 Moving `latest` here is continuous deployment in the plain sense of the term: Watchtower on the live instance polls that tag, so a server merge reaches production within one build with nobody deploying it by hand, and a bad merge reaches it exactly as fast.
 That is the trade the owner asked for explicitly, not a gap: fast iteration on the one host that matters to him, at the cost of no gate between a merge and production.
 

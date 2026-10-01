@@ -55,13 +55,16 @@ flatpak run top.npcserver.slimm
 
 There is no flatpak remote yet, so `flatpak update` will not find new versions - you download the new bundle and install it over the old one.
 
-**Tarball** (`-linux-amd64.tar.gz`): extract it and run the binary inside.
+**Tarball** (`-linux-amd64.tar.gz`): extract it and run `./slim-m` inside, or run `./install.sh` for a per-user install that updates itself (see [Updates](#updates-and-uninstalling)).
 It needs `libayatana-appindicator3.so.1` for the tray icon and will not start without it, plus `xdg-desktop-portal` for screen share and a keyring (gnome-keyring, KWallet, KeePassXC) to stay signed in.
 [packaging/linux/README.md](../packaging/linux/README.md) has the full dependency list.
 
 ## Windows
 
-Download `slim-m-client-<version>-windows-x64.zip`, unzip it anywhere, and run the executable inside.
+Download `slim-m-client-<version>-windows-x64.zip`, unzip it anywhere, and double-click `install.cmd`.
+That installs slim-m for your own account only, under `%LOCALAPPDATA%\slim-m`, adds a Start menu shortcut and asks for no administrator rights.
+Run the app from there, not from the unzipped folder: a copy run straight from the zip is never updated.
+[packaging/windows/README.md](../packaging/windows/README.md) has the layout.
 
 **Windows will try to stop you, and this is expected.**
 There is no code-signing certificate for this project, so SmartScreen shows a blue box saying "Windows protected your PC" and "unrecognized app".
@@ -93,7 +96,6 @@ Download `slim-m-client-android.apk` and open it.
 There is no Play Store listing, so this is a sideload and Android will warn you.
 You will be asked to allow installs from whatever app you downloaded with (usually your browser), which means a trip into Settings the first time.
 
-Download `slim-m-client-android.apk`.
 Releases from 0.80.0 onward carry only the apk; older ones also list an `.aab`, which is a Play Store upload format and cannot be installed on a phone.
 
 Android also has no in-app update prompt yet, so you will not be told when a new version exists - check the releases page now and then.
@@ -104,6 +106,30 @@ iOS builds go out through TestFlight, which needs the space owner to add your Ap
 Ask them, accept the email invite, install TestFlight from the App Store, and slim-m appears inside it.
 
 There is no way to sideload on iOS, so TestFlight is the only route.
+
+## Updates and uninstalling
+
+What updates itself and what does not depends on how you installed it.
+A desktop app checks the latest client release for a signed `manifest.json`, and only an install the updater itself laid out will replace itself from it (decision [0041](decisions/0041-per-user-installs-and-signed-self-update.md)).
+A release published without `manifest.json` and `manifest.json.sig` cannot be updated to; the client's fetch of `manifest.json` fails and nothing is downloaded.
+
+| Install | How it updates | How to remove it |
+| --- | --- | --- |
+| Fedora COPR rpm | `sudo dnf upgrade --refresh slim-m-client`; never replaced by the app | `sudo dnf remove slim-m-client` |
+| Flatpak | Download the new bundle and install it over the old one; there is no remote | `flatpak uninstall top.npcserver.slimm` |
+| Linux tarball, run in place | Not updated; download the next one | Delete the folder |
+| Linux tarball via `install.sh` | In the app, from a signed manifest | Delete `~/.local/share/slim-m` and `~/.local/bin/slim-m` |
+| Windows via `install.cmd` | In the app, from a signed manifest | Delete `%LOCALAPPDATA%\slim-m` and the Start menu shortcut |
+| Windows, run from the unzipped folder | Not updated | Delete the folder |
+| macOS app in `~/Applications` | In the app, from a signed manifest; never run on a real Mac yet, so treat it as unconfirmed | Drag the app to the bin |
+| Android apk | Not updated by the app as far as the client tree shows; check the releases page | Uninstall as any app |
+| iPhone and iPad | TestFlight | Delete the app |
+| Web client | Reload when the page offers it | Nothing installed |
+
+A per-user install keeps the previous version until the new one has run for 20 seconds.
+On Linux and Windows the launcher moves back to the previous version on the third start of a new version that has not yet run cleanly, and the app says so.
+The macOS app counts its own starts and moves the previous bundle back at the same point.
+A system-wide copy (rpm, flatpak, `Program Files`, a machine-wide `/Applications`) is never modified by the app.
 
 ## Signing in
 
@@ -120,6 +146,10 @@ Forgotten passwords are handled by the space's admin, not by email: they issue y
 If you are the admin doing the issuing, it is **Space settings -> Account recovery**, or the same action on the member's own profile.
 It needs the administrator permission, and the code is legible once, so hand it over before closing the sheet.
 
+A reset code does not touch two-factor authentication.
+If you turned two-factor on and lost both your authenticator and your recovery codes, an admin has to clear it from your profile card (**Clear two-factor...**).
+[OPERATING.md](OPERATING.md#two-factor-authentication) says what that does, and what happens when the person who lost the factor is the only admin.
+
 ## Which file is which
 
 A release page lists several files, and most of them are not for you:
@@ -127,12 +157,13 @@ A release page lists several files, and most of them are not for you:
 | File | What it is |
 | --- | --- |
 | `slim-m-client-<version>-1.fc44.x86_64.rpm` | Fedora package, but prefer the `dnf copr` route above |
-| `slim-m-client-<version>-linux-amd64.tar.gz` | Linux, extract and run |
+| `slim-m-client-<version>-linux-amd64.tar.gz` | Linux, extract and run, or `install.sh` for a self-updating install |
 | `slim-m-client-<version>.flatpak` | Linux flatpak bundle |
 | `slim-m-client-<version>-windows-x64.zip` | Windows |
 | `slim-m-client-<version>-macos.zip` | macOS |
 | `slim-m-client-android.apk` | Android, this is the one you want |
 | `SHA256SUMS`, `SHA256SUMS.android` | checksums, for verifying a download |
+| `manifest.json`, `manifest.json.sig` | the signed list the desktop app updates from; not for you to open |
 
 To check a download matches what was published, compare it against the checksums file:
 

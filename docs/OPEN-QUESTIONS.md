@@ -318,7 +318,7 @@ Recorded rather than chosen, because it is a trade about how long you are willin
 That last line was half right and half not: the fix did need a custom `contextMenuBuilder`, but not a custom *item* - the working shape forces the platform's own standard Paste item into the list rather than building a custom one, because a custom item's tap round-trips through Dart after the gesture is already dispatched and loses the prompt exemption that dispatch depends on.
 
 Closed 2026-08-02, confirmed by the owner on a real iPhone: long-press the composer, the edit menu offers Paste, and it attaches the image with no prompt.
-Full mechanism and the two real mistakes made getting there (an unproven claim hiding the working fallback row, and a category on a private engine class breaking the 0.21.2 build) are in `CLAUDE.md`'s "Image paste on iPhone, confirmed working" entry.
+Full mechanism and the two real mistakes made getting there (an unproven claim hiding the working fallback row, and a category on a private engine class breaking the 0.21.2 build) are in the pre-trim `CLAUDE.md`'s "Image paste on iPhone, confirmed working" entry.
 
 ~~Nothing about an Objective-C method swizzle, a native pasteboard read, or the "Allow Paste?" prompt's own exemptions can be exercised in this environment, which has no iPhone.~~
 ~~Two things specifically need confirming on a real device, in this order, because the second is meaningless without the first:~~
@@ -336,7 +336,7 @@ Android's clipboard path (the "+" sheet's "Paste image" row, its only route ther
 The record's own recommendation - a thread as a channel with a parent - was built on 2026-08-01 under a stated assumption, since it is additive and could be walked back.
 `channels.parent_message_id` (migration 0030) is the column, `Store::permission_channel` is the single place a thread resolves to its parent for permissions, and nesting is refused outright.
 The reply-count affordance and a live `ThreadUpdated` event followed on 2026-08-01 and 2026-08-02.
-See CLAUDE.md's "Threads, built from the option 0005 recommended" for what building it actually found.
+See the pre-trim CLAUDE.md's "Threads, built from the option 0005 recommended" for what building it actually found.
 It is still fair to say the owner never explicitly picked the shape, so if the answer is "no, the cheap filtered view was good enough", saying so is still worth something - but nothing is blocked on it.
 
 The original question follows.

@@ -4,6 +4,8 @@ A minimal production stack for a friend group.
 It wires up the slim-m server, Caddy for automatic TLS, and an optional Litestream sidecar that streams the SQLite database to S3-compatible storage.
 Voice and screen share are a second compose file you add when you want them.
 
+Once it is running, [docs/OPERATING.md](../docs/OPERATING.md) lists every setting and covers two-factor, modules, webhooks and bots, and [docs/TROUBLESHOOTING.md](../docs/TROUBLESHOOTING.md) is organised by symptom.
+
 **Text chat on its own is a complete deployment, not a degraded one.**
 The server treats a missing SFU as a normal configuration and answers 501 for every voice request, so a group who only want to type need no LiveKit keys and no second DNS record.
 Start there; adding voice later is one line in `.env` and does not disturb anything already running.
@@ -261,7 +263,7 @@ That is an accepted trade-off for a friend-group deployment, and plain UDP TURN 
 Its listener also needs a certificate of its own.
 It cannot borrow Caddy's, because Caddy's ACME storage layout is not a stable path to mount from.
 
-To enable it: point a third DNS name at this host (`turn.example.com`, say), obtain a certificate and key for it by whatever means you like, mount them into the `livekit` container, uncomment the `- "5349:5349"` port line in `docker-compose.yml`, and add these four keys under the existing `turn:` block in `LIVEKIT_CONFIG`:
+To enable it: point a third DNS name at this host (`turn.example.com`, say), obtain a certificate and key for it by whatever means you like, mount them into the `livekit` container, uncomment the `- "5349:5349"` port line in `docker-compose.voice.yml`, and add these four keys under the existing `turn:` block in `LIVEKIT_CONFIG`:
 
 ```yaml
           domain: turn.example.com

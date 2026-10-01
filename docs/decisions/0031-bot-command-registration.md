@@ -1,6 +1,6 @@
 # 0031 - Bot command registration
 
-Status: proposed (server surface built now; the composer and the prefix/profile/mention-card follow-up land as separate PRs)
+Status: accepted; built (the server surface, the composer and the prefix/profile/mention-card follow-up)
 Date: 2026-09-24
 
 ## The ask
