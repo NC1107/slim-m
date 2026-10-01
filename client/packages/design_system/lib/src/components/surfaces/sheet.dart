@@ -25,6 +25,7 @@ import 'package:flutter/material.dart';
 import '../../app_metrics.dart';
 import '../../app_motion.dart';
 import '../../app_tokens.dart';
+import 'in_window_dialog.dart';
 
 /// How wide a dialog is allowed to get, when it is one.
 ///
@@ -84,7 +85,7 @@ Future<T?> showAppSheet<T>(
       builder: (context) => SafeArea(top: false, child: builder(context)),
     );
   }
-  return showDialog<T>(
+  return showInWindowDialog<T>(
     context: context,
     animationStyle: noAnimation,
     builder: (context) => _SheetDialog(

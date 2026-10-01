@@ -12,6 +12,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:slimm_app/src/providers/auto_update_preference.dart';
 import 'package:slimm_app/src/providers/providers.dart';
 import 'package:slimm_app/src/widgets/app_info_section.dart';
+import 'package:slimm_app/src/widgets/whats_new_sheet.dart';
 import 'package:slimm_design_system/design_system.dart';
 import 'package:slimm_platform/platform.dart';
 
@@ -58,6 +59,16 @@ void main() {
     );
     await tester.pumpAndSettle();
   }
+
+  testWidgets('the Release notes row opens the full history', (tester) async {
+    await pumpAbout(tester, '');
+
+    await tester.tap(find.text('Release notes'));
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(whatsNewBodyBoxKey), findsOneWidget);
+    expect(find.text('Close'), findsOneWidget);
+  });
 
   testWidgets('a build with no build number shows the bare version', (
     tester,
