@@ -297,10 +297,11 @@ async fn assign(
         .ok_or(ApiError::NotFound("role not found"))?;
     escalation_guard(caller_granted(&state, ctx.user_id).await?, role.permissions)?;
 
-    state.store.assign_role(user_id, role_id).await?;
-    state
-        .hub
-        .publish(Event::MemberRoleChanged { user_id, role_id });
+    if state.store.assign_role(user_id, role_id).await? {
+        state
+            .hub
+            .publish(Event::MemberRoleChanged { user_id, role_id });
+    }
     Ok(StatusCode::NO_CONTENT)
 }
 
@@ -327,10 +328,12 @@ async fn unassign(
     }
 
     match state.store.unassign_role(user_id, role_id).await {
-        Ok(()) => {
-            state
-                .hub
-                .publish(Event::MemberRoleChanged { user_id, role_id });
+        Ok(removed) => {
+            if removed {
+                state
+                    .hub
+                    .publish(Event::MemberRoleChanged { user_id, role_id });
+            }
             Ok(StatusCode::NO_CONTENT)
         }
         Err(guard_err) => Err(role_guard_error(guard_err)),

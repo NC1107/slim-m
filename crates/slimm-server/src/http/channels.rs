@@ -25,9 +25,11 @@ use serde::{Deserialize, Serialize};
 
 use super::AppState;
 use super::channel_slow_mode::validate_slow_mode_seconds;
+use super::channel_validation::{
+    JOIN_MUTED_VOICE_ONLY, validate_channel_name, validate_channel_topic,
+};
 use super::error::ApiError;
 use super::extract::{AUTHED_READ, Authed, AuthedLimited, Json, enforce};
-use super::hidden_chars::is_hidden_char;
 use super::messages::parse_uuid;
 use crate::hub::Event;
 use crate::ids::{ChannelCategoryId, ChannelId};
@@ -37,10 +39,6 @@ use crate::store::{Channel, DM_CHANNEL_KIND, DeleteChannelError};
 use crate::voice::VoiceError;
 
 const CHANNEL_BODY_LIMIT: usize = 4 * 1024;
-/// A one-line header, not a description field: long enough for a real
-/// sentence, short enough that a client never needs to wrap or truncate it
-/// in the channel header it's designed for.
-const CHANNEL_TOPIC_MAX_CHARS: usize = 256;
 
 /// The channel routes, mounted by [`super::router`].
 pub fn routes() -> Router<AppState> {
@@ -470,43 +468,4 @@ async fn end_voice_room(state: &AppState, channel_id: ChannelId) {
             tracing::warn!(%err, "could not end the deleted channel's voice room");
         }
     }
-}
-
-// --- Validation ---
-
-/// Normalizes a topic edit. A blank (or whitespace-only) value clears the
-/// topic back to `None` rather than being stored as an empty string: a topic
-/// with nothing visible in it is not meaningfully different from having
-/// none, and folding the two together means a single `Option<String>` field
-/// can carry "clear it" without a separate tri-state signal.
-fn validate_channel_topic(topic: &str) -> Result<Option<String>, ApiError> {
-    let trimmed = topic.trim();
-    if trimmed.chars().count() > CHANNEL_TOPIC_MAX_CHARS {
-        return Err(ApiError::BadRequest("topic must be at most 256 characters"));
-    }
-    if trimmed.chars().any(is_hidden_char) {
-        return Err(ApiError::BadRequest(
-            "topic must not contain control or invisible characters",
-        ));
-    }
-    Ok(if trimmed.is_empty() {
-        None
-    } else {
-        Some(trimmed.to_owned())
-    })
-}
-
-const JOIN_MUTED_VOICE_ONLY: &str = "join_muted only applies to a voice channel";
-
-fn validate_channel_name(name: &str) -> Result<&str, ApiError> {
-    let trimmed = name.trim();
-    if trimmed.is_empty() || trimmed.chars().count() > 64 {
-        return Err(ApiError::BadRequest("name must be 1 to 64 characters"));
-    }
-    if trimmed.chars().any(is_hidden_char) {
-        return Err(ApiError::BadRequest(
-            "name must not contain control or invisible characters",
-        ));
-    }
-    Ok(trimmed)
 }

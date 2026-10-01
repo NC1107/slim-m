@@ -443,25 +443,26 @@ impl Store {
     /// Revokes a role from a member. Idempotent: unassigning a role the
     /// member does not hold still succeeds, the same as [`Store::assign_role`]
     /// is idempotent the other way. Refuses if doing so would leave no
-    /// administrator.
+    /// administrator. Answers whether the member held it.
     pub async fn unassign_role(
         &self,
         user_id: UserId,
         role_id: RoleId,
-    ) -> Result<(), RoleGuardError> {
+    ) -> Result<bool, RoleGuardError> {
         let mut tx = self.begin_write().await?;
-        sqlx::query!(
+        let removed = sqlx::query!(
             "DELETE FROM member_roles WHERE user_id = ? AND role_id = ?",
             user_id,
             role_id
         )
         .execute(&mut *tx)
-        .await?;
+        .await?
+        .rows_affected();
         if administrator_count(&mut tx).await? == 0 {
             return Err(RoleGuardError::LastAdministrator);
         }
         tx.commit().await?;
-        Ok(())
+        Ok(removed > 0)
     }
 }
 

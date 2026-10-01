@@ -405,6 +405,17 @@ impl Store {
         Ok(row.map(|r| r.channel_id))
     }
 
+    /// Whether any report, open or closed, has this id.
+    pub async fn report_exists(&self, report_id: Uuid) -> anyhow::Result<bool> {
+        let row = sqlx::query_scalar!(
+            r#"SELECT 1 AS "one!: i64" FROM reports WHERE id = ?"#,
+            report_id
+        )
+        .fetch_optional(&self.pool)
+        .await?;
+        Ok(row.is_some())
+    }
+
     /// Resolves or dismisses an open report. `resolution` is a short caller-
     /// supplied label ("resolved" or "dismissed"); the distinction is not
     /// enforced here, since both are just a moderator's disposition on the

@@ -578,7 +578,8 @@ paths:
       description: >
         The self-hosted account recovery path chosen in place of email. The
         plaintext code is returned once; only its hash is stored, and it
-        expires on its own even if nobody redeems it.
+        expires on its own even if nobody redeems it. Issuing one is written to
+        the moderation audit log as `reset_code_issue`.
       responses:
         "200":
           description: The issued code and its expiry.
@@ -1193,7 +1194,8 @@ paths:
         used to confirm a message exists in a channel the caller cannot read.
         Idempotent by the optional client-supplied `id`: a retry with the same
         id from the same reporter about the same subject returns the report
-        already filed. The same id naming a different reporter or subject is a
+        already filed. You cannot report yourself or your own message; both
+        are 400. The same id naming a different reporter or subject is a
         conflict, as is a second open report about the same subject under any
         id.
       requestBody:
@@ -1321,7 +1323,8 @@ paths:
       summary: Resolve or dismiss a report. Requires MANAGE_MESSAGES.
       description: >
         The close is a conditional update, so two moderators racing the same
-        report cannot both win it; the loser sees it as already gone.
+        report cannot both win it. A report that is already resolved or
+        dismissed answers 409; one that never existed answers 404.
       requestBody:
         required: true
         content:
@@ -1339,6 +1342,8 @@ paths:
           $ref: "#/components/responses/Forbidden"
         "404":
           $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
         "429":
           $ref: "#/components/responses/TooManyRequests"
 
@@ -2320,9 +2325,10 @@ paths:
       tags: [roles]
       summary: Grant a role to a member. Requires MANAGE_ROLES.
       description: >
-        Idempotent. Refused if the role carries a permission the caller does
-        not themselves hold, since granting a role is granting whatever it
-        carries. A bot is a role holder like any other, ADMINISTRATOR
+        Idempotent: granting a role the member already holds changes nothing
+        and publishes nothing. Refused if the role carries a permission the
+        caller does not themselves hold, since granting a role is granting
+        whatever it carries. A bot is a role holder like any other, ADMINISTRATOR
         included; see docs/decisions/0028-bot-accounts.md.
       responses:
         "204":
@@ -2340,7 +2346,8 @@ paths:
       tags: [roles]
       summary: Revoke a role from a member. Requires MANAGE_ROLES.
       description: >
-        Idempotent. Refused if it would leave the deployment with no
+        Idempotent: revoking a role the member does not hold changes nothing
+        and publishes nothing. Refused if it would leave the deployment with no
         administrator.
       responses:
         "204":
@@ -2580,7 +2587,8 @@ paths:
       tags: [moderation]
       summary: Delete a member's account outright. Requires ADMINISTRATOR.
       description: >
-        Does to somebody else's account exactly what `deleteAccount` does to
+        Written to the moderation audit log as `account_delete`. Does to
+        somebody else's account exactly what `deleteAccount` does to
         your own: purges their personal data, anonymizes what they wrote,
         tombstones the user, revokes every session, and frees the username
         for reuse.
@@ -9279,7 +9287,21 @@ components:
           format: uuid
         action:
           type: string
-          enum: [remove, restore, timeout, timeout_cleared, messages_deleted]
+          enum:
+            - remove
+            - restore
+            - timeout
+            - timeout_cleared
+            - messages_deleted
+            - bot_create
+            - bot_revoke
+            - bot_permission_grant
+            - webhook_create
+            - webhook_revoke
+            - webhook_rotate
+            - totp_cleared
+            - account_delete
+            - reset_code_issue
         reason:
           type: [string, "null"]
         until:

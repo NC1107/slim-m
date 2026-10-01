@@ -276,8 +276,9 @@ async fn file_report(
         // Reporting a message requires being able to see it, so the endpoint
         // cannot confirm a message exists in a channel you cannot read.
         ReportSubject::Message(message_id) => {
-            let visible = match state.store.message(message_id).await? {
-                Some(ref m) => {
+            let message = state.store.message(message_id).await?;
+            let visible = match &message {
+                Some(m) => {
                     state
                         .store
                         .has_permission(
@@ -289,13 +290,19 @@ async fn file_report(
                 }
                 None => false,
             };
-            if !visible {
+            let Some(message) = message.filter(|_| visible) else {
                 return Err(ApiError::NotFound("that message was not found"));
+            };
+            if message.author_id == Some(ctx.user_id) {
+                return Err(ApiError::BadRequest("you cannot report your own message"));
             }
         }
         // A user subject has no foreign key on the report row, so a random id
         // would otherwise be accepted and sit in the queue naming nobody.
         ReportSubject::User(user_id) => {
+            if user_id == ctx.user_id {
+                return Err(ApiError::BadRequest("you cannot report yourself"));
+            }
             if !state.store.user_row_exists(user_id).await? {
                 return Err(ApiError::NotFound("that user was not found"));
             }
