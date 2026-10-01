@@ -161,10 +161,6 @@ List<int>? parseVersion(String raw) {
   return numbers;
 }
 
-/// Whether [raw] is plain `X.Y.Z`, the only shape safe to use as a directory name.
-bool isInstallableVersion(String raw) =>
-    RegExp(r'^\d+\.\d+\.\d+$').hasMatch(raw);
-
 /// Whether [candidate] is a strictly higher version than [against].
 ///
 /// Either side failing to parse answers false, because the honest answer is

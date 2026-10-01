@@ -44,7 +44,7 @@ http.Client _api({
   if (request.url.path.endsWith('/voice/heartbeat')) {
     return http.Response('', 204);
   }
-  onToken?.call();
+  if (request.url.path.endsWith('/voice/token')) onToken?.call();
   if (refuse()) {
     return http.Response(
       jsonEncode({
