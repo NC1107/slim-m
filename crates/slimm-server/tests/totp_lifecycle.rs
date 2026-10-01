@@ -9,6 +9,7 @@
 
 use axum::http::StatusCode;
 use serde_json::json;
+use slimm_server::hub::{Event, Hub};
 use slimm_server::totp;
 use tower::ServiceExt;
 
@@ -16,8 +17,8 @@ mod support;
 mod totp_support;
 
 use totp_support::{
-    app, enrol_and_confirm, json_body, login, login_for_challenge, member, new_store, now_ms,
-    request, verify,
+    app, app_with_hub, enrol_and_confirm, json_body, login, login_for_challenge, member, new_store,
+    now_ms, request, verify,
 };
 
 // --- Recovery codes ---
@@ -256,4 +257,88 @@ async fn enabling_and_disabling_leave_existing_sessions_alone() {
         StatusCode::OK,
         "disabling must not revoke the session either"
     );
+}
+
+// --- Lockout on a change ---
+
+/// Spends the failure budget on `path`, then offers a correct code through a fresh router.
+async fn lock_then_offer_correct_code(path: &str, prefix: &str) -> StatusCode {
+    let (store, auth, _guard) = new_store(prefix).await;
+    let first = app(store.clone(), auth.clone());
+    let (token, _id) = member(&store, &auth, "ada").await;
+    let (secret, _codes) = enrol_and_confirm(&first, &token).await;
+    for attempt in 0..totp::MAX_FAILURES {
+        let refused = first
+            .clone()
+            .oneshot(request(
+                "POST",
+                path,
+                Some(&token),
+                Some(json!({ "code": "000000" })),
+            ))
+            .await
+            .unwrap();
+        assert_eq!(
+            refused.status(),
+            StatusCode::BAD_REQUEST,
+            "attempt {attempt}"
+        );
+    }
+    let restarted = app(store.clone(), auth.clone());
+    let code = totp::code_at(&secret, now_ms()).unwrap();
+    let status = restarted
+        .clone()
+        .oneshot(request(
+            "POST",
+            path,
+            Some(&token),
+            Some(json!({ "code": code })),
+        ))
+        .await
+        .unwrap()
+        .status();
+    let challenge = login(&restarted, "ada").await.status();
+    assert_eq!(challenge, StatusCode::ACCEPTED, "the factor is still on");
+    status
+}
+
+#[tokio::test]
+async fn repeated_wrong_codes_lock_disabling_even_against_a_correct_code() {
+    let status =
+        lock_then_offer_correct_code("/auth/totp/disable", "slimm-totp-lock-disable").await;
+    assert_eq!(status, StatusCode::TOO_MANY_REQUESTS);
+}
+
+#[tokio::test]
+async fn repeated_wrong_codes_lock_reissuing_even_against_a_correct_code() {
+    let status =
+        lock_then_offer_correct_code("/auth/totp/recovery-codes", "slimm-totp-lock-reissue").await;
+    assert_eq!(status, StatusCode::TOO_MANY_REQUESTS);
+}
+
+// --- Sign-in alert ---
+
+#[tokio::test]
+async fn a_totp_sign_in_alerts_the_other_devices() {
+    let (store, auth, _guard) = new_store("slimm-totp-sign-in-alert").await;
+    let hub = Hub::new();
+    let app = app_with_hub(store.clone(), auth.clone(), hub.clone());
+    let (token, _id) = member(&store, &auth, "ada").await;
+    let (secret, _codes) = enrol_and_confirm(&app, &token).await;
+
+    let challenge = login_for_challenge(&app, "ada").await;
+    let mut rx = hub.subscribe();
+    let code = totp::code_at(&secret, now_ms()).unwrap();
+    assert_eq!(
+        verify(&app, &challenge, &code).await.status(),
+        StatusCode::OK
+    );
+
+    let mut alerted = None;
+    while let Ok(event) = rx.try_recv() {
+        if let Event::NewDeviceSignIn { device_name, .. } = event {
+            alerted = Some(device_name);
+        }
+    }
+    assert_eq!(alerted.as_deref(), Some("phone"));
 }

@@ -149,3 +149,47 @@ async fn invisible_characters_and_disguised_links_are_refused() {
         "the stored url is the normalized form"
     );
 }
+
+#[tokio::test]
+async fn invisible_characters_are_refused_when_a_bot_replaces_buttons() {
+    let w = world().await;
+    let sent = posted(&w).await;
+    let uri = format!(
+        "/channels/{}/messages/{}/components",
+        w.channel,
+        sent["id"].as_str().unwrap()
+    );
+    let control =
+        json!([{ "buttons": [{ "label": "Fine", "style": "primary", "custom_id": "a" }] }]);
+    let (status, _) = call(
+        &w,
+        "PUT",
+        &uri,
+        &w.bot.1,
+        Some(json!({ "components": control })),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK, "sanity: a plain label is accepted");
+    for label in ["Hit\u{061C}", "Hit\u{202E}"] {
+        let bad =
+            json!([{ "buttons": [{ "label": label, "style": "primary", "custom_id": "a" }] }]);
+        let (status, _) = call(
+            &w,
+            "PUT",
+            &uri,
+            &w.bot.1,
+            Some(json!({ "components": bad })),
+        )
+        .await;
+        assert_eq!(status, StatusCode::BAD_REQUEST);
+    }
+    let (_, page) = call(
+        &w,
+        "GET",
+        &format!("/channels/{}/messages", w.channel),
+        &w.alice.1,
+        None,
+    )
+    .await;
+    assert_eq!(page[0]["components"][0]["buttons"][0]["label"], "Fine");
+}

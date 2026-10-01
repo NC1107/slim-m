@@ -307,3 +307,26 @@ async fn the_second_block_runs_by_its_own_index_after_an_edit_moves_it() {
         "an index from before the edit no longer names a block"
     );
 }
+
+#[tokio::test]
+async fn a_member_who_cannot_see_the_channel_gets_404_and_nothing_is_stored() {
+    let (s, _guard) = new_store("slimm-run-hidden-channel").await;
+    let (author, runner, channel_id, _author_token, runner_token) = scene(&s).await;
+    let router = app(s.clone());
+    let id = post_block(&s, channel_id, &author, "```js\nroll()\n```").await;
+    s.set_member_overwrite(
+        channel_id,
+        runner.id,
+        Permissions::NONE,
+        Permissions::VIEW_CHANNEL,
+    )
+    .await
+    .unwrap();
+
+    assert_eq!(
+        run(&router, id, &runner_token, "roll()").await,
+        StatusCode::NOT_FOUND
+    );
+    let stored = s.code_runs_for_messages(&[id]).await.unwrap();
+    assert!(stored.iter().all(|(_, runs)| runs.is_empty()));
+}
