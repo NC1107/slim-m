@@ -86,6 +86,8 @@ import 'src/widgets/toast_overlay.dart';
 /// size. Waiting for the real first frame avoids that race entirely.
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  // First, so a launch that dies in any later step still counts toward a rollback.
+  await countLaunch();
   // The browser's own menu otherwise lands on top of every in-app one.
   if (kIsWeb) unawaited(BrowserContextMenu.disableContextMenu());
   // Registers media_kit's player backend; every inline video attachment goes through it (attachment_video_player.dart).

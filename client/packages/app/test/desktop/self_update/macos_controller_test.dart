@@ -80,26 +80,38 @@ void main() {
     );
   });
 
-  test(
-    'a third start of an unconfirmed bundle restores and restarts',
-    () async {
-      final state = stateDir();
-      File('${state.path}/pending').writeAsStringSync('0.89.0');
-      File('${state.path}/pending.tries').writeAsStringSync('2');
-      final c = container();
+  test('a third start that dies before the app is ready restores and '
+      'restarts, because the start is counted up front', () async {
+    final state = stateDir();
+    File('${state.path}/pending').writeAsStringSync('0.89.0');
+    final c = container();
+    // Each launch counts itself first and then crashes: confirmStart never runs.
+    for (var launch = 0; launch < 3; launch++) {
       await c
           .read(selfUpdateProvider)
-          .confirmStart(
-            resolvedExecutable: exe,
-            os: 'macos',
-            home: home,
-            settle: Duration.zero,
-          );
-      expect(restarts, 1);
-      expect(File(exe).readAsStringSync(), 'old');
-      expect(File('${state.path}/rolled-back').readAsStringSync(), '0.89.0');
-    },
-  );
+          .countStart(resolvedExecutable: exe, os: 'macos', home: home);
+    }
+    expect(restarts, 1);
+    expect(File(exe).readAsStringSync(), 'old');
+    expect(File('${state.path}/rolled-back').readAsStringSync(), '0.89.0');
+  });
+
+  test('confirmStart does not count the start a second time', () async {
+    final state = stateDir();
+    File('${state.path}/pending').writeAsStringSync('0.89.0');
+    File('${state.path}/pending.tries').writeAsStringSync('2');
+    final c = container();
+    await c
+        .read(selfUpdateProvider)
+        .confirmStart(
+          resolvedExecutable: exe,
+          os: 'macos',
+          home: home,
+          settle: Duration.zero,
+        );
+    expect(restarts, 0);
+    expect(File(exe).readAsStringSync(), 'new');
+  });
 
   test(
     'the restored version reports the rollback and keeps the previous bundle',
