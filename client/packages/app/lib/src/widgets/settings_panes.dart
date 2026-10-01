@@ -95,12 +95,20 @@ class SettingsPanesScaffold extends StatefulWidget {
     required this.backFallback,
     this.footer,
     this.initialPaneId,
+    this.onPaneChanged,
   });
 
   final String title;
 
   /// The pane shown first; on a phone this opens straight into it.
+  ///
+  /// Also the route's own answer: when it changes after the first build the
+  /// selection follows, which is how a pane in the URL reaches this widget.
   final String? initialPaneId;
+
+  /// Told the pane the user picked, or null for the nav on a phone, so the
+  /// route can carry it in its location and a reload lands on the same pane.
+  final ValueChanged<String?>? onPaneChanged;
   final List<SettingsPaneGroup> groups;
 
   /// Names the destination, not just "Back"; see [BackToButton].
@@ -118,6 +126,25 @@ class SettingsPanesScaffold extends StatefulWidget {
 
 class _SettingsPanesScaffoldState extends State<SettingsPanesScaffold> {
   late String? _selectedId = widget.initialPaneId;
+
+  @override
+  void didUpdateWidget(SettingsPanesScaffold oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.initialPaneId != oldWidget.initialPaneId) {
+      _selectedId = widget.initialPaneId;
+    }
+  }
+
+  // One per pane, so its content keeps its state when the window crosses the width that swaps the two-pane layout for the drill-in.
+  final _contentKeys = <String, GlobalKey>{};
+
+  GlobalKey _contentKey(SettingsPane pane) =>
+      _contentKeys.putIfAbsent(pane.id, GlobalKey.new);
+
+  void _select(String? id) {
+    setState(() => _selectedId = id);
+    widget.onPaneChanged?.call(id);
+  }
 
   List<SettingsPane> get _allPanes => [
     for (final group in widget.groups) ...group.panes,
@@ -145,11 +172,14 @@ class _SettingsPanesScaffoldState extends State<SettingsPanesScaffold> {
           leading: IconButton(
             icon: const Icon(AppIcons.back),
             tooltip: 'Back to ${widget.title.toLowerCase()}',
-            onPressed: () => setState(() => _selectedId = null),
+            onPressed: () => _select(null),
           ),
           actions: selected.actions,
         ),
-        body: SafeArea(top: false, child: _PaneBody(pane: selected)),
+        body: SafeArea(
+          top: false,
+          child: _PaneBody(pane: selected, contentKey: _contentKey(selected)),
+        ),
       );
     }
 
@@ -166,7 +196,7 @@ class _SettingsPanesScaffoldState extends State<SettingsPanesScaffold> {
           context.push(route);
           return;
         }
-        setState(() => _selectedId = id);
+        _select(id);
       },
     );
 
@@ -209,7 +239,11 @@ class _SettingsPanesScaffoldState extends State<SettingsPanesScaffold> {
             Expanded(
               child: selected == null
                   ? const SizedBox.shrink()
-                  : _PaneBody(pane: selected, showHeading: true),
+                  : _PaneBody(
+                      pane: selected,
+                      contentKey: _contentKey(selected),
+                      showHeading: true,
+                    ),
             ),
           ],
         ),
@@ -228,9 +262,16 @@ class _SettingsPanesScaffoldState extends State<SettingsPanesScaffold> {
 /// flat" report on a wide desktop window, where the nav's 240px left nothing
 /// else bounding it.
 class _PaneBody extends StatelessWidget {
-  const _PaneBody({required this.pane, this.showHeading = false});
+  const _PaneBody({
+    required this.pane,
+    required this.contentKey,
+    this.showHeading = false,
+  });
 
   final SettingsPane pane;
+
+  /// Owned by the scaffold, so the pane's own state outlives this widget.
+  final GlobalKey contentKey;
 
   /// Wide only: beside the nav nothing else names the pane, where on compact
   /// the app bar already does.
@@ -247,7 +288,10 @@ class _PaneBody extends StatelessWidget {
               padding: pane.padding,
               children: [
                 if (showHeading) _PaneHeading(pane.label),
-                Builder(builder: pane.builder),
+                KeyedSubtree(
+                  key: contentKey,
+                  child: Builder(builder: pane.builder),
+                ),
               ],
             )
           : showHeading
@@ -266,14 +310,20 @@ class _PaneBody extends StatelessWidget {
                       pane.padding.right,
                       pane.padding.bottom,
                     ),
-                    child: Builder(builder: pane.builder),
+                    child: KeyedSubtree(
+                      key: contentKey,
+                      child: Builder(builder: pane.builder),
+                    ),
                   ),
                 ),
               ],
             )
           : Padding(
               padding: pane.padding,
-              child: Builder(builder: pane.builder),
+              child: KeyedSubtree(
+                key: contentKey,
+                child: Builder(builder: pane.builder),
+              ),
             ),
     ),
   );
