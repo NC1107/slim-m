@@ -111,6 +111,11 @@ A Dart pub workspace under `client/packages/`, layered bottom-up:
 
 Wire types and the drift tables are hand-written on both sides; `schema/openapi.yaml` is the contract, not a generator input.
 
+Two client limits that are deliberate rather than bugs:
+
+- Android sweeps its share temp folders only on the next share, so the chooser can still read them; iOS and desktop delete in a `finally`. Exported images can therefore sit in the cache until the next share.
+- A message deep link resolves by walking at most 10 pages (about 500 messages) of channel history, so an older link lands on the "unreachable" notice.
+
 ## The contract
 
 `schema/openapi.yaml` is the source of record for the wire protocol.
