@@ -18,6 +18,7 @@ import 'package:slimm_design_system/design_system.dart';
 import 'context_menu_region.dart';
 import 'emoji_picker.dart';
 import 'message_context_menu.dart';
+import 'message_row_roving.dart';
 
 /// Every slot is an [AppIconButton] whose hit box is [AppSizes.rowPointer]
 /// (30), the pointer minimum from `AppControlWithOptions`, with the 28px
@@ -77,7 +78,12 @@ class MessageHoverToolbar extends StatelessWidget {
             child: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                EmojiPickerButton(onSelect: onPickReaction),
+                RovingStop(
+                  builder: (_, node) => EmojiPickerButton(
+                    focusNode: node,
+                    onSelect: onPickReaction,
+                  ),
+                ),
                 if (actions.canReply)
                   _slot(replyKey, AppIcons.reply, 'Reply', actions.onReply),
                 if (actions.canOpenThread)
@@ -99,13 +105,16 @@ class MessageHoverToolbar extends StatelessWidget {
   }
 
   Widget _slot(Key key, IconData icon, String label, VoidCallback onPressed) =>
-      AppIconButton(
-        key: key,
-        icon: icon,
-        semanticLabel: label,
-        tooltip: label,
-        iconSize: AppSizes.icon16,
-        onPressed: onPressed,
+      RovingStop(
+        builder: (_, node) => AppIconButton(
+          key: key,
+          focusNode: node,
+          icon: icon,
+          semanticLabel: label,
+          tooltip: label,
+          iconSize: AppSizes.icon16,
+          onPressed: onPressed,
+        ),
       );
 }
 
@@ -114,9 +123,10 @@ class _OverflowSlot extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Builder(
-      builder: (context) => AppIconButton(
+    return RovingStop(
+      builder: (context, node) => AppIconButton(
         key: MessageHoverToolbar.overflowKey,
+        focusNode: node,
         icon: AppIcons.moreHorizontal,
         semanticLabel: 'More message actions',
         tooltip: 'More',

@@ -12,6 +12,7 @@ import 'package:slimm_design_system/design_system.dart';
 
 import '../providers/user_profiles.dart';
 import 'member_profile.dart';
+import 'message_row_roving.dart';
 
 /// Wraps [child] so a tap (or its own accessible action) opens [authorId]'s
 /// profile - the exact popover [showMemberProfile] already opens from the
@@ -39,6 +40,7 @@ class AuthorProfileTapTarget extends ConsumerStatefulWidget {
     required this.semanticLabel,
     required this.child,
     this.decorativeWhenUnresolved = false,
+    this.fingerTarget = false,
   });
 
   final String? authorId;
@@ -52,6 +54,13 @@ class AuthorProfileTapTarget extends ConsumerStatefulWidget {
   /// meaning on its own (the header's name text) until there is somewhere
   /// for a tap to actually go.
   final bool decorativeWhenUnresolved;
+
+  /// True for the one control a finger presses to open the profile (the
+  /// avatar): at touch density its hit area is padded to 44pt. False for the
+  /// author name, which at 22pt tall cannot be padded without growing every
+  /// message header, so a finger does not press it there; the avatar covers
+  /// that, and the keyboard and screen readers still reach the name.
+  final bool fingerTarget;
 
   @override
   ConsumerState<AuthorProfileTapTarget> createState() =>
@@ -78,39 +87,55 @@ class _AuthorProfileTapTargetState
 
     void open() => unawaited(showMemberProfile(context, ref, profile: profile));
 
-    return Semantics(
-      button: true,
-      label: widget.semanticLabel,
-      excludeSemantics: true,
-      onTap: open,
-      child: FocusableActionDetector(
-        mouseCursor: SystemMouseCursors.click,
-        onShowFocusHighlight: (v) => setState(() => _focused = v),
-        actions: <Type, Action<Intent>>{
-          ActivateIntent: CallbackAction<ActivateIntent>(
-            onInvoke: (_) => open(),
-          ),
-        },
-        child: GestureDetector(
+    final pressable = widget.fingerTarget || !AppTouchTargets.of(context);
+
+    return AppTouchHitArea(
+      touch: widget.fingerTarget ? null : false,
+      alignment: Alignment.topLeft,
+      child: RovingStop(
+        builder: (context, node) => Semantics(
+          button: true,
+          label: widget.semanticLabel,
+          excludeSemantics: true,
           onTap: open,
-          excludeFromSemantics: true,
-          child: Stack(
-            clipBehavior: Clip.none,
-            children: [
-              widget.child,
-              // Only mounted while focus-highlighted, so a pointer-only run draws nothing extra.
-              if (_focused)
-                Positioned.fill(
-                  child: IgnorePointer(
-                    child: DecoratedBox(
-                      decoration: BoxDecoration(
-                        border: Border.all(color: tokens.focusRing, width: 2),
-                        borderRadius: BorderRadius.circular(AppRadii.control),
+          child: FocusableActionDetector(
+            focusNode: node,
+            mouseCursor: pressable
+                ? SystemMouseCursors.click
+                : MouseCursor.defer,
+            onShowFocusHighlight: (v) => setState(() => _focused = v),
+            actions: <Type, Action<Intent>>{
+              ActivateIntent: CallbackAction<ActivateIntent>(
+                onInvoke: (_) => open(),
+              ),
+            },
+            child: GestureDetector(
+              onTap: pressable ? open : null,
+              excludeFromSemantics: true,
+              child: Stack(
+                clipBehavior: Clip.none,
+                children: [
+                  widget.child,
+                  // Only mounted while focus-highlighted, so a pointer-only run draws nothing extra.
+                  if (_focused)
+                    Positioned.fill(
+                      child: IgnorePointer(
+                        child: DecoratedBox(
+                          decoration: BoxDecoration(
+                            border: Border.all(
+                              color: tokens.focusRing,
+                              width: 2,
+                            ),
+                            borderRadius: BorderRadius.circular(
+                              AppRadii.control,
+                            ),
+                          ),
+                        ),
                       ),
                     ),
-                  ),
-                ),
-            ],
+                ],
+              ),
+            ),
           ),
         ),
       ),

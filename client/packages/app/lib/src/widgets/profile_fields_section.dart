@@ -96,6 +96,7 @@ class _ProfileFieldsSectionState extends ConsumerState<ProfileFieldsSection> {
   Widget build(BuildContext context) {
     final tokens = Theme.of(context).extension<AppTokens>()!;
     final me = ref.watch(meProvider).valueOrNull;
+    final touch = AppTouchTargets.of(context);
     if (me != null) _seed(me);
 
     return SettingsSectionCard(
@@ -142,12 +143,14 @@ class _ProfileFieldsSectionState extends ConsumerState<ProfileFieldsSection> {
                 'Profile colour',
                 style: AppText.caption.copyWith(color: tokens.textSecondary),
               ),
-              const SizedBox(height: AppSpacing.s8),
+              SizedBox(height: touch ? 0 : AppSpacing.s8),
               Row(
                 children: [
                   for (var i = 0; i < AppCanvasColors.cursors.length; i++)
                     Padding(
-                      padding: const EdgeInsets.only(right: AppSpacing.s8),
+                      padding: EdgeInsets.only(
+                        right: touch ? 0 : AppSpacing.s8,
+                      ),
                       child: _ColorSwatch(
                         color: AppCanvasColors.cursors[i],
                         name: _colourNames[i],
@@ -191,6 +194,7 @@ class _ColorSwatch extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final tokens = Theme.of(context).extension<AppTokens>()!;
+    final side = AppTouchTargets.of(context) ? AppSizes.rowTouch : 28.0;
     return Semantics(
       button: true,
       selected: selected,
@@ -199,22 +203,27 @@ class _ColorSwatch extends StatelessWidget {
         onTap: onTap,
         customBorder: const CircleBorder(),
         child: Container(
-          width: 28,
-          height: 28,
-          decoration: BoxDecoration(
-            color: color,
-            shape: BoxShape.circle,
-            border: selected
-                ? Border.all(color: tokens.textPrimary, width: 2)
+          width: side,
+          height: side,
+          alignment: Alignment.center,
+          child: Container(
+            width: 28,
+            height: 28,
+            decoration: BoxDecoration(
+              color: color,
+              shape: BoxShape.circle,
+              border: selected
+                  ? Border.all(color: tokens.textPrimary, width: 2)
+                  : null,
+            ),
+            child: selected
+                ? Icon(
+                    AppIcons.check,
+                    size: AppSizes.icon16,
+                    color: tokens.accentOn,
+                  )
                 : null,
           ),
-          child: selected
-              ? Icon(
-                  AppIcons.check,
-                  size: AppSizes.icon16,
-                  color: tokens.accentOn,
-                )
-              : null,
         ),
       ),
     );

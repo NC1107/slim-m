@@ -16,6 +16,9 @@ Platform checks are only ever for capability (push, tray, file pickers), never f
 
 1. Width decides, and it is re-checked live on resize (panes slide, they do not pop).
 2. Pointer rows are 30-38dp; touch rows are >= 44dp.
+   A control whose drawn size is the design (an avatar) pads its hit area with `AppTouchHitArea` instead of growing.
+   An ancestor only passes a press down while it contains it, so the padding needs a parent with room, and a control that cannot get that room (the 22dp author name) is not a finger target at touch density.
+   `phone_touch_targets_test.dart` hit-tests the area around each control rather than reading the size of its icon.
 3. Every hover affordance has a named long-press equivalent. A desktop-only action is a review defect.
 
 ## The three widths

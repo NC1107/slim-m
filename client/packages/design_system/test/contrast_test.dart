@@ -61,9 +61,9 @@
 ///
 /// ## Borders
 ///
-/// Borders stay reported rather than asserted, which is a deliberate open
-/// question rather than an oversight, and worth writing down rather than leaving
-/// as a silent omission.
+/// The hairline separator stays reported rather than asserted. The edge of an
+/// input or a card is gated at 3:1 in `component_boundary_contrast_test.dart`,
+/// against `borderStrong`; see decision 0004's 2026-10-01 addendum.
 ///
 /// WCAG 1.4.11 asks 3:1 of a UI component boundary. Reaching that on #000000
 /// needs roughly #5A5A5A, which is not a hairline any more, it is a visible grey

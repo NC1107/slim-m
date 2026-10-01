@@ -60,6 +60,7 @@ class ContextMenuRegion extends StatefulWidget {
     this.ownsFocusNode = true,
     this.enableLongPress = true,
     this.opensAbove = false,
+    this.focusNode,
   });
 
   /// Builds the menu's items given a callback that closes it. Called fresh
@@ -113,6 +114,10 @@ class ContextMenuRegion extends StatefulWidget {
   /// Opens the anchored menu above [child]'s top-left instead of at the
   /// pointer, for a control docked near the bottom edge that it would cover.
   final bool opensAbove;
+
+  /// The row's own tab stop, for a caller that drives focus itself; see
+  /// [ContextMenuFocus.focusNode].
+  final FocusNode? focusNode;
 
   @override
   State<ContextMenuRegion> createState() => ContextMenuRegionState();
@@ -275,6 +280,7 @@ class ContextMenuRegionState extends State<ContextMenuRegion> {
       child: ContextMenuFocus(
         onOpen: () => _setOpen(true),
         ownsFocusNode: widget.ownsFocusNode,
+        focusNode: widget.focusNode,
         child: GestureDetector(
           // Up, never down: only the up event belongs to the arena winner.
           onSecondaryTapUp: (details) =>
