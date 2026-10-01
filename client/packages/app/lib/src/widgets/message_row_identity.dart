@@ -266,9 +266,13 @@ class MessageRowHeader extends ConsumerWidget {
     super.key,
     required this.message,
     this.webhookUsername,
+    this.editing = false,
   });
 
   final Message message;
+
+  /// Adds the EDITING tag, so a row being edited says so on its first line.
+  final bool editing;
 
   /// A webhook's per-post label, drawn as the name only while the author
   /// resolves to a webhook, so the Webhook badge always sits beside it.
@@ -327,6 +331,10 @@ class MessageRowHeader extends ConsumerWidget {
           ],
           const SizedBox(width: AppSpacing.s8),
           MessageTimeMark(message: message),
+          if (editing) ...[
+            const SizedBox(width: AppSpacing.s8),
+            const AppBadge(variant: AppBadgeVariant.role, label: 'Editing'),
+          ],
         ],
       ),
     );

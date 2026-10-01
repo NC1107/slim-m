@@ -29,26 +29,15 @@ import 'package:slimm_design_system/design_system.dart';
 
 import '../routing/breakpoints.dart';
 
-import 'app_surface_view.dart';
-import 'attachment_view.dart';
-import 'embed_card.dart';
-import 'bot_ui_failure.dart';
-import 'message_buttons.dart';
 import 'emoji_picker.dart';
 import 'message_hover_toolbar.dart';
-import 'forwarded_message_card.dart';
 import 'hover_reveal.dart';
-import 'link_preview_card.dart';
 import 'message_context_menu.dart';
-import 'message_edit_field.dart';
-import 'message_inline.dart' show extractLinkPreviewUrls;
 import 'message_row_identity.dart';
+import 'message_row_column.dart';
 import 'message_row_parts.dart';
 import 'reactions_row.dart';
 import 'message_text.dart';
-import 'call_record_view.dart';
-import 'poll_view.dart';
-import 'reply_quote.dart';
 
 /// One message, and optionally the "New" divider directly above it.
 ///
@@ -229,9 +218,6 @@ class MessageRow extends StatelessWidget {
   Widget build(BuildContext context) {
     final compact = LayoutClass.of(context) == LayoutClass.compact;
     final tokens = Theme.of(context).extension<AppTokens>()!;
-    final edited = message.editedAt != null && !editing
-        ? EditedMarker(onTap: onViewEditHistory)
-        : null;
     return HoverReveal(
       builder: (context, hovered, menuOpen, focusWithin) => Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -261,7 +247,7 @@ class MessageRow extends StatelessWidget {
                     key: MessageRow.hoverFillKey,
                     duration: AppMotion.reduced(context, AppMotion.fast),
                     curve: AppMotion.entrance,
-                    color: hovered || menuOpen
+                    color: hovered || menuOpen || editing
                         ? tokens.surfaceRaised
                         : Colors.transparent,
                   ),
@@ -315,164 +301,38 @@ class MessageRow extends StatelessWidget {
                                 constraints: const BoxConstraints(
                                   maxWidth: kMessageColumnMax,
                                 ),
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    if (!grouped)
-                                      Padding(
-                                        // Compact has no hover to reserve for, and no room to spare.
-                                        padding: MessageHoverToolbar.clearance(
-                                          compact: compact,
-                                        ),
-                                        child: MessageRowHeader(
-                                          message: message,
-                                          webhookUsername: webhookUsername,
-                                        ),
-                                      ),
-                                    if (message.replyToId != null)
-                                      ReplyQuote(
-                                        resolved: replyTo,
-                                        onTap: onReplyTap ?? () {},
-                                      ),
-                                    if (editing)
-                                      MessageEditField(
-                                        initialContent: message.content,
-                                        onSubmit: onSubmitEdit,
-                                        onCancel: onCancelEdit,
-                                      )
-                                    // An attachment-only message has no body; an empty one still adds a blank line above the image. A forward's own note is often empty too.
-                                    else if (message.content.isNotEmpty)
-                                      Padding(
-                                        // A headerless row's first line is what the toolbar would sit on.
-                                        padding: grouped
-                                            ? MessageHoverToolbar.clearance(
-                                                compact: compact,
-                                              )
-                                            : EdgeInsets.zero,
-                                        child: MessageBody(
-                                          content: message.content,
-                                          messageId: message.id,
-                                          knownUsernames: knownUsernames,
-                                          knownRoleNames: knownRoleNames,
-                                          customEmoji: customEmoji,
-                                          dim: message.pending,
-                                          announceSending: message.pending,
-                                          trailing: edited,
-                                        ),
-                                      ),
-                                    if (!editing && message.content.isNotEmpty)
-                                      LinkPreviewList(
-                                        urls: extractLinkPreviewUrls(
-                                          message.content,
-                                        ),
-                                      ),
-                                    if (!editing && embeds.isNotEmpty)
-                                      EmbedList(embeds: embeds),
-                                    if (!editing && components.isNotEmpty)
-                                      MessageButtons(
-                                        channelId: message.channelId,
-                                        messageId: message.id,
-                                        rows: components,
-                                        unavailable: message.authorId == null,
-                                      ),
-                                    BotUiFailureLine(messageId: message.id),
-                                    if (message.forwarded case final forwarded?)
-                                      Padding(
-                                        padding: const EdgeInsets.only(
-                                          top: AppSpacing.s4,
-                                        ),
-                                        child: ForwardedMessageCard(
-                                          forwarded: forwarded,
-                                          body: forwarded.content.isEmpty
-                                              ? null
-                                              : MessageBody(
-                                                  content: forwarded.content,
-                                                  knownUsernames:
-                                                      knownUsernames,
-                                                  knownRoleNames:
-                                                      knownRoleNames,
-                                                  customEmoji: customEmoji,
-                                                ),
-                                          attachments: attachments,
-                                          currentChannelId: message.channelId,
-                                        ),
-                                      ),
-                                    if (edited != null &&
-                                        message.content.isEmpty)
-                                      Padding(
-                                        padding: const EdgeInsets.only(top: 2),
-                                        child: edited,
-                                      ),
-                                    if (poll != null)
-                                      Padding(
-                                        padding: const EdgeInsets.only(
-                                          top: AppSpacing.s4,
-                                        ),
-                                        child: PollView(
-                                          poll: poll!,
-                                          onVote: onVote,
-                                        ),
-                                      ),
-                                    if (call != null)
-                                      Padding(
-                                        padding: const EdgeInsets.only(
-                                          top: AppSpacing.s4,
-                                        ),
-                                        child: CallRecordView(
-                                          record: call!,
-                                          viewerIsCaller: viewerIsCaller,
-                                        ),
-                                      ),
-                                    if (appSurface != null)
-                                      Padding(
-                                        padding: const EdgeInsets.only(
-                                          top: AppSpacing.s4,
-                                        ),
-                                        child: AppSurfaceView(
-                                          messageId: message.id,
-                                          surface: appSurface!,
-                                          title: appSurface!.moduleId,
-                                        ),
-                                      ),
-                                    // A forward's attachments are part of what was forwarded, and are drawn inside its card instead.
-                                    if (message.forwarded == null)
-                                      for (final attachment in attachments)
-                                        Padding(
-                                          padding: const EdgeInsets.only(
-                                            top: AppSpacing.s4,
-                                          ),
-                                          child: AttachmentView(
-                                            attachment: attachment,
-                                            siblings: openableImages(
-                                              attachments,
-                                            ),
-                                          ),
-                                        ),
-                                    if (!_unsent)
-                                      ReactionsRow(
-                                        messageId: message.id,
-                                        reactions: reactions,
-                                        onReactionTap: onReactionTap,
-                                        onPickReaction: onPickReaction,
-                                        customEmoji: customEmoji,
-                                      ),
-                                    if ((threadReplyCount ?? 0) > 0)
-                                      ThreadReplySummary(
-                                        replyCount: threadReplyCount!,
-                                        lastReplyAt: threadLastReplyAt,
-                                        unread: (threadUnreadCount ?? 0) > 0,
-                                        onTap: actions.canOpenThread
-                                            ? actions.onOpenThread
-                                            : null,
-                                      ),
-                                    if (message.failed)
-                                      FailedRow(
-                                        onRetry: onRetry,
-                                        onEdit: onEditFailed,
-                                        onDiscard: onDiscard,
-                                        reason: message.failureReason,
-                                      ),
-                                  ],
+                                child: MessageRowColumn(
+                                  message: message,
+                                  grouped: grouped,
+                                  compact: compact,
+                                  editing: editing,
+                                  actions: actions,
+                                  knownUsernames: knownUsernames,
+                                  knownRoleNames: knownRoleNames,
+                                  customEmoji: customEmoji,
+                                  onRetry: onRetry,
+                                  onDiscard: onDiscard,
+                                  onPickReaction: onPickReaction,
+                                  onReactionTap: onReactionTap,
+                                  onVote: onVote,
+                                  onSubmitEdit: onSubmitEdit,
+                                  onCancelEdit: onCancelEdit,
+                                  onEditFailed: onEditFailed,
+                                  onViewEditHistory: onViewEditHistory,
+                                  onReplyTap: onReplyTap,
+                                  replyTo: replyTo,
+                                  webhookUsername: webhookUsername,
+                                  reactions: reactions,
+                                  attachments: attachments,
+                                  embeds: embeds,
+                                  components: components,
+                                  poll: poll,
+                                  appSurface: appSurface,
+                                  call: call,
+                                  viewerIsCaller: viewerIsCaller,
+                                  threadReplyCount: threadReplyCount,
+                                  threadLastReplyAt: threadLastReplyAt,
+                                  threadUnreadCount: threadUnreadCount,
                                 ),
                               ),
                             ),
@@ -483,7 +343,10 @@ class MessageRow extends StatelessWidget {
                   ),
                 ),
                 // Outside layout, and never on compact, which reserves no clearance for it.
-                if (!compact && (hovered || focusWithin) && !_unsent)
+                if (!compact &&
+                    (hovered || focusWithin) &&
+                    !_unsent &&
+                    !editing)
                   Positioned(
                     top: 0,
                     right: AppSizes.paneGutter,

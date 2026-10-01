@@ -10,6 +10,8 @@ import 'package:flutter/material.dart';
 import 'package:slimm_api/api.dart' as api;
 import 'package:slimm_design_system/design_system.dart';
 
+import '../routing/breakpoints.dart';
+import 'add_reaction_chip.dart';
 import 'custom_emoji_image.dart';
 import 'emoji_picker.dart';
 import 'reaction_chip_who.dart';
@@ -62,6 +64,9 @@ class ReactionsRow extends StatefulWidget {
     this.messageId,
     this.customEmoji = const {},
   });
+
+  /// The dashed chip that trails the reactions, for a test to find.
+  static const addChipKey = Key('reactions_add_chip');
 
   /// The message these chips sit under. With it, holding a chip (or
   /// right-clicking it) lists who left that reaction; without it the chips are
@@ -168,6 +173,27 @@ class _ReactionsRowState extends State<ReactionsRow> {
     );
   }
 
+  /// The picker opens as a sheet below the compact width and anchored under
+  /// the chip above it: nothing floats under a thumb.
+  Widget _addChip(BuildContext context) {
+    if (LayoutClass.of(context) == LayoutClass.compact) {
+      return KeyedSubtree(
+        key: ReactionsRow.addChipKey,
+        child: AddReactionChip(
+          onTap: () =>
+              showEmojiPickerSheet(context, onSelect: widget.onPickReaction),
+        ),
+      );
+    }
+    return KeyedSubtree(
+      key: ReactionsRow.addChipKey,
+      child: EmojiPickerButton(
+        onSelect: widget.onPickReaction,
+        triggerBuilder: (context, toggle) => AddReactionChip(onTap: toggle),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final live = {for (final r in widget.reactions) r.emoji: r};
@@ -201,6 +227,7 @@ class _ReactionsRowState extends State<ReactionsRow> {
                   },
                   child: _chip(reaction, exiting: true),
                 ),
+            if (live.isNotEmpty) _addChip(context),
           ],
         ),
       ),

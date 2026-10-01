@@ -136,6 +136,15 @@ Map<String, ({List<Widget> rows, int? menuOn, bool own})> _scenes() => {
     menuOn: null,
     own: false,
   ),
+  'edit-keys': (
+    rows: [
+      _row('a', 'morning, did anyone look at the canvas bug'),
+      _row('b', 'yes, it was the seq ordering on resync', editing: true),
+      _row('c', 'a continuation', editing: true, grouped: true),
+    ],
+    menuOn: null,
+    own: false,
+  ),
   'reactions': (
     rows: [
       _row(
@@ -178,7 +187,7 @@ void main() {
                 child: MaterialApp(
                   debugShowCheckedModeBanner: false,
                   theme: base.copyWith(
-                    platform: width.value < 600
+                    platform: width.value < 600 && scene.key != 'edit-keys'
                         ? TargetPlatform.android
                         : TargetPlatform.linux,
                   ),

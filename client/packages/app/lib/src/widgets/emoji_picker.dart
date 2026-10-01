@@ -39,12 +39,22 @@ const Offset _buttonDrop = Offset(0, 4);
 /// follower did, so it closes on one instead, `ContextMenuRegion`'s own
 /// answer to the same trade.
 class EmojiPickerButton extends StatefulWidget {
-  const EmojiPickerButton({super.key, required this.onSelect, this.focusNode});
+  const EmojiPickerButton({
+    super.key,
+    required this.onSelect,
+    this.triggerBuilder,
+    this.focusNode,
+  });
 
   final ValueChanged<String> onSelect;
 
   /// Lets a row that walks its own controls with the arrow keys own this stop.
   final FocusNode? focusNode;
+
+  /// Draws something other than the toolbar glyph as the control that opens
+  /// the picker; the callback toggles it. The picker still anchors under it.
+  final Widget Function(BuildContext context, VoidCallback toggle)?
+  triggerBuilder;
 
   @override
   State<EmojiPickerButton> createState() => _EmojiPickerButtonState();
@@ -95,6 +105,8 @@ class _EmojiPickerButtonState extends State<EmojiPickerButton> {
     _watched?.addListener(_closeOnScroll);
   }
 
+  void _toggle() => _setOpen(!_controller.isShowing);
+
   void _select(String emoji) {
     _setOpen(false);
     widget.onSelect(emoji);
@@ -124,13 +136,16 @@ class _EmojiPickerButtonState extends State<EmojiPickerButton> {
           ),
         ),
       ),
-      child: AppIconButton(
-        focusNode: widget.focusNode,
-        icon: AppIcons.smile,
-        semanticLabel: ActionLabels.addReaction,
-        iconSize: AppSizes.icon16,
-        onPressed: () => _setOpen(!_controller.isShowing),
-      ),
+      child: switch (widget.triggerBuilder) {
+        final build? => build(context, _toggle),
+        null => AppIconButton(
+          focusNode: widget.focusNode,
+          icon: AppIcons.smile,
+          semanticLabel: 'Add a reaction',
+          iconSize: AppSizes.icon16,
+          onPressed: _toggle,
+        ),
+      },
     );
   }
 }
