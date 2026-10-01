@@ -131,6 +131,7 @@ Future<void> expectSettled(
   bool knownTransient = false,
   bool allowNoText = false,
 }) async {
+  expectNotNotFound(renderedText(tester), snapshotName);
   final before = renderedText(tester);
   for (var i = 0; i < extraSettlePumps; i++) {
     await tester.pump(extraSettleFrame);
@@ -150,6 +151,22 @@ Future<void> expectSettled(
       'A real screen a person reads shows something; pass allowNoText: '
       'true if this surface is genuinely text-free.',
     );
+  }
+}
+
+/// The router's two not-found pages: go_router's own and the app's.
+const _notFoundTexts = ['Page Not Found', 'This page does not exist.'];
+
+/// Fails a capture whose tree is a not-found page: a fixture router missing a
+/// route rendered 24 of these as the Dock module surfaces and passed.
+void expectNotNotFound(List<String> text, String snapshotName) {
+  for (final marker in _notFoundTexts) {
+    if (text.contains(marker)) {
+      fail(
+        'not-found capture: "$snapshotName" rendered the not-found page, so '
+        'the surface it names is not in the fixture router.',
+      );
+    }
   }
 }
 

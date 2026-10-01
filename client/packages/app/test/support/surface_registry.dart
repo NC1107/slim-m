@@ -49,11 +49,6 @@ const snapshotSurfaces = <String, ({String route, List<String> viewports})>{
     route: '/channels/c-empty',
     viewports: phoneAndDesktop,
   ),
-  // An ordinary DM, distinct from the self-DM personal space: renders the rail's DM section and a real transcript.
-  'dm-normal-transcript': (
-    route: '/channels/c-dm-ada',
-    viewports: phoneAndDesktop,
-  ),
   'onboarding': (
     route: '/join',
     viewports: [

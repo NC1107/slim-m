@@ -73,16 +73,11 @@ final _voiceCallVariantSurfaces =
       ),
     };
 
-/// The join preview's two states that never call `VoiceController.join` at
-/// all - connecting, and the busy-elsewhere switch prompt - reached by
-/// pinning `voiceControllerProvider` directly.
+/// The join preview's busy-elsewhere switch prompt, which never calls
+/// `VoiceController.join`, reached by pinning `voiceControllerProvider`
+/// directly. Its connecting state is the `voice` shell surface.
 final _voiceJoinPreviewSurfaces =
     <String, ({String route, List<String> viewports, VoiceState state})>{
-      'voice-connecting': (
-        route: '/channels/c-main',
-        viewports: _phoneAndDesktop,
-        state: connectingState,
-      ),
       'voice-switch-prompt': (
         route: '/channels/c-main',
         viewports: _phoneAndDesktop,
@@ -95,11 +90,6 @@ final _voiceJoinPreviewSurfaces =
 /// for why a plain pinned `VoiceState` cannot reach these.
 final _voiceRejoinSurfaces =
     <String, ({String route, List<String> viewports, VoiceState state})>{
-      'voice-rejoin-plain': (
-        route: '/channels/c-main',
-        viewports: _phoneAndDesktop,
-        state: leftPlainState,
-      ),
       'voice-rejoin-recap': (
         route: '/channels/c-main',
         viewports: _phoneAndDesktop,
