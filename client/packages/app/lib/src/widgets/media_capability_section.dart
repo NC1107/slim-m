@@ -77,8 +77,7 @@ class _MediaCapabilitySectionState
   Widget build(BuildContext context) {
     return SettingsSectionCard(
       title: 'Device capabilities',
-      description:
-          'Checks whether the microphone, camera and screen capture work.',
+      description: 'Tests the microphone, camera and screen capture.',
       children: [
         AppButton(
           label: _buttonLabel(),

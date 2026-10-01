@@ -61,7 +61,7 @@ class NotificationsSection extends ConsumerWidget {
         ),
         SettingsToggleRow(
           label: 'Dock module sounds',
-          description: 'Lets modules play short sounds when you use them.',
+          description: 'Lets modules play short sounds.',
           value: moduleSoundsEnabled,
           onChanged: (value) =>
               ref.read(moduleSoundSettingsProvider.notifier).setEnabled(value),
