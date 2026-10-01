@@ -90,6 +90,7 @@ mod notification_schedule;
 mod overwrites;
 mod pins;
 mod polls;
+mod post_commit;
 mod presence;
 mod push;
 mod quiet_hours;
