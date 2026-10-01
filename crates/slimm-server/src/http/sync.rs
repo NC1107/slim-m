@@ -56,13 +56,13 @@ struct MarkReadRequest {
 }
 
 #[derive(Serialize)]
-struct ReadStateDto {
-    last_read_seq: i64,
-    unread: i64,
+pub(super) struct ReadStateDto {
+    pub(super) last_read_seq: i64,
+    pub(super) unread: i64,
     /// Whether the reader asked to see this channel as unread even though
     /// they have read it. Separate from `unread` because they are different
     /// facts: `unread` counts messages, this records an intention.
-    manually_unread: bool,
+    pub(super) manually_unread: bool,
 }
 
 #[derive(Deserialize)]

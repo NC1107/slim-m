@@ -7411,6 +7411,31 @@ paths:
           $ref: "#/components/responses/Unauthorized"
         "429":
           $ref: "#/components/responses/TooManyRequests"
+  /read-states:
+    get:
+      operationId: listReadStates
+      tags: [sync]
+      summary: Read the caller's marker in every channel they can read.
+      description: >
+        One request instead of one `GET /channels/{channelId}/read` per
+        channel, for a client signing in. Covers the channels `GET /channels`
+        lists and every DM the caller is party to, hidden ones included, and
+        only the caller's own markers. A channel never opened is answered with
+        a zero marker, and each row is what the per-channel route would return.
+        Order is unspecified.
+      responses:
+        "200":
+          description: One entry per readable channel.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ChannelReadState"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
   /sync:
     post:
       operationId: sync
@@ -12205,6 +12230,16 @@ components:
         manually_unread:
           type: boolean
           description: The caller asked to see this as unread despite the marker.
+
+    ChannelReadState:
+      allOf:
+        - $ref: "#/components/schemas/ReadState"
+        - type: object
+          required: [channel_id]
+          properties:
+            channel_id:
+              type: string
+              format: uuid
 
     MarkReadRequest:
       type: object

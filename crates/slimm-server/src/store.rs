@@ -81,6 +81,7 @@ mod presence;
 mod push;
 mod quiet_hours;
 mod reactions;
+mod read_markers;
 mod read_state;
 mod recovery;
 mod refresh_rotation;
@@ -172,6 +173,7 @@ pub use polls::{
 };
 pub use push::{PushError, PushRegistration, PushTarget};
 pub use reactions::{MAX_EMOJI_BYTES, ReactError, ReactionSummary, ReactorCursor};
+pub use read_markers::ChannelReadState;
 pub use recovery::{ConsumeResetError, IssueResetError};
 pub use refresh_rotation::RefreshOutcome;
 pub use removals::{RemoveMemberError, SpaceRemoval};

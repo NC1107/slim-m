@@ -95,6 +95,7 @@ mod push;
 mod quiet_hours;
 mod reaction_emoji;
 mod reactions;
+mod read_states;
 mod read_sync;
 mod recovery;
 mod reports;
@@ -235,6 +236,7 @@ pub fn router(state: AppState) -> Router {
         .merge(totp::routes())
         .merge(storage::routes())
         .merge(sync::routes())
+        .merge(read_states::routes())
         .merge(threads::routes())
         .merge(bots::routes())
         .merge(bot_commands::routes())
