@@ -119,6 +119,14 @@ What else is true here:
 Keep the recovery codes somewhere other than the phone, and give a second person ADMINISTRATOR before you enrol on the owner account.
 [deploy/README.md](../deploy/README.md) covers backups, and a restore from before you enrolled also removes the factor, along with everything else since.
 
+## Usernames
+
+Usernames are unique without regard to letter case, so `Alice` cannot register beside `alice`, and sign-in ignores case.
+Migration 0095 added the index.
+A deployment that already held a colliding pair kept the earliest account's name and had each later one renamed to its own name plus `_` and the last eight hex digits of its id.
+`username_collision_renames` records the old and new name of each, so you can tell those members what to sign in with.
+Display names were not touched.
+
 ## Modules and module sources
 
 Modules are WebAssembly programs the server runs in-process, installed from the Dock in Space settings under Addons.

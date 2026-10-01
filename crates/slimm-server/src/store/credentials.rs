@@ -7,7 +7,8 @@ use crate::ids::UserId;
 
 impl Store {
     /// Looks up the user id and stored password hash for a live username, for the
-    /// login path. `None` covers both no-such-user and a passwordless account.
+    /// login path. Case-insensitive, matching the unique index, so `Alice` and
+    /// `alice` are one account and a sign-in cannot be ambiguous. `None` covers both no-such-user and a passwordless account.
     pub async fn find_credentials(
         &self,
         username: &str,
@@ -15,7 +16,7 @@ impl Store {
         let row = sqlx::query!(
             r#"SELECT id AS "id!: UserId", password_hash
                FROM users
-               WHERE username = ? AND deleted_at IS NULL"#,
+               WHERE lower(username) = lower(?) AND deleted_at IS NULL"#,
             username
         )
         .fetch_optional(&self.pool)

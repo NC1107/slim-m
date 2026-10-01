@@ -1,6 +1,6 @@
 {
   "db_name": "SQLite",
-  "query": "SELECT id AS \"id!: UserId\", password_hash\n               FROM users\n               WHERE username = ? AND deleted_at IS NULL",
+  "query": "SELECT id AS \"id!: UserId\", password_hash\n               FROM users\n               WHERE lower(username) = lower(?) AND deleted_at IS NULL",
   "describe": {
     "columns": [
       {
@@ -22,5 +22,5 @@
       true
     ]
   },
-  "hash": "127a7f8688ec7e5bacc5bb5f07d237f1f413f2ffa29aa5c9f5a384cfc50c7814"
+  "hash": "6bbd99f7faddd01233edb3051242b964930e23dc3473627d6bcad1e42cdbb27d"
 }

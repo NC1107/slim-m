@@ -411,6 +411,12 @@ impl Store {
         sqlx::query!("DELETE FROM user_totp_factors WHERE user_id = ?", user_id)
             .execute(&mut *tx)
             .await?;
+        sqlx::query!(
+            "DELETE FROM username_collision_renames WHERE user_id = ?",
+            user_id
+        )
+        .execute(&mut *tx)
+        .await?;
 
         // The live-username index excludes tombstones, so the name frees up.
         let tombstone = format!("deleted-{user_id}");

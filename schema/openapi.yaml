@@ -244,6 +244,9 @@ paths:
         An account with two-factor authentication on answers 202 with a
         challenge instead of 200 with a token pair: the password was accepted
         and the sign-in is not finished. Complete it at /auth/totp/verify.
+        Usernames match in any letter case. Every credential that cannot
+        sign in, including one too short or malformed to ever have been
+        registered, answers the same 401.
       responses:
         "200":
           $ref: "#/components/responses/Tokens"

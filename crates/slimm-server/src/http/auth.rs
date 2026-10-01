@@ -242,11 +242,14 @@ async fn login(
     State(state): State<AppState>,
     Json(req): Json<LoginRequest>,
 ) -> Result<LoginOutcome, ApiError> {
-    validate_username(&req.username)?;
-    validate_password(&req.password)?;
     validate_label(&req.device_name, "device_name must be 1 to 64 characters")?;
     let (client_kind, client_version) =
         parse_client_info(req.client_kind.as_deref(), req.client_version.as_deref())?;
+    // A credential that could never exist fails like a wrong one, so the error never teaches the policy.
+    if validate_username(&req.username).is_err() || validate_password(&req.password).is_err() {
+        state.auth.verify_decoy().await?;
+        return Err(ApiError::Unauthorized);
+    }
 
     let credentials = state.store.find_credentials(&req.username).await?;
     let verified = match &credentials {
