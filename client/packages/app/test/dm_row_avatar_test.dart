@@ -70,16 +70,18 @@ ProviderContainer _container({required bool hasAvatar}) {
                 headers: {'content-type': 'application/json'},
               );
             }
-            if (request.url.path.endsWith('/users/user-nadia')) {
+            if (request.url.path == '/users') {
               return http.Response(
-                jsonEncode({
-                  'id': 'user-nadia',
-                  'username': 'nadia',
-                  'display_name': 'Nadia',
-                  'created_at': 0,
-                  'avatar_updated_at': hasAvatar ? 1 : null,
-                  'roles': <String>[],
-                }),
+                jsonEncode([
+                  {
+                    'id': 'user-nadia',
+                    'username': 'nadia',
+                    'display_name': 'Nadia',
+                    'created_at': 0,
+                    'avatar_updated_at': hasAvatar ? 1 : null,
+                    'roles': <String>[],
+                  },
+                ]),
                 200,
                 headers: {'content-type': 'application/json'},
               );

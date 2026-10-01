@@ -23,6 +23,7 @@ import 'message_ops_sync.dart';
 import 'op_adjacency.dart';
 import 'message_extras.dart';
 import 'providers.dart';
+import 'rate_limit_retry.dart';
 import 'reconnect_backoff.dart';
 import 'sync_failure.dart';
 import 'typing_controller.dart';
@@ -323,7 +324,10 @@ class SyncController extends StateNotifier<SyncStatus> {
     String channelId,
   ) async {
     await store.resetChannel(channelId);
-    final fresh = await api.listMessages(channelId, limit: 50);
+    final fresh = await retryWhenRateLimited(
+      () => api.listMessages(channelId, limit: 50),
+      wait: _ref.read(rateLimitWaitProvider),
+    );
     if (generation != _generation) return;
     await store.applyMessages(fresh);
   }

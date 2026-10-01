@@ -166,15 +166,17 @@ void main() {
       _harness(
         const UserAvatar(name: 'Kess', userId: 'u2', size: 36),
         overrides: _apiOverrides((request) async {
-          if (request.url.path == '/users/u2') {
+          if (request.url.path == '/users') {
             return http.Response(
-              jsonEncode({
-                'id': 'u2',
-                'username': 'kess',
-                'display_name': 'Kess',
-                'created_at': 0,
-                'avatar_updated_at': 7,
-              }),
+              jsonEncode([
+                {
+                  'id': 'u2',
+                  'username': 'kess',
+                  'display_name': 'Kess',
+                  'created_at': 0,
+                  'avatar_updated_at': 7,
+                },
+              ]),
               200,
               headers: {'content-type': 'application/json'},
             );
