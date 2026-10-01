@@ -39,6 +39,10 @@ More was meant to move into the call row so the tool row never scrolls.
 Amended 2026-09-30, while implementing this in #1517: at 360 wide the call row cannot hold mic, camera, share, more, the canvas toggle and leave at 44px targets, so more stays with the tools and the top row can still scroll.
 The consequence is that a phone user scrolls the strip to reach the eraser, which is tracked separately.
 
+Amended 2026-10-01: #1526 then gave the five tools a row of their own, so the compact dock is three rows (tools; undo, canvas overflow and the canvas toggle; call with leave last), not two.
+Two rows cannot hold every control without scrolling at 360: measured, the tools with the pen's options caret and undo already reach x=320 of 336, and the call row (mic, speaker, camera, share, leave) fills 293 of 336 before the canvas toggle and the overflow join it.
+The eraser staying on screen was chosen over the row count, and `canvas_call_dock_tool_reach_test.dart` holds it at 360, 390 and 430.
+
 Why: it already works, and the only thing wrong with it is the order that point 2 fixes everywhere.
 
 ### 2. Leave is always last, after a divider

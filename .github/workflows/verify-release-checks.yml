@@ -34,7 +34,7 @@ permissions:
 
 jobs:
   verify:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     # Ceiling over the script's 180-minute deadline (10800s); see docs/ci.md.
     timeout-minutes: 195
     steps:

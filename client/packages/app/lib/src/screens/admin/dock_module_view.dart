@@ -14,6 +14,7 @@ import '../../widgets/settings_section_header.dart';
 import '../../widgets/settings_toggle_row.dart';
 import 'dock_command_panel_group.dart';
 import 'dock_host_access_card.dart';
+import 'dock_limits_card.dart';
 import 'dock_what_it_adds.dart';
 
 /// A module's manifest, plus the lifecycle action appropriate to
@@ -107,7 +108,7 @@ class DockManifestView extends StatelessWidget {
           DockWhatItAddsCard(extensionPoints: manifest.extensionPoints),
         ],
         const SizedBox(height: AppSpacing.s16),
-        _CapabilitiesCard(manifest: manifest),
+        DockLimitsCard(manifest: manifest),
         if (grantableHostCapabilities(manifest.capabilities).isNotEmpty) ...[
           const SizedBox(height: AppSpacing.s16),
           DockHostAccessCard(
@@ -184,9 +185,12 @@ class _PermissionsCard extends StatelessWidget {
       return SettingsSectionCard(
         title: 'Permissions this will add',
         children: [
-          Text(
-            'None. This module adds no grantable permission.',
-            style: AppText.caption.copyWith(color: tokens.textSecondary),
+          Padding(
+            padding: const EdgeInsets.all(AppSpacing.s8),
+            child: Text(
+              'None. This module adds no grantable permission.',
+              style: AppText.caption.copyWith(color: tokens.textSecondary),
+            ),
           ),
         ],
       );
@@ -196,7 +200,10 @@ class _PermissionsCard extends StatelessWidget {
       children: [
         for (final p in permissions)
           Padding(
-            padding: const EdgeInsets.symmetric(vertical: AppSpacing.s4),
+            padding: const EdgeInsets.symmetric(
+              horizontal: AppSpacing.s8,
+              vertical: AppSpacing.s4,
+            ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -213,68 +220,6 @@ class _PermissionsCard extends StatelessWidget {
           ),
       ],
     );
-  }
-}
-
-/// What a module asks the host for, and its runtime ceilings - the other
-/// half of what an admin approves at install, alongside the permissions
-/// above.
-class _CapabilitiesCard extends StatelessWidget {
-  const _CapabilitiesCard({required this.manifest});
-
-  final api.DockManifest manifest;
-
-  @override
-  Widget build(BuildContext context) {
-    final tokens = Theme.of(context).extension<AppTokens>()!;
-    final limits = manifest.runtime.limits;
-    return SettingsSectionCard(
-      title: 'Capabilities this asks for',
-      children: [
-        if (manifest.capabilities.isEmpty)
-          Text(
-            'None.',
-            style: AppText.caption.copyWith(color: tokens.textSecondary),
-          )
-        else
-          Wrap(
-            spacing: AppSpacing.s8,
-            runSpacing: AppSpacing.s8,
-            children: [
-              for (final capability in manifest.capabilities)
-                AppBadge(variant: AppBadgeVariant.tag, label: capability),
-            ],
-          ),
-        const SizedBox(height: AppSpacing.s12),
-        Text(
-          _runtimeSummary(limits),
-          style: AppText.caption.copyWith(color: tokens.textSecondary),
-        ),
-      ],
-    );
-  }
-
-  /// A generalized, human summary of the module's resource ceilings. The
-  /// specific runtime (wasm) and its raw units (fuel) are implementation
-  /// detail an admin should not have to reason about, so this shows only what
-  /// a limit means - how much memory and how long - not how it is enforced.
-  static String _runtimeSummary(api.DockLimits limits) {
-    final caps = <String>[
-      if (limits.memoryMb != null) '${limits.memoryMb} MB of memory',
-      if (limits.wallMs != null) _duration(limits.wallMs!),
-    ];
-    return caps.isEmpty
-        ? 'Runs sandboxed in this space.'
-        : 'Runs sandboxed, capped at ${caps.join(' and ')}.';
-  }
-
-  static String _duration(int ms) {
-    if (ms < 1000) return '$ms ms';
-    final seconds = ms / 1000;
-    final text = seconds == seconds.roundToDouble()
-        ? seconds.toStringAsFixed(0)
-        : seconds.toStringAsFixed(1);
-    return '$text seconds';
   }
 }
 

@@ -34,7 +34,10 @@ class DockWhatItAddsCard extends StatelessWidget {
       children: [
         for (final (title, subtitle) in entries)
           Padding(
-            padding: const EdgeInsets.symmetric(vertical: AppSpacing.s4),
+            padding: const EdgeInsets.symmetric(
+              horizontal: AppSpacing.s8,
+              vertical: AppSpacing.s4,
+            ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
