@@ -22,7 +22,7 @@ async fn a_clean_import_adds_every_image_under_its_normalised_name() {
     let smile = png(b"smile");
     write(&dir, "Big Smile.png", &smile);
     write(&dir, "party-parrot.gif", b"GIF89aparrot");
-    write(&dir, "ok.jpg", b"\xff\xd8\xffok");
+    write(&dir, "okay.jpg", b"\xff\xd8\xffok");
 
     let report = import_directory(&store, &media, &dir)
         .await
@@ -38,9 +38,9 @@ async fn a_clean_import_adds_every_image_under_its_normalised_name() {
                 }
             ),
             (
-                "ok.jpg".to_owned(),
+                "okay.jpg".to_owned(),
                 Outcome::Imported {
-                    name: "ok".to_owned()
+                    name: "okay".to_owned()
                 }
             ),
             (
@@ -91,8 +91,8 @@ async fn re_importing_the_same_directory_changes_nothing() {
     let (store, _guard) = new_store().await;
     let (media, _mediadir) = media_for_test();
     let (dir, _packdir) = pack_dir();
-    write(&dir, "smile.png", &png(b"smile"));
-    write(&dir, "wave.png", &png(b"wave"));
+    write(&dir, "my_smile.png", &png(b"smile"));
+    write(&dir, "my_wave.png", &png(b"wave"));
 
     let first = import_directory(&store, &media, &dir)
         .await
@@ -107,15 +107,15 @@ async fn re_importing_the_same_directory_changes_nothing() {
         outcomes(&second),
         vec![
             (
-                "smile.png".to_owned(),
+                "my_smile.png".to_owned(),
                 Outcome::Unchanged {
-                    name: "smile".to_owned()
+                    name: "my_smile".to_owned()
                 }
             ),
             (
-                "wave.png".to_owned(),
+                "my_wave.png".to_owned(),
                 Outcome::Unchanged {
-                    name: "wave".to_owned()
+                    name: "my_wave".to_owned()
                 }
             ),
         ]
@@ -133,7 +133,7 @@ async fn a_name_collision_skips_rather_than_replacing_the_existing_image() {
 
     let original = png(b"the original");
     let (first_dir, _firstpack) = pack_dir();
-    write(&first_dir, "smile.png", &original);
+    write(&first_dir, "my_smile.png", &original);
     import_directory(&store, &media, &first_dir)
         .await
         .expect("first import");
@@ -141,7 +141,7 @@ async fn a_name_collision_skips_rather_than_replacing_the_existing_image() {
     let (second_dir, _secondpack) = pack_dir();
     write(
         &second_dir,
-        "Smile.png",
+        "My_Smile.png",
         &png(b"a completely different image"),
     );
     let report = import_directory(&store, &media, &second_dir)
@@ -151,9 +151,9 @@ async fn a_name_collision_skips_rather_than_replacing_the_existing_image() {
     assert_eq!(
         outcomes(&report),
         vec![(
-            "Smile.png".to_owned(),
+            "My_Smile.png".to_owned(),
             Outcome::NameTaken {
-                name: "smile".to_owned()
+                name: "my_smile".to_owned()
             }
         )]
     );

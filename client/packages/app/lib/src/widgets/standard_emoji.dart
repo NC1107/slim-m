@@ -15,3 +15,19 @@ String? standardEmojiFor(String token) {
   final name = token.substring(1, token.length - 1).toLowerCase();
   return Emoji.byShortName(name)?.char;
 }
+
+final RegExp _storableName = RegExp(r'^[a-z0-9_]{1,32}$');
+
+final Set<String> _standardNames = {
+  for (final emoji in Emoji.all())
+    if (emoji.emojiGroup != EmojiGroup.component)
+      emoji.shortName.toLowerCase().replaceAll(RegExp(r'[ -]'), '_'),
+}..removeWhere((name) => !_storableName.hasMatch(name));
+
+/// Every such name, for the test that holds it equal to the server's list.
+Set<String> get standardEmojiNames => _standardNames;
+
+/// Whether a normalised custom emoji name is a standard emoji's shortcode.
+///
+/// Mirrors `emoji::builtin` on the server, which refuses such a name.
+bool isStandardEmojiName(String name) => _standardNames.contains(name);

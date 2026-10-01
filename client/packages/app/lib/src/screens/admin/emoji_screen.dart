@@ -21,6 +21,7 @@ import '../../routing/routes.dart';
 import '../settings_screen_scaffold.dart';
 import '../../widgets/confirm_dialog.dart';
 import '../../widgets/custom_emoji_image.dart';
+import '../../widgets/emoji_catalog.dart' show emojiNameMatches;
 import '../../widgets/run_guarded.dart';
 import '../../widgets/settings_entity_row.dart';
 import '../../widgets/settings_section_header.dart';
@@ -54,12 +55,26 @@ class EmojiScreen extends StatelessWidget {
 /// for every row regardless of what was actually on screen. Bounding the
 /// box and reusing the same lazy list the pin/thread sheets already use
 /// means a large catalog only ever realizes the rows actually visible.
-class EmojiPane extends ConsumerWidget {
+class EmojiPane extends ConsumerStatefulWidget {
   const EmojiPane({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<EmojiPane> createState() => _EmojiPaneState();
+}
+
+class _EmojiPaneState extends ConsumerState<EmojiPane> {
+  final _search = TextEditingController();
+
+  @override
+  void dispose() {
+    _search.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final emoji = ref.watch(customEmojiProvider);
+    final tokens = Theme.of(context).extension<AppTokens>()!;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -75,23 +90,52 @@ class EmojiPane extends ConsumerWidget {
           onRetry: () => ref.invalidate(customEmojiProvider),
           isEmpty: (list) => list.isEmpty,
           emptyMessage: 'No emoji yet.',
-          data: (context, list) => SettingsSectionCard(
-            title: 'Emoji',
-            children: [
-              ConstrainedBox(
-                key: emojiListBodyBoxKey,
-                constraints: BoxConstraints(
-                  maxHeight: MediaQuery.sizeOf(context).height * 0.6,
+          data: (context, list) {
+            final shown = [
+              for (final e in list)
+                if (emojiNameMatches(e.name, _search.text)) e,
+            ];
+            return SettingsSectionCard(
+              title: 'Emoji',
+              children: [
+                AppInput(
+                  controller: _search,
+                  placeholder: 'Search emoji',
+                  semanticLabel: 'Search emoji',
+                  icon: Icon(
+                    AppIcons.search,
+                    size: AppSizes.icon16,
+                    color: tokens.textSecondary,
+                  ),
+                  onChanged: (_) => setState(() {}),
                 ),
-                child: SheetItemList(
-                  padding: EdgeInsets.zero,
-                  itemCount: list.length,
-                  itemBuilder: (context, index) =>
-                      _EmojiRow(emoji: list[index]),
-                ),
-              ),
-            ],
-          ),
+                const SizedBox(height: AppSpacing.s8),
+                if (shown.isEmpty)
+                  Padding(
+                    padding: const EdgeInsets.symmetric(
+                      vertical: AppSpacing.s12,
+                    ),
+                    child: Text(
+                      'No emoji match "${_search.text.trim()}".',
+                      style: AppText.body.copyWith(color: tokens.textSecondary),
+                    ),
+                  )
+                else
+                  ConstrainedBox(
+                    key: emojiListBodyBoxKey,
+                    constraints: BoxConstraints(
+                      maxHeight: MediaQuery.sizeOf(context).height * 0.6,
+                    ),
+                    child: SheetItemList(
+                      padding: EdgeInsets.zero,
+                      itemCount: shown.length,
+                      itemBuilder: (context, index) =>
+                          _EmojiRow(emoji: shown[index]),
+                    ),
+                  ),
+              ],
+            );
+          },
         ),
       ],
     );

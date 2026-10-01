@@ -71,12 +71,29 @@ void main() {
       findsNothing,
       reason: 'the full catalog belongs to the reaction picker',
     );
-    expect(
-      find.text('Search emoji'),
-      findsNothing,
-      reason: 'nothing to search: this sheet is one Space list',
-    );
     expect(gridTokens(tester), [':party_parrot:', ':shipit:']);
+  });
+
+  testWidgets('the Space list can be searched by name', (tester) async {
+    _useCompactWindow(tester);
+    await tester.pumpWidget(
+      composerHarness(
+        controller: controller,
+        sends: sends,
+        platform: TargetPlatform.iOS,
+        customEmoji: [custom('party_parrot'), custom('shipit')],
+      ),
+    );
+    await tester.tap(emojiButton);
+    await tester.pumpAndSettle();
+
+    await tester.enterText(find.byType(TextField).last, 'ship');
+    await tester.pumpAndSettle();
+    expect(gridTokens(tester), [':shipit:']);
+
+    await tester.enterText(find.byType(TextField).last, 'zzz');
+    await tester.pumpAndSettle();
+    expect(find.text('No emoji match "zzz".'), findsOneWidget);
   });
 
   testWidgets('a Space with none says so rather than opening empty', (

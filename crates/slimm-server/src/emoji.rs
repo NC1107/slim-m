@@ -11,6 +11,7 @@
 //! slim-m ships no emoji of its own. Nothing here bundles, fetches or seeds a
 //! set; it only takes what an operator supplies.
 
+pub mod builtin;
 pub mod bulk;
 pub mod import;
 
@@ -63,6 +64,9 @@ pub enum AddError {
     UnsupportedType,
     /// Another emoji already answers to this name.
     NameTaken,
+    /// The name is a standard unicode emoji's shortcode, which a custom emoji
+    /// would shadow.
+    BuiltinName,
     /// The deployment is at [`crate::store::MAX_CUSTOM_EMOJI`].
     Full,
     /// The database or the blob directory refused the write. Not a property
@@ -119,6 +123,9 @@ pub struct ValidatedImage {
 /// each ask it at the point that makes sense for their own shape.
 pub fn validate_image(raw_name: &str, bytes: Vec<u8>) -> Result<ValidatedImage, AddError> {
     let name = normalize_name(raw_name).map_err(|_| AddError::UnusableName)?;
+    if builtin::is_builtin_name(&name) {
+        return Err(AddError::BuiltinName);
+    }
     if bytes.is_empty() {
         return Err(AddError::Empty);
     }

@@ -16,8 +16,8 @@ async fn a_non_image_is_refused_and_the_rest_of_the_directory_carries_on() {
     let (store, _guard) = new_store().await;
     let (media, _mediadir) = media_for_test();
     let (dir, _packdir) = pack_dir();
-    write(&dir, "notes.txt", b"read me first");
-    write(&dir, "wave.png", &png(b"wave"));
+    write(&dir, "readme.txt", b"read me first");
+    write(&dir, "zwave.png", &png(b"wave"));
     std::fs::create_dir(dir.join("nested")).expect("create a subdirectory");
 
     let report = import_directory(&store, &media, &dir)
@@ -34,15 +34,15 @@ async fn a_non_image_is_refused_and_the_rest_of_the_directory_carries_on() {
                 }
             ),
             (
-                "notes.txt".to_owned(),
+                "readme.txt".to_owned(),
                 Outcome::Refused {
                     reason: Refusal::NotAnImage
                 }
             ),
             (
-                "wave.png".to_owned(),
+                "zwave.png".to_owned(),
                 Outcome::Imported {
-                    name: "wave".to_owned()
+                    name: "zwave".to_owned()
                 }
             ),
         ]
