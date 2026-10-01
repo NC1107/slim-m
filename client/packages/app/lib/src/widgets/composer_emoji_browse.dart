@@ -27,9 +27,10 @@ import 'emoji_picker_grid.dart';
 import 'emoji_preview_footer.dart';
 import 'emoji_sectioned_grid.dart';
 
-/// The rail-plus-grid area's own fixed height, matching the reaction
-/// picker's `_gridHeight` so the two floating cards read the same size.
-const double _browseHeight = 260;
+/// The rail-plus-grid area's own fixed height: tall enough that the rail shows
+/// every default category, with Flags last, instead of clipping the end of it.
+final double _browseHeight =
+    emojiCategoriesInOrder.length * EmojiCategoryRail.entryExtent;
 
 class ComposerEmojiPicker extends ConsumerStatefulWidget {
   const ComposerEmojiPicker({

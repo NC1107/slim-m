@@ -34,26 +34,26 @@ void main() {
   test('12-hour shows midnight and noon as 12, not 0', () {
     expect(
       formatDateTime(_ms(2026, 3, 7, 0, 5), use24Hour: false),
-      '2026-03-07 12:05 AM',
+      '2026-03-07 12:05\u00A0AM',
     );
     expect(
       formatDateTime(_ms(2026, 3, 7, 12, 0), use24Hour: false),
-      '2026-03-07 12:00 PM',
+      '2026-03-07 12:00\u00A0PM',
     );
   });
 
   test('12-hour picks AM before noon and PM after, hour unpadded', () {
     expect(
       formatDateTime(_ms(2026, 3, 7, 9, 7), use24Hour: false),
-      '2026-03-07 9:07 AM',
+      '2026-03-07 9:07\u00A0AM',
     );
     expect(
       formatDateTime(_ms(2026, 3, 7, 13, 45), use24Hour: false),
-      '2026-03-07 1:45 PM',
+      '2026-03-07 1:45\u00A0PM',
     );
     expect(
       formatDateTime(_ms(2026, 3, 7, 23, 9), use24Hour: false),
-      '2026-03-07 11:09 PM',
+      '2026-03-07 11:09\u00A0PM',
     );
   });
 }

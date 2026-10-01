@@ -71,7 +71,7 @@ class _SavedMessagesSheet extends ConsumerWidget {
           const Padding(
             padding: EdgeInsets.fromLTRB(
               AppSpacing.s16,
-              AppSpacing.s12,
+              0,
               AppSpacing.s16,
               AppSpacing.s8,
             ),

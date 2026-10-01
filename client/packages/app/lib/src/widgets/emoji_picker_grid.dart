@@ -69,6 +69,10 @@ class EmojiCategoryRail extends StatelessWidget {
   /// not have to measure this.
   static const double width = 32;
 
+  /// One entry's slot: its [AppSizes.rowPointer] hit box and the 1 px above
+  /// and below it.
+  static const double entryExtent = AppSizes.rowPointer + 2;
+
   @override
   Widget build(BuildContext context) {
     return SizedBox(

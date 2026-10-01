@@ -211,7 +211,12 @@ class _AvatarCropSheetState extends State<_AvatarCropSheet> {
     return SafeArea(
       top: false,
       child: Padding(
-        padding: const EdgeInsets.all(AppSpacing.s16),
+        padding: const EdgeInsets.fromLTRB(
+          AppSpacing.s16,
+          0,
+          AppSpacing.s16,
+          AppSpacing.s16,
+        ),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [

@@ -103,7 +103,7 @@ Future<void> _sendForward(
 
 const _headingPadding = EdgeInsets.fromLTRB(
   AppSpacing.s16,
-  AppSpacing.s12,
+  0,
   AppSpacing.s16,
   AppSpacing.s8,
 );

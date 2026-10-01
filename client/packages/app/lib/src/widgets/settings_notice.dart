@@ -102,7 +102,7 @@ class SettingsAbsentValue extends StatelessWidget {
     return Text(
       text,
       style: AppText.caption.copyWith(
-        color: tokens.textDisabled,
+        color: tokens.textSecondary,
         fontStyle: FontStyle.italic,
       ),
     );

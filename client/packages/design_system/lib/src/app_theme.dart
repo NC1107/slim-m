@@ -235,7 +235,7 @@ ThemeData buildTheme(Brightness brightness, AppTokens tokens) {
       errorStyle: AppText.caption.copyWith(color: tokens.dangerText),
       labelStyle: AppText.body.copyWith(color: tokens.textSecondary),
       floatingLabelStyle: AppText.caption.copyWith(color: tokens.textSecondary),
-      hintStyle: AppText.body.copyWith(color: tokens.textDisabled),
+      hintStyle: AppText.body.copyWith(color: tokens.textSecondary),
       helperStyle: AppText.caption.copyWith(color: tokens.textSecondary),
     ),
     // Raw ListTiles took M3's onSurface, putting two blacks in one panel.

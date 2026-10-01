@@ -232,7 +232,7 @@ class _CanvasOverflowMenuState extends State<CanvasOverflowMenu> {
           padding: const EdgeInsets.symmetric(horizontal: 2),
           child: Text(
             '+',
-            style: AppText.micro.copyWith(color: tokens.textDisabled),
+            style: AppText.micro.copyWith(color: tokens.textSecondary),
           ),
         ),
         const AppKbd('V'),

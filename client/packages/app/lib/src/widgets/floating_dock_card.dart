@@ -143,6 +143,19 @@ class FloatingDockCard extends StatelessWidget {
     );
   }
 
+  /// The top edge of the dock card around [context], in [overlay]'s space, or
+  /// null when [context] is not inside one. Menus that open above a dock
+  /// control anchor here, so they clear the card rather than covering its top.
+  static double? topEdgeOf(BuildContext context, RenderBox overlay) {
+    RenderBox? card;
+    context.visitAncestorElements((element) {
+      if (element.widget is! FloatingDockCard) return true;
+      card = element.renderObject as RenderBox?;
+      return false;
+    });
+    return card?.localToGlobal(Offset.zero, ancestor: overlay).dy;
+  }
+
   static Widget _withTrailing(Widget row, Widget trailing) => Row(
     mainAxisSize: MainAxisSize.min,
     children: [

@@ -101,7 +101,7 @@ void main() {
       final tokens = AppTokens.light;
       final rendered = tester.widget<Text>(find.text('No reason given.'));
 
-      expect(rendered.style?.color, tokens.textDisabled);
+      expect(rendered.style?.color, tokens.textSecondary);
       expect(
         rendered.style?.fontStyle,
         FontStyle.italic,

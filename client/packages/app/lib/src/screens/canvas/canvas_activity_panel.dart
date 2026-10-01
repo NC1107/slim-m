@@ -160,7 +160,7 @@ class CanvasActivityPanel extends StatelessWidget {
                                 "Activity from before you joined isn't "
                                 'shown here.',
                                 style: AppText.caption.copyWith(
-                                  color: tokens.textDisabled,
+                                  color: tokens.textSecondary,
                                 ),
                                 textAlign: TextAlign.center,
                               ),

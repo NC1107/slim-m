@@ -29,6 +29,31 @@ import 'voice_settings_screen_harness.dart';
 void main() {
   setUp(() => SharedPreferences.setMockInitialValues({}));
 
+  testWidgets('the accented sensitivity tick is the one the thumb sits on', (
+    tester,
+  ) async {
+    await tester.pumpWidget(wrap(const VoiceSettingsBody()));
+    await tester.pumpAndSettle();
+
+    final tokens = AppTokens.light;
+    final slider = tester.widget<AppSlider>(
+      find.byWidgetPredicate(
+        (w) =>
+            w is AppSlider && w.semanticLabel == 'Voice activity sensitivity',
+      ),
+    );
+    final labels = slider.ticks!;
+    final fraction = (slider.value - slider.min) / (slider.max - slider.min);
+    final thumbOn = labels[(fraction * (labels.length - 1)).round()];
+    final accented = [
+      for (final label in labels)
+        if (tester.widget<Text>(find.text(label)).style?.color == tokens.accent)
+          label,
+    ];
+
+    expect(accented, [thumbOn]);
+  });
+
   testWidgets(
     'out of a call, the meter says so instead of showing a live level',
     (tester) async {
