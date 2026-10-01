@@ -129,6 +129,14 @@ final RegExp _emojiPattern = RegExp(r':[A-Za-z0-9_]{1,32}:');
 final RegExp _digitsOnly = RegExp(r'^[0-9]+$');
 final RegExp _wordChar = RegExp(r'[A-Za-z0-9_]');
 
+/// The characters a backslash can escape: the delimiters this grammar owns
+/// plus the block markers, so `\# x` and `\> x` read as text too.
+const String _escapable = r'\*_~|`@:[]#>-';
+
+/// Whether [s] holds a backslash at [i] that escapes the character after it.
+bool _isEscapeAt(String s, int i) =>
+    s[i] == r'\' && i + 1 < s.length && _escapable.contains(s[i + 1]);
+
 bool _isWordAt(String s, int i) =>
     i >= 0 && i < s.length && _wordChar.hasMatch(s[i]);
 
@@ -241,6 +249,10 @@ int _codeSpanEnd(String s, int start) {
 int _findCloser(String s, int from, String closer) {
   var j = from;
   while (j <= s.length - closer.length) {
+    if (_isEscapeAt(s, j)) {
+      j += 2;
+      continue;
+    }
     if (s[j] == '`') {
       final end = _codeSpanEnd(s, j);
       j = end == -1 ? j + 1 : end + 1;
@@ -258,6 +270,10 @@ int _findCloser(String s, int from, String closer) {
 int _findItalicStarCloser(String s, int from) {
   var j = from;
   while (j < s.length) {
+    if (_isEscapeAt(s, j)) {
+      j += 2;
+      continue;
+    }
     if (s[j] == '`') {
       final end = _codeSpanEnd(s, j);
       j = end == -1 ? j + 1 : end + 1;
@@ -279,6 +295,10 @@ int _findItalicStarCloser(String s, int from) {
 int _findItalicUnderscoreCloser(String s, int from) {
   var j = from;
   while (j < s.length) {
+    if (_isEscapeAt(s, j)) {
+      j += 2;
+      continue;
+    }
     if (s[j] == '`') {
       final end = _codeSpanEnd(s, j);
       j = end == -1 ? j + 1 : end + 1;
@@ -314,6 +334,11 @@ List<InlineNode> parseInline(String content) {
   while (i < content.length) {
     final ch = content[i];
 
+    if (_isEscapeAt(content, i)) {
+      buffer.write(content[i + 1]);
+      i += 2;
+      continue;
+    }
     if (ch == '`') {
       final end = _codeSpanEnd(content, i);
       if (end != -1) {

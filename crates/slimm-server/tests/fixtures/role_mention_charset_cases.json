@@ -8,5 +8,7 @@
   { "content": "@[] empty brackets are not a mention", "mentions": [] },
   { "content": "@[dup] and @[dup] again", "mentions": ["dup"] },
   { "content": "plain @nick is a user, not a role", "mentions": [] },
-  { "content": "@[Núñez Crew] keeps non-ascii letters", "mentions": ["Núñez Crew"] }
+  { "content": "@[Núñez Crew] keeps non-ascii letters", "mentions": ["Núñez Crew"] },
+  { "content": "\\@[Core Team] is escaped", "mentions": [] },
+  { "content": "\\\\@[Core Team] after an escaped backslash", "mentions": ["Core Team"] }
 ]
