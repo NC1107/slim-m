@@ -100,7 +100,29 @@ class UpdateManifestTest(unittest.TestCase):
 
     def test_build_tolerates_a_missing_optional_platform(self):
         (self.assets / "slim-m-client-0.90.0-linux-amd64.tar.gz").unlink()
-        self.assertEqual(self.build().returncode, 0)
+        self.assertEqual(self.build("--require", "windows-x64,macos").returncode, 0)
+
+    def test_the_default_requires_the_linux_tarball(self):
+        (self.assets / "slim-m-client-0.90.0-linux-amd64.tar.gz").unlink()
+        done = self.build()
+        self.assertEqual(done.returncode, 1)
+        self.assertIn("linux-x64", done.stderr)
+
+    def test_defer_writes_nothing_and_succeeds_while_a_platform_is_missing(self):
+        (self.assets / "slim-m-client-0.90.0-windows-x64.zip").unlink()
+        done = self.build("--defer-if-missing")
+        self.assertEqual(done.returncode, 0, done.stderr)
+        self.assertIn("deferred", done.stdout)
+        self.assertFalse(self.manifest.exists())
+
+    def test_defer_still_builds_when_everything_is_attached(self):
+        self.assertEqual(self.build("--defer-if-missing").returncode, 0)
+        self.assertIn("linux-x64", json.loads(self.manifest.read_text())["artifacts"])
+
+    def test_defer_does_not_swallow_a_bad_tag(self):
+        done = run("build", "--tag", "v1", "--dir", self.assets, "--repo", "o/r",
+                   "--out", "manifest.json", "--defer-if-missing")
+        self.assertEqual(done.returncode, 1)
 
     def test_build_refuses_a_bad_tag(self):
         done = run("build", "--tag", "v1", "--dir", self.assets, "--repo", "o/r",
