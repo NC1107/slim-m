@@ -67,6 +67,8 @@ mixin VoiceControllerRejoinMixin
     await join(channelId);
     if (state.channelId != channelId) return;
     if (state.state == VoiceSessionState.connected) return;
+    // A refusal that cannot change (forbidden, no voice, insecure SFU) is the person's to act on.
+    if (!state.retryable) return;
     _scheduleAutoRejoin(channelId);
   }
 }

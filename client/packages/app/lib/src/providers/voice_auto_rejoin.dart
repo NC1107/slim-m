@@ -26,6 +26,7 @@ library;
 
 import 'dart:async';
 
+import 'package:clock/clock.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'sync_controller.dart';
@@ -57,10 +58,21 @@ class VoiceAutoRejoin {
     Duration(seconds: 30),
   ];
 
+  /// How long a connection must hold before the budget is restored, so a
+  /// flapping link spends one budget across its connects instead of a fresh one each.
+  static const stableAfter = Duration(seconds: 60);
+
   final List<Duration> delays;
 
   Timer? _timer;
   int _spent = 0;
+  DateTime? _connectedAt;
+
+  /// Records a successful connect and drops any stale queued attempt.
+  void connected() {
+    cancelPending();
+    _connectedAt = clock.now();
+  }
 
   /// Whether an attempt is waiting to run, so a screen can say it is
   /// reconnecting rather than showing an error nothing asked the user to act
@@ -71,6 +83,12 @@ class VoiceAutoRejoin {
   /// anything: `false` means the attempts are spent and whoever called this
   /// owns what the user sees next.
   bool schedule(void Function() attempt) {
+    final connectedAt = _connectedAt;
+    _connectedAt = null;
+    if (connectedAt != null &&
+        clock.now().difference(connectedAt) >= stableAfter) {
+      _spent = 0;
+    }
     if (_spent >= delays.length) return false;
     _timer?.cancel();
     final delay = delays[_spent++];
@@ -125,5 +143,6 @@ class VoiceAutoRejoin {
     _timer?.cancel();
     _timer = null;
     _spent = 0;
+    _connectedAt = null;
   }
 }

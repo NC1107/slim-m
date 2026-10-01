@@ -96,7 +96,7 @@ class VoiceController extends StateNotifier<VoiceState>
         case VoiceSessionState.connected:
           // Not gated on lifecycle: only termination may let this lapse.
           _heartbeat.start(state.channelId);
-          _autoRejoin.reset();
+          _autoRejoin.connected();
           if (state.rejoining) state = state.copyWith(rejoining: false);
         case VoiceSessionState.idle:
         case VoiceSessionState.failed:
