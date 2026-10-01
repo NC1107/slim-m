@@ -126,7 +126,7 @@ class _ShortcutHint extends StatelessWidget {
                         child: Text(
                           '+',
                           style: AppText.micro.copyWith(
-                            color: tokens.textDisabled,
+                            color: tokens.textSecondary,
                           ),
                         ),
                       ),

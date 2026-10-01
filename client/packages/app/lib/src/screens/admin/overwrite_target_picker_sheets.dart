@@ -178,6 +178,10 @@ class _PickerList extends StatelessWidget {
       maxHeight:
           MediaQuery.sizeOf(context).height * _pickerListMaxHeightFraction,
     ),
-    child: ListView(shrinkWrap: true, children: children),
+    child: ListView(
+      shrinkWrap: true,
+      padding: const EdgeInsets.only(bottom: AppSpacing.s8),
+      children: children,
+    ),
   );
 }

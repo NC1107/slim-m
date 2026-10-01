@@ -20,6 +20,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:slimm_app/src/widgets/composer_emoji_browse.dart';
+import 'package:slimm_app/src/widgets/emoji_catalog.dart';
 import 'package:slimm_app/src/widgets/emoji_picker_grid.dart';
 import 'package:slimm_app/src/widgets/emoji_preview_footer.dart';
 import 'package:slimm_app/src/widgets/emoji_sectioned_grid.dart';
@@ -68,6 +69,24 @@ void main() {
     expect(find.byTooltip('Flags'), findsOneWidget);
     // Nothing has a history yet, so the recent rail entry is absent too.
     expect(find.byTooltip('Recently used'), findsNothing);
+  });
+
+  testWidgets('every rail entry is fully inside the rail, none clipped', (
+    tester,
+  ) async {
+    await tester.pumpWidget(_harness((_) {}));
+
+    final rail = tester.getRect(find.byType(EmojiCategoryRail));
+    for (final category in emojiCategoriesInOrder) {
+      final entry = tester.getRect(find.byTooltip(category.label));
+      expect(
+        entry.bottom,
+        lessThanOrEqualTo(rail.bottom),
+        reason:
+            '${category.label} ends ${entry.bottom - rail.bottom} px '
+            'below the rail',
+      );
+    }
   });
 
   testWidgets('every category is on screen at once, not swapped by a tab', (

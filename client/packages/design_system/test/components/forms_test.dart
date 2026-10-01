@@ -440,28 +440,35 @@ void main() {
       expect(find.byType(AppSlider), findsOneWidget);
     });
 
-    testWidgets('ticks render as a row with the second entry picked out',
+    testWidgets('the tick nearest the thumb is the one picked out',
         (tester) async {
-      await tester.pumpWidget(
-        _wrap(
-          SizedBox(
-            width: 200,
-            child: AppSlider(
-              value: 50,
-              onChanged: (_) {},
-              ticks: const ['Small', 'Default', 'Large'],
+      const labels = ['Small', 'Default', 'Large'];
+      final accent = AppTokens.light.accent;
+
+      Future<List<String>> accented(double value) async {
+        await tester.pumpWidget(
+          _wrap(
+            SizedBox(
+              width: 200,
+              child: AppSlider(
+                value: value,
+                onChanged: (_) {},
+                ticks: labels,
+              ),
             ),
           ),
-        ),
-      );
+        );
+        return [
+          for (final label in labels)
+            if (tester.widget<Text>(find.text(label)).style?.color == accent)
+              label,
+        ];
+      }
 
-      expect(find.text('Small'), findsOneWidget);
-      expect(find.text('Default'), findsOneWidget);
-      expect(find.text('Large'), findsOneWidget);
-
-      final defaultTick = tester.widget<Text>(find.text('Default'));
-      final smallTick = tester.widget<Text>(find.text('Small'));
-      expect(defaultTick.style?.color, isNot(smallTick.style?.color));
+      expect(await accented(0), ['Small']);
+      expect(await accented(40), ['Default']);
+      expect(await accented(50), ['Default']);
+      expect(await accented(100), ['Large']);
     });
   });
 }

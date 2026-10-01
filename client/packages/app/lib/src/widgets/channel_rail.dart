@@ -164,7 +164,7 @@ class _ChannelRailState extends ConsumerState<ChannelRail> {
                                 child: Text(
                                   '+',
                                   style: AppText.micro.copyWith(
-                                    color: tokens.textDisabled,
+                                    color: tokens.textSecondary,
                                   ),
                                 ),
                               ),

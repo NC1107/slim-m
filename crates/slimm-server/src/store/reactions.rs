@@ -34,6 +34,14 @@ pub struct ReactionSummary {
     pub reacted: bool,
 }
 
+/// Where the previous page of a reactor list ended: the reaction time and the
+/// user, so two reactions in one millisecond still have a strict order.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct ReactorCursor {
+    pub created_at: i64,
+    pub user_id: UserId,
+}
+
 /// Why adding a reaction failed.
 #[derive(Debug)]
 pub enum ReactError {
@@ -258,5 +266,51 @@ impl Store {
             }
         }
         Ok(grouped)
+    }
+
+    /// One page of the people who left `emoji` on a message, oldest reaction
+    /// first, without a reactor the `viewer` has blocked.
+    ///
+    /// The block clause is the same one [`Store::reactions_for_messages`]
+    /// counts with, so a viewer's list is always as long as the tally they
+    /// were shown. Returns at most `limit` rows; the caller asks for one more
+    /// than it will show to learn whether another page exists.
+    pub async fn reaction_reactor_page(
+        &self,
+        message_id: MessageId,
+        viewer: UserId,
+        emoji: &str,
+        after: Option<ReactorCursor>,
+        limit: i64,
+    ) -> anyhow::Result<Vec<ReactorCursor>> {
+        use sqlx::Row;
+        let mut builder =
+            QueryBuilder::new("SELECT user_id, created_at FROM reactions WHERE message_id = ");
+        builder.push_bind(message_id);
+        builder.push(" AND emoji = ");
+        builder.push_bind(emoji);
+        builder.push(" AND user_id NOT IN (SELECT blocked_id FROM user_blocks WHERE blocker_id = ");
+        builder.push_bind(viewer);
+        builder.push(")");
+        if let Some(cursor) = after {
+            builder.push(" AND (created_at > ");
+            builder.push_bind(cursor.created_at);
+            builder.push(" OR (created_at = ");
+            builder.push_bind(cursor.created_at);
+            builder.push(" AND user_id > ");
+            builder.push_bind(cursor.user_id);
+            builder.push("))");
+        }
+        builder.push(" ORDER BY created_at ASC, user_id ASC LIMIT ");
+        builder.push_bind(limit);
+
+        let mut page = Vec::new();
+        for row in builder.build().fetch_all(&self.pool).await? {
+            page.push(ReactorCursor {
+                user_id: row.try_get("user_id")?,
+                created_at: row.try_get("created_at")?,
+            });
+        }
+        Ok(page)
     }
 }

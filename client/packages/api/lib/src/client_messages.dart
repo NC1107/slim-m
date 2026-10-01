@@ -256,6 +256,26 @@ extension SlimmApiMessages on SlimmApi {
         expectNoContent: true,
       );
 
+  /// Who left [emoji] on a message, oldest first, as the caller may see them:
+  /// a reactor the caller has blocked is left out, exactly as the tally leaves
+  /// them out of the count. [after] is a previous page's `nextCursor`.
+  Future<ReactionUsersPage> listReactionUsers({
+    required String messageId,
+    required String emoji,
+    int? limit,
+    String? after,
+  }) async {
+    final json = await _send(
+      'GET',
+      '/messages/$messageId/reactions/$emoji',
+      query: {
+        if (limit != null) 'limit': '$limit',
+        if (after != null) 'after': after,
+      },
+    );
+    return ReactionUsersPage.fromJson(json as Map<String, dynamic>);
+  }
+
   /// Runs the fenced code block at [blockIndex] in a message and shares the
   /// result: unlike [runModuleCommand], the output is stored against the block
   /// and broadcast, so everyone viewing the message sees it inline without

@@ -61,7 +61,7 @@ class _ModerationSheet extends StatelessWidget {
     return Padding(
       padding: const EdgeInsets.fromLTRB(
         AppSpacing.s16,
-        AppSpacing.s4,
+        0,
         AppSpacing.s16,
         AppSpacing.s16,
       ),

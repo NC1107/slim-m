@@ -404,7 +404,7 @@ class _Nav extends StatelessWidget {
                           fontSize: AppText.micro.fontSize,
                           fontWeight: AppWeights.medium,
                           letterSpacing: 1,
-                          color: tokens.textDisabled,
+                          color: tokens.textSecondary,
                         ),
                       ),
                     ),

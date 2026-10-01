@@ -45,7 +45,7 @@ class CallRecapCard extends StatelessWidget {
           Text(
             'Your last call',
             textAlign: TextAlign.center,
-            style: AppText.caption.copyWith(color: tokens.textDisabled),
+            style: AppText.caption.copyWith(color: tokens.textSecondary),
           ),
           const SizedBox(height: AppSpacing.s8),
           Row(

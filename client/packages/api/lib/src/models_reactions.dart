@@ -37,3 +37,27 @@ class ReactionSummary {
         reacted: json['reacted'] as bool,
       );
 }
+
+/// One page of the people who left one reaction, as the caller may see them.
+///
+/// Only ids: a client resolves names and avatars from the profiles it already
+/// holds. The list is already filtered for this viewer exactly as the tally
+/// is, so its total length always equals the count the viewer was shown.
+class ReactionUsersPage {
+  const ReactionUsersPage({required this.userIds, this.nextCursor});
+
+  /// Oldest reaction first.
+  final List<String> userIds;
+
+  /// Opaque; pass it back as `after` for the next page. Null on the last one.
+  final String? nextCursor;
+
+  factory ReactionUsersPage.fromJson(Map<String, dynamic> json) =>
+      ReactionUsersPage(
+        userIds: [
+          for (final u in json['users'] as List<dynamic>)
+            (u as Map<String, dynamic>)['user_id'] as String,
+        ],
+        nextCursor: json['next_cursor'] as String?,
+      );
+}

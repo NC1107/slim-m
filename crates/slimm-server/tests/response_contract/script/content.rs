@@ -339,6 +339,12 @@ pub(super) async fn message_calls(c: &mut Contract, root: &str, channel: &str) -
         root,
     )
     .await;
+    c.get(
+        "listReactionUsers",
+        &format!("/messages/{message}/reactions/{THUMBS_UP}"),
+        root,
+    )
+    .await;
 
     c.bare(
         "pinMessage",

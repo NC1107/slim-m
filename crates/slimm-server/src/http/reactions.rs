@@ -7,23 +7,25 @@
 //! of mine is gone") already holds.
 //!
 //! The emoji is a path segment rather than a body, so the two verbs are a plain
-//! PUT and DELETE on the same resource.
+//! PUT and DELETE on the same resource. A GET on it lists who left the
+//! reaction, per viewer; see `docs/decisions/0051-who-reacted.md`.
 
 use axum::Router;
 use axum::extract::{DefaultBodyLimit, Path, State};
 use axum::http::StatusCode;
 use axum::http::request::Parts;
 use axum::routing::put;
+use serde::{Deserialize, Serialize};
 
 use super::AppState;
 use super::error::ApiError;
-use super::extract::{Authed, enforce};
+use super::extract::{AUTHED_READ, Authed, AuthedLimited, Json, Query, enforce};
 use super::messages::parse_uuid;
 use crate::hub::Event;
 use crate::ids::MessageId;
 use crate::permissions::Permissions;
 use crate::ratelimit::Class;
-use crate::store::ReactError;
+use crate::store::{ReactError, ReactorCursor};
 
 /// Nothing here carries a body; the emoji is in the path.
 const BODY_LIMIT: usize = 1024;
@@ -32,7 +34,7 @@ pub fn routes() -> Router<AppState> {
     Router::new()
         .route(
             "/messages/{message_id}/reactions/{emoji}",
-            put(add).delete(remove),
+            put(add).delete(remove).get(list_reactors),
         )
         .layer(DefaultBodyLimit::max(BODY_LIMIT))
 }
@@ -146,4 +148,81 @@ async fn publish(
         reactors,
     });
     Ok(())
+}
+
+const DEFAULT_PAGE: i64 = 50;
+const MAX_PAGE: i64 = 100;
+
+#[derive(Deserialize)]
+struct ReactorParams {
+    limit: Option<i64>,
+    after: Option<String>,
+}
+
+#[derive(Serialize)]
+struct Reactor {
+    user_id: String,
+}
+
+#[derive(Serialize)]
+struct ReactorPage {
+    users: Vec<Reactor>,
+    next_cursor: Option<String>,
+}
+
+/// `<reacted_at ms>.<user uuid>`: opaque to clients, strict to parse.
+fn parse_cursor(raw: &str) -> Result<ReactorCursor, ApiError> {
+    let bad = || ApiError::BadRequest("after is not a cursor this route returned");
+    let (at, user) = raw.split_once('.').ok_or_else(bad)?;
+    Ok(ReactorCursor {
+        created_at: at.parse().map_err(|_| bad())?,
+        user_id: crate::ids::UserId(user.parse().map_err(|_| bad())?),
+    })
+}
+
+/// Lists who left one reaction, as the caller may see them.
+///
+/// Read access to the message is the whole gate, answered as a missing message
+/// when it fails. The list goes through the same block filter as the tally, so
+/// it never names someone the count leaves out. Identity still never rides the
+/// WebSocket frame; this is a per-viewer read.
+async fn list_reactors(
+    AuthedLimited(ctx): AuthedLimited<AUTHED_READ>,
+    Path((message_id, emoji)): Path<(String, String)>,
+    Query(params): Query<ReactorParams>,
+    State(state): State<AppState>,
+) -> Result<Json<ReactorPage>, ApiError> {
+    let message_id = MessageId(parse_uuid(&message_id)?);
+    let after = params.after.as_deref().map(parse_cursor).transpose()?;
+    let limit = params.limit.unwrap_or(DEFAULT_PAGE).clamp(1, MAX_PAGE);
+    let Some(message) = state.store.message(message_id).await? else {
+        return Err(ApiError::NotFound("no such message"));
+    };
+    if !state
+        .store
+        .has_permission(ctx.user_id, message.channel_id, Permissions::VIEW_CHANNEL)
+        .await?
+    {
+        return Err(ApiError::NotFound("no such message"));
+    }
+
+    let mut rows = state
+        .store
+        .reaction_reactor_page(message_id, ctx.user_id, &emoji, after, limit + 1)
+        .await?;
+    let has_more = rows.len() as i64 > limit;
+    rows.truncate(limit as usize);
+    let next_cursor = rows
+        .last()
+        .filter(|_| has_more)
+        .map(|last| format!("{}.{}", last.created_at, last.user_id));
+    Ok(Json(ReactorPage {
+        users: rows
+            .into_iter()
+            .map(|r| Reactor {
+                user_id: r.user_id.to_string(),
+            })
+            .collect(),
+        next_cursor,
+    }))
 }

@@ -4223,6 +4223,56 @@ paths:
           adding; removing is not checked, so an old reaction can always go.
         schema:
           type: string
+    get:
+      operationId: listReactionUsers
+      tags: [messages]
+      summary: List who left one reaction on a message.
+      description: >
+        The people who left this emoji, oldest reaction first, as the caller
+        may see them: a reactor the caller has blocked is left out, exactly as
+        the tally leaves them out of the count, so the list is as long as the
+        count shown to the same caller. Needs only what reading the message
+        needs; a hidden or deleted message answers as a missing one. An emoji
+        nobody used is an empty list. `limit` defaults to 50 and is at most
+        100; `after` is a `next_cursor` from the previous page. Reactor
+        identity is never on the WebSocket, only here.
+      parameters:
+        - name: limit
+          in: query
+          schema:
+            type: integer
+        - name: after
+          in: query
+          schema:
+            type: string
+      responses:
+        "200":
+          description: One page of reactors.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [users, next_cursor]
+                properties:
+                  users:
+                    type: array
+                    items:
+                      type: object
+                      required: [user_id]
+                      properties:
+                        user_id:
+                          type: string
+                          format: uuid
+                  next_cursor:
+                    type: [string, "null"]
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
     put:
       operationId: addReaction
       tags: [messages]

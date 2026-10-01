@@ -34,14 +34,19 @@ class SheetItemList extends StatelessWidget {
     super.key,
     required this.itemCount,
     required this.itemBuilder,
-    this.padding = const EdgeInsets.symmetric(horizontal: AppSpacing.s8),
+    this.padding = const EdgeInsets.fromLTRB(
+      AppSpacing.s8,
+      0,
+      AppSpacing.s8,
+      AppSpacing.s8,
+    ),
   });
 
   final int itemCount;
   final IndexedWidgetBuilder itemBuilder;
 
-  /// Defaults to the horizontal inset every sheet caller wants against its
-  /// own edge-to-edge box. A caller nesting this inside a container that
+  /// Defaults to the side and bottom inset every sheet caller wants against
+  /// its own edge-to-edge box, so the last row never sits on the card edge. A caller nesting this inside a container that
   /// already insets its content (`SettingsSectionCard`'s own card padding)
   /// passes [EdgeInsets.zero] instead, so the two insets do not stack.
   final EdgeInsets padding;

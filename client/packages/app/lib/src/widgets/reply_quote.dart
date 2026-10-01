@@ -18,6 +18,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:slimm_data/data.dart';
 import 'package:slimm_design_system/design_system.dart';
 
+import '../message_preview.dart';
 import '../providers/user_profiles.dart';
 import 'author_label.dart';
 
@@ -57,7 +58,7 @@ class ReplyQuote extends ConsumerWidget {
           );
     final snippet = resolved == null
         ? 'Message unavailable'
-        : _snippet(resolved.content);
+        : previewSnippet(resolved.content, maxRunes: _quoteMaxRunes);
     final textStyle = AppText.caption.copyWith(
       color: tokens.textSecondary,
       fontStyle: resolved == null ? FontStyle.italic : null,
@@ -109,14 +110,4 @@ class ReplyQuote extends ConsumerWidget {
       ),
     );
   }
-}
-
-/// A one-line, rune-safe truncation - `String.substring` cuts mid-surrogate
-/// on a codepoint outside the BMP, which a plain-text preview should not risk.
-String _snippet(String content) {
-  final oneLine = content.replaceAll('\n', ' ').trim();
-  if (oneLine.isEmpty) return '(no text)';
-  final runes = oneLine.runes.toList(growable: false);
-  if (runes.length <= _quoteMaxRunes) return oneLine;
-  return '${String.fromCharCodes(runes.take(_quoteMaxRunes))}…';
 }
