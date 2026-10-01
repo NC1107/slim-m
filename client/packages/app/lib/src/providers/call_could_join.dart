@@ -18,7 +18,7 @@ final callCouldJoinProvider = Provider.autoDispose
       ref.watch(presenceSeedProvider(channelId));
       final members = ref.watch(channelMembersProvider(channelId));
       ref.watch(presenceControllerProvider.select(reachablePresenceKey));
-      ref.watch(presenceVisibilityDisplayProvider);
+      ref.watch(ownVisibilityProvider);
       final roster = members.valueOrNull ?? const <api.UserProfile>[];
       final presence = presenceOfAll(ref, roster.map((m) => m.id));
       return [

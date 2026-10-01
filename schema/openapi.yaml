@@ -8328,6 +8328,12 @@ components:
         profile_color:
           type: integer
           description: The caller's own profile colour index; see `UserProfile.profile_color`.
+        presence_visibility:
+          type: string
+          enum: [online, away, dnd, hidden]
+          description: >
+            The caller's own stored presence choice, as `SetVisibilityRequest`
+            takes it. Self-view only: never on `UserProfile` or any frame.
 
     UpdateMeRequest:
       type: object

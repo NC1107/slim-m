@@ -74,6 +74,8 @@ class _Harness {
             baseUrl: Uri.parse('http://localhost:8080'),
             session: ref.watch(sessionProvider),
             httpClient: MockClient((request) async {
+              // The stored visibility is read from /me; it is not an activity call.
+              if (request.url.path == '/me') return http.Response('{}', 404);
               calls.add(
                 '${request.method} ${request.url.path}'
                 '${request.body.isEmpty ? '' : ' ${request.body}'}',

@@ -29,29 +29,35 @@ impl Store {
     /// for every future message, with nothing in the API able to lower it again.
     /// Only `VIEW_CHANNEL` is needed to reach this, and the counter read is a
     /// single indexed lookup rather than a scan of the messages.
+    ///
+    /// Returns the stored marker when the row changed (the marker advanced or
+    /// a manual unread was cleared) and `None` for a mark that moved nothing,
+    /// so a caller can skip announcing a no-op.
     pub async fn mark_read(
         &self,
         user_id: UserId,
         channel_id: ChannelId,
         seq: i64,
-    ) -> anyhow::Result<()> {
+    ) -> anyhow::Result<Option<i64>> {
         let seq = seq.min(self.latest_message_seq(channel_id).await?);
         let now = now_ms();
-        sqlx::query!(
-            "INSERT INTO read_states (user_id, channel_id, last_read_seq, updated_at)
+        let stored = sqlx::query_scalar!(
+            r#"INSERT INTO read_states (user_id, channel_id, last_read_seq, updated_at)
              VALUES (?, ?, ?, ?)
              ON CONFLICT(user_id, channel_id) DO UPDATE SET
                  last_read_seq = MAX(last_read_seq, excluded.last_read_seq),
                  manually_unread = 0,
-                 updated_at = excluded.updated_at",
+                 updated_at = excluded.updated_at
+             WHERE excluded.last_read_seq > last_read_seq OR manually_unread != 0
+             RETURNING last_read_seq AS "last_read_seq!: i64""#,
             user_id,
             channel_id,
             seq,
             now
         )
-        .execute(&self.pool)
+        .fetch_optional(&self.pool)
         .await?;
-        Ok(())
+        Ok(stored)
     }
 
     /// Marks a channel unread without moving the read marker backwards.
