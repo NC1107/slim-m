@@ -419,20 +419,9 @@ pub(crate) fn validate_label(value: &str, message: &'static str) -> Result<(), A
     Ok(())
 }
 
-/// Rejects control (Cc) characters and the bidi and zero-width format characters
-/// used to spoof how a name renders to other members. `pub(crate)`: `http::users`
-/// reuses this exact blocklist for a status line's own validation, rather than
-/// keeping a second copy of the same spoofing-character set to drift from.
-pub(crate) fn is_disallowed_label_char(c: char) -> bool {
-    c.is_control()
-        || matches!(c,
-            '\u{200B}'..='\u{200F}'   // zero-width space and joiners, LRM, RLM
-            | '\u{202A}'..='\u{202E}' // bidi embeddings and overrides
-            | '\u{2060}'              // word joiner
-            | '\u{2066}'..='\u{2069}' // bidi isolates
-            | '\u{FEFF}'              // zero-width no-break space / BOM
-        )
-}
+/// The label blocklist is the shared hidden-character set, under the name its
+/// callers already use, so a name and a status line refuse what a message does.
+pub(crate) use crate::hidden_chars::is_hidden_char as is_disallowed_label_char;
 
 #[cfg(test)]
 mod tests;

@@ -185,7 +185,7 @@ impl Store {
         let provisioning_uri = totp::provisioning_uri(&secret, issuer, account)?;
         let now = now_ms();
 
-        let mut tx = self.pool.begin().await?;
+        let mut tx = self.begin_write().await?;
         let existing = sqlx::query!(
             "SELECT confirmed_at FROM user_totp_factors WHERE user_id = ?",
             user_id
@@ -230,7 +230,7 @@ impl Store {
         code: &str,
     ) -> Result<Vec<String>, TotpError> {
         let now = now_ms();
-        let mut tx = self.pool.begin().await?;
+        let mut tx = self.begin_write().await?;
 
         let factor = sqlx::query!(
             "SELECT secret, confirmed_at, last_step, failed_attempts, locked_until
@@ -282,7 +282,7 @@ impl Store {
         user_id: UserId,
     ) -> Result<Vec<String>, TotpError> {
         let now = now_ms();
-        let mut tx = self.pool.begin().await?;
+        let mut tx = self.begin_write().await?;
         let confirmed = sqlx::query_scalar!(
             r#"SELECT 1 AS "one!: i64" FROM user_totp_factors
                WHERE user_id = ? AND confirmed_at IS NOT NULL"#,
@@ -305,7 +305,7 @@ impl Store {
     /// devices out would punish them for tidying up. [`Self::clear_totp_factor`]
     /// is the path that does revoke, because it has no such proof.
     pub async fn remove_totp_factor(&self, user_id: UserId) -> Result<(), TotpError> {
-        let mut tx = self.pool.begin().await?;
+        let mut tx = self.begin_write().await?;
         let removed = sqlx::query!("DELETE FROM user_totp_factors WHERE user_id = ?", user_id)
             .execute(&mut *tx)
             .await?
@@ -336,7 +336,7 @@ impl Store {
         user_id: UserId,
     ) -> Result<Vec<SessionId>, TotpError> {
         let now = now_ms();
-        let mut tx = self.pool.begin().await?;
+        let mut tx = self.begin_write().await?;
 
         let removed = sqlx::query!("DELETE FROM user_totp_factors WHERE user_id = ?", user_id)
             .execute(&mut *tx)

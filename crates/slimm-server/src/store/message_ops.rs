@@ -135,7 +135,7 @@ impl Store {
         after_seq: i64,
         limit: i64,
     ) -> anyhow::Result<MessageOpsPage> {
-        let mut tx = self.pool.begin().await?;
+        let mut tx = self.begin_read().await?;
 
         let latest_seq = sqlx::query_scalar!(
             r#"SELECT next_seq - 1 AS "seq!: i64" FROM channel_seq_counters

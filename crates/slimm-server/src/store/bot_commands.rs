@@ -4,6 +4,7 @@
 
 use std::collections::HashMap;
 
+use crate::hidden_chars::is_hidden_char;
 use crate::ids::{ChannelId, UserId};
 use crate::permissions::Permissions;
 
@@ -70,7 +71,10 @@ fn validate_bot_prefix(prefix: &str) -> Result<(), &'static str> {
     if prefix.is_empty() || prefix.chars().count() > MAX_BOT_PREFIX_LEN {
         return Err("a bot's prefix must be 1 to 16 characters");
     }
-    if prefix.chars().any(char::is_whitespace) {
+    if prefix
+        .chars()
+        .any(|c| c.is_whitespace() || is_hidden_char(c))
+    {
         return Err("a bot's prefix must not contain whitespace");
     }
     if RESERVED_BOT_PREFIXES.contains(&prefix) {
@@ -102,6 +106,17 @@ fn validate_bot_command(command: &BotCommand) -> Result<(), &'static str> {
         && usage.chars().count() > MAX_BOT_COMMAND_USAGE_LEN
     {
         return Err("a command's usage hint must be at most 80 characters");
+    }
+    let usage = command.usage.as_deref().unwrap_or("");
+    if command
+        .description
+        .chars()
+        .chain(usage.chars())
+        .any(is_hidden_char)
+    {
+        return Err(
+            "a command's description and usage must not hold control or invisible characters",
+        );
     }
     if let Some(bit) = command.permission {
         let perm = Permissions::from_bits(bit);
@@ -137,7 +152,7 @@ impl Store {
         }
 
         let now = now_ms();
-        let mut tx = self.pool.begin().await?;
+        let mut tx = self.begin_write().await?;
         sqlx::query!(
             "INSERT INTO bot_command_registrations (bot_user_id, prefix, updated_at)
              VALUES (?, ?, ?)

@@ -131,7 +131,7 @@ impl Store {
     ) -> anyhow::Result<()> {
         let mode = off_hours_mode.as_str();
         let now = now_ms();
-        let mut tx = self.pool.begin().await?;
+        let mut tx = self.begin_write().await?;
         sqlx::query!(
             "INSERT INTO notification_schedules (user_id, timezone, off_hours_mode, snooze_until, updated_at)
              VALUES (?, ?, ?, NULL, ?)
@@ -198,7 +198,7 @@ impl Store {
         until_ms: Option<i64>,
     ) -> anyhow::Result<()> {
         let now = now_ms();
-        let mut tx = self.pool.begin().await?;
+        let mut tx = self.begin_write().await?;
         let existed = sqlx::query!(
             "SELECT user_id AS \"id: UserId\" FROM notification_schedules WHERE user_id = ?",
             user_id

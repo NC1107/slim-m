@@ -112,7 +112,7 @@ impl Store {
         let token_hash = hash_secret(&token);
         let now = now_ms();
 
-        let mut tx = self.pool.begin().await?;
+        let mut tx = self.begin_write().await?;
         let inserted = sqlx::query!(
             "INSERT INTO users (id, username, display_name, created_at, is_bot)
              VALUES (?, ?, ?, ?, 1)",
@@ -315,7 +315,7 @@ impl Store {
         actor_id: UserId,
         permissions: Permissions,
     ) -> Result<Bot, UpdateBotPermissionsError> {
-        let mut tx = self.pool.begin().await?;
+        let mut tx = self.begin_write().await?;
         let role_id = sqlx::query_scalar!(
             r#"SELECT id AS "id!: RoleId" FROM roles WHERE managed_bot_id = ?"#,
             bot_user_id
@@ -406,7 +406,7 @@ impl Store {
             return Ok(self.is_bot(bot_user_id).await?.then(Vec::new));
         }
 
-        let mut tx = self.pool.begin().await?;
+        let mut tx = self.begin_write().await?;
         sqlx::query!(
             "UPDATE bot_tokens SET revoked_at = ? WHERE bot_user_id = ? AND revoked_at IS NULL",
             now,

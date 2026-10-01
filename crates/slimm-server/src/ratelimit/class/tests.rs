@@ -6,18 +6,14 @@
 
 use super::Class;
 
-/// `ALL` exists so `/metrics` never has to be told about a new class by
-/// hand; if this ever drifts, a class silently stops being counted.
+/// `ALL` and the enum come from one macro list, so this pins the property
+/// the old hand-kept array could not: discriminants run 0..len with no gap,
+/// which is only true when every variant is in it exactly once.
 #[test]
 fn all_lists_every_variant_exactly_once() {
-    let mut seen = std::collections::HashSet::new();
-    for class in Class::ALL {
-        assert!(
-            seen.insert(class),
-            "{class:?} appears more than once in ALL"
-        );
+    for (position, class) in Class::ALL.into_iter().enumerate() {
+        assert_eq!(class as usize, position, "{class:?} is out of place in ALL");
     }
-    assert_eq!(seen.len(), Class::ALL.len());
 }
 
 /// The label is a Prometheus dimension, so two classes sharing one would

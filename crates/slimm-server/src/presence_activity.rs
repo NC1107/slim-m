@@ -36,13 +36,6 @@ pub struct Activity {
     pub started_at: Option<i64>,
 }
 
-/// Control characters plus the invisible and direction-changing marks that
-/// let one string read as another.
-fn is_hidden_char(c: char) -> bool {
-    c.is_control()
-        || matches!(c, '\u{200b}'..='\u{200f}' | '\u{202a}'..='\u{202e}' | '\u{2066}'..='\u{2069}')
-}
-
 impl Activity {
     /// Refuses an empty, over-long or hidden-character text rather than
     /// trimming it, so what viewers read is exactly what the sender sent.
@@ -55,7 +48,7 @@ impl Activity {
             if text.chars().count() > MAX_TEXT_CHARS {
                 return Err("activity text is too long");
             }
-            if text.chars().any(is_hidden_char) {
+            if text.chars().any(crate::hidden_chars::is_hidden_char) {
                 return Err("activity text must not contain control characters");
             }
         }
@@ -92,5 +85,9 @@ mod tests {
         assert!(sample("  ").validate().is_err());
         assert!(sample("a\nb").validate().is_err());
         assert!(sample("a\u{202e}b").validate().is_err());
+        // These three were accepted while this file kept a list of its own.
+        for mark in ['\u{061C}', '\u{2060}', '\u{FEFF}'] {
+            assert!(sample(&format!("a{mark}b")).validate().is_err(), "{mark:?}");
+        }
     }
 }

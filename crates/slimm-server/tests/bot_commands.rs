@@ -286,6 +286,41 @@ async fn a_whitespace_prefix_is_rejected() {
     assert_eq!(response.status(), StatusCode::BAD_REQUEST);
 }
 
+/// A description and a usage hint are read by every member in the command
+/// menu, so they refuse what a button label and a `/bots/ui` label refuse.
+#[tokio::test]
+async fn hidden_characters_in_a_description_usage_or_prefix_are_rejected() {
+    let (store, _guard) = new_store("slimm-botcmds-hidden").await;
+    let (admin_id, _admin_token) = register(&store, "root").await;
+    let (_bot_id, bot_token) = bot(&store, admin_id, "helper").await;
+    let router = app(store);
+
+    let bodies = [
+        register_body(
+            "!",
+            json!([{ "name": "ping", "description": "safe\u{202E}txt" }]),
+        ),
+        register_body(
+            "!",
+            json!([{ "name": "ping", "description": "pong", "usage": "[a\u{200B}b]" }]),
+        ),
+        register_body("!\u{3164}", json!([])),
+    ];
+    for body in bodies {
+        let response = router
+            .clone()
+            .oneshot(request(
+                "PUT",
+                "/bots/commands",
+                &bot_token,
+                Some(body.clone()),
+            ))
+            .await
+            .unwrap();
+        assert_eq!(response.status(), StatusCode::BAD_REQUEST, "{body}");
+    }
+}
+
 #[tokio::test]
 async fn a_duplicate_command_name_is_rejected_case_insensitively() {
     let (store, _guard) = new_store("slimm-botcmds-dup").await;

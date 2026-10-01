@@ -87,7 +87,7 @@ impl Store {
     pub async fn rotate_refresh(&self, refresh_token: &str) -> anyhow::Result<RefreshOutcome> {
         let presented = hash_secret(refresh_token);
         let now = now_ms();
-        let mut tx = self.pool.begin().await?;
+        let mut tx = self.begin_write().await?;
 
         // Claim-first, so this opens on a write; see this function's doc.
         let claimed = sqlx::query!(

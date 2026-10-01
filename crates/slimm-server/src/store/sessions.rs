@@ -237,7 +237,7 @@ impl Store {
     ) -> Result<Account, RegisterError> {
         let id = UserId::generate();
         let now = now_ms();
-        let mut tx = self.pool.begin().await?;
+        let mut tx = self.begin_write().await?;
 
         let inserted = sqlx::query!(
             "INSERT INTO users (id, username, display_name, password_hash, created_at)
@@ -397,7 +397,7 @@ impl Store {
         let access_expires_at = now + ACCESS_TTL_MS;
         let refresh_expires_at = now + REFRESH_TTL_MS;
 
-        let mut tx = self.pool.begin().await?;
+        let mut tx = self.begin_write().await?;
         let created = sqlx::query!(
             "INSERT INTO devices (id, user_id, name, created_at, client_kind, client_version)
              SELECT ?, ?, ?, ?, ?, ? WHERE EXISTS (SELECT 1 FROM users WHERE id = ? AND deleted_at IS NULL)
@@ -527,7 +527,7 @@ impl Store {
     pub async fn redeem_ws_ticket(&self, ticket: &str) -> anyhow::Result<Option<SessionContext>> {
         let hash = hash_secret(ticket);
         let now = now_ms();
-        let mut tx = self.pool.begin().await?;
+        let mut tx = self.begin_write().await?;
 
         // Claimed atomically as the first statement, so a double redemption
         // cannot have both callers pass the `used_at` check.
@@ -573,7 +573,7 @@ impl Store {
     /// resolving on the next request.
     pub async fn revoke_session(&self, session_id: SessionId) -> anyhow::Result<()> {
         let now = now_ms();
-        let mut tx = self.pool.begin().await?;
+        let mut tx = self.begin_write().await?;
         revoke_session_rows(&mut tx, session_id, now).await?;
         tx.commit().await?;
         Ok(())

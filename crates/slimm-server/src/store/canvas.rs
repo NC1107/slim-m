@@ -314,7 +314,7 @@ impl Store {
         channel_id: ChannelId,
         query: &ViewportQuery,
     ) -> anyhow::Result<(i64, Vec<CanvasObject>)> {
-        let mut tx = self.pool.begin().await?;
+        let mut tx = self.begin_read().await?;
         let latest_seq = latest_canvas_seq_query(&mut *tx, channel_id).await?;
         let objects = viewport_objects_query(&mut *tx, channel_id, query).await?;
         tx.commit().await?;

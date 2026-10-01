@@ -34,7 +34,7 @@ impl Store {
         id: MessageId,
     ) -> anyhow::Result<Option<Vec<MessageRevision>>> {
         // One read snapshot for both, so a concurrent edit cannot leave the current content and the captured versions disagreeing.
-        let mut tx = self.pool.begin().await?;
+        let mut tx = self.begin_read().await?;
         let Some(message) = fetch_message(&mut *tx, id).await? else {
             return Ok(None);
         };

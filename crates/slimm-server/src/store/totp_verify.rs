@@ -156,7 +156,7 @@ impl Store {
     ) -> Result<TotpSignIn, ChallengeError> {
         let hash = hash_secret(challenge);
         let now = now_ms();
-        let mut tx = self.pool.begin().await?;
+        let mut tx = self.begin_write().await?;
 
         let pending = sqlx::query!(
             r#"SELECT c.user_id AS "user_id!: UserId", c.device_name,
@@ -252,7 +252,7 @@ impl Store {
         code: &str,
     ) -> Result<TotpProof, TotpError> {
         let now = now_ms();
-        let mut tx = self.pool.begin().await?;
+        let mut tx = self.begin_write().await?;
         let factor = sqlx::query!(
             "SELECT secret, last_step, failed_attempts, locked_until
              FROM user_totp_factors WHERE user_id = ? AND confirmed_at IS NOT NULL",

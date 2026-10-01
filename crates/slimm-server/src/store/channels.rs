@@ -197,7 +197,7 @@ impl Store {
     /// see docs/decisions/0005-threads.md.
     pub async fn delete_channel(&self, id: ChannelId) -> Result<bool, DeleteChannelError> {
         let now = now_ms();
-        let mut tx = self.pool.begin().await?;
+        let mut tx = self.begin_write().await?;
 
         let affected = sqlx::query!(
             "UPDATE channels SET deleted_at = ?

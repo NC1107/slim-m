@@ -237,3 +237,160 @@ async fn no_decision_names_a_column_that_no_longer_exists() {
          recording a choice about nothing: {stale:?}"
     );
 }
+
+/// The first value a `CHECK (<column> IN ('a', 'b'))` allows, read out of the
+/// table's own definition, so an enum-like column gets a value it accepts.
+fn first_allowed_value(definition: &str, column: &str) -> Option<String> {
+    let needle = format!("{column} IN (");
+    let after = &definition[definition.find(&needle)? + needle.len()..];
+    let open = after.find('\'')? + 1;
+    let close = open + after[open..].find('\'')?;
+    Some(after[open..close].to_owned())
+}
+
+/// Seeds one row whose `column` is `user`, filling every other required
+/// column with a value of its declared type. Foreign keys are off on this
+/// connection, so the row needs no real parents: all that matters is that a
+/// row pointing at the user exists before the account goes.
+async fn seed_reference(
+    conn: &mut sqlx::SqliteConnection,
+    table: &str,
+    column: &str,
+    user: &[u8],
+) -> Result<(), sqlx::Error> {
+    let info = sqlx::query(&format!("PRAGMA table_info({table})"))
+        .fetch_all(&mut *conn)
+        .await?;
+    let definition: String =
+        sqlx::query_scalar("SELECT sql FROM sqlite_master WHERE type = 'table' AND name = ?")
+            .bind(table)
+            .fetch_one(&mut *conn)
+            .await?;
+    // Only a lone integer key is a rowid SQLite fills in; part of a composite key is not.
+    let key_columns = info.iter().filter(|c| c.get::<i64, _>("pk") > 0).count();
+    let mut names = Vec::new();
+    let mut values: Vec<Vec<u8>> = Vec::new();
+    let mut literals = Vec::new();
+    for col in info {
+        let name: String = col.get("name");
+        let declared: String = col.get::<String, _>("type").to_uppercase();
+        let required = col.get::<i64, _>("notnull") == 1
+            && col.get::<Option<String>, _>("dflt_value").is_none();
+        let integer_key =
+            key_columns == 1 && col.get::<i64, _>("pk") > 0 && declared.contains("INT");
+        if name == column {
+            names.push(name);
+            literals.push("?".to_owned());
+            values.push(user.to_vec());
+        } else if required && !integer_key {
+            names.push(name.clone());
+            if declared.contains("BLOB") {
+                literals.push("?".to_owned());
+                values.push(uuid::Uuid::now_v7().as_bytes().to_vec());
+            } else if declared.contains("INT") || declared.contains("REAL") {
+                literals.push("1".to_owned());
+            } else if let Some(allowed) = first_allowed_value(&definition, &name) {
+                literals.push(format!("'{allowed}'"));
+            } else {
+                literals.push(format!("'{}'", uuid::Uuid::now_v7().simple()));
+            }
+        }
+    }
+    let sql = format!(
+        "INSERT INTO {table} ({}) VALUES ({})",
+        names.join(", "),
+        literals.join(", ")
+    );
+    let mut insert = sqlx::query(&sql);
+    for value in &values {
+        insert = insert.bind(value.as_slice());
+    }
+    insert.execute(&mut *conn).await.map(|_| ())
+}
+
+/// How many rows of `table` still name `user` in `column`.
+async fn references(pool: &sqlx::SqlitePool, table: &str, column: &str, user: &[u8]) -> i64 {
+    sqlx::query_scalar(&format!("SELECT count(*) FROM {table} WHERE {column} = ?"))
+        .bind(user)
+        .fetch_one(pool)
+        .await
+        .expect("count")
+}
+
+/// A recorded decision is a promise, and this is the test that it is kept.
+///
+/// `user_totp_factors`, `totp_recovery_codes` and `totp_challenges` all said
+/// `Purge` here from the day they were added, and `delete_account` deleted
+/// none of them: the secret outlived the account. The two tests above could
+/// not see that, because they check a decision exists and stop there.
+#[tokio::test]
+async fn every_purge_and_anonymize_decision_is_carried_out() {
+    use sqlx::ConnectOptions;
+    use std::str::FromStr;
+
+    let (path, _guard) = support::TestDbGuard::new("slimm-deletion-carried-out");
+    let config = Config {
+        port: 0,
+        database_path: path.clone(),
+        hash_concurrency: 2,
+        ..Config::default()
+    };
+    let pool = db::connect(&config).await.expect("connect + migrate");
+    let store = slimm_server::store::Store::new(pool.clone());
+    // Somebody has to be left, or deleting the only account takes a different path.
+    let stays = store
+        .create_user("stays", "Stays")
+        .await
+        .expect("bystander");
+    store
+        .bootstrap_deployment(stays.id)
+        .await
+        .expect("an administrator stays");
+    let leaver = store.create_user("leaver", "Leaver").await.expect("leaver");
+    let user = leaver.id.0.as_bytes().to_vec();
+
+    let mut seeder = sqlx::sqlite::SqliteConnectOptions::from_str(&format!("sqlite://{path}"))
+        .expect("seeder options")
+        .foreign_keys(false)
+        .connect()
+        .await
+        .expect("seeder connection");
+
+    let mut checked = Vec::new();
+    let mut unseeded = Vec::new();
+    for (table, column, decision) in DECISIONS {
+        if !matches!(decision, OnDelete::Purge | OnDelete::Anonymize) {
+            continue;
+        }
+        match seed_reference(&mut seeder, table, column, &user).await {
+            Ok(()) => checked.push((*table, *column)),
+            Err(err) => unseeded.push(format!("{table}.{column}: {err}")),
+        }
+    }
+    drop(seeder);
+    assert!(
+        unseeded.is_empty(),
+        "these references could not be given a row to test with, so a table is \
+         going unchecked; teach seed_reference the constraint that refused it: {unseeded:#?}"
+    );
+
+    // A seed that did not land would make every check below pass on nothing.
+    for (table, column) in &checked {
+        let seeded = references(&pool, table, column, &user).await;
+        assert!(seeded > 0, "{table}.{column} has no row to check");
+    }
+
+    store.delete_account(leaver.id).await.expect("delete");
+
+    let mut survivors = Vec::new();
+    for (table, column) in &checked {
+        if references(&pool, table, column, &user).await > 0 {
+            survivors.push(format!("{table}.{column}"));
+        }
+    }
+    assert!(
+        survivors.is_empty(),
+        "these still point at the account after it was deleted, although \
+         DECISIONS says each is purged or anonymized: {survivors:?}"
+    );
+}

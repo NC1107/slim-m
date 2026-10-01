@@ -144,7 +144,7 @@ impl Store {
         if embeds.is_empty() {
             return Ok(());
         }
-        let mut tx = self.pool.begin().await?;
+        let mut tx = self.begin_write().await?;
         insert_embeds(&mut tx, message_id, embeds).await?;
         tx.commit().await?;
         Ok(())

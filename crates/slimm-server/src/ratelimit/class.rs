@@ -4,9 +4,25 @@
 //! Split out of `ratelimit.rs` to keep that file under the review budget;
 //! the limiter mechanism itself (buckets, sweeping, counting) stays there.
 
-/// A traffic class and its budget: a sustained refill rate and a burst size.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub enum Class {
+/// Declares [`Class`] and [`Class::ALL`] from one list. They were two
+/// hand-kept lists, and a class missing from the second compiled clean and
+/// was simply never counted.
+macro_rules! classes {
+    ($( $(#[$doc:meta])* $name:ident, )+) => {
+        /// A traffic class and its budget: a sustained refill rate and a burst size.
+        #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+        pub enum Class {
+            $( $(#[$doc])* $name, )+
+        }
+
+        impl Class {
+            /// Every variant, for `/metrics` to enumerate a stable label set from.
+            pub const ALL: [Class; [$(Class::$name),+].len()] = [$(Class::$name),+];
+        }
+    };
+}
+
+classes! {
     /// Password endpoints (register, login). Tight, because each request can
     /// cost an Argon2id hash, but sized for the case that actually happens:
     /// several people signing up together from one office or household, who
@@ -377,40 +393,6 @@ impl Class {
             Class::WatchTick => (4.0, 1.0 / 2.0),
         }
     }
-
-    /// Every variant, for `/metrics` to enumerate a stable label set from.
-    /// Hand-kept, matching the exhaustive matches in [`Self::budget`] and
-    /// [`Self::label`]; a class added to the enum without extending this
-    /// array compiles clean and is simply never counted, so add to all three
-    /// together.
-    pub const ALL: [Class; 26] = [
-        Class::Password,
-        Class::Refresh,
-        Class::Ticket,
-        Class::Write,
-        Class::Typing,
-        Class::Read,
-        Class::InviteCheck,
-        Class::Upload,
-        Class::Canvas,
-        Class::CanvasCursor,
-        Class::CanvasStrokePreview,
-        Class::Asset,
-        Class::Gif,
-        Class::AuthedRead,
-        Class::Ring,
-        Class::LinkPreview,
-        Class::Module,
-        Class::CodeRunner,
-        Class::Webhook,
-        Class::LiveKitWebhook,
-        Class::Interaction,
-        Class::ModulePost,
-        Class::SignInAlert,
-        Class::PresenceActivity,
-        Class::Totp,
-        Class::WatchTick,
-    ];
 }
 
 #[cfg(test)]

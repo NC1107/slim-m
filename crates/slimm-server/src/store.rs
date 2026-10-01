@@ -420,6 +420,20 @@ impl Store {
         self.pool.begin_with("BEGIN IMMEDIATE").await
     }
 
+    /// Opens a transaction that only reads, for a consistent snapshot across
+    /// several statements.
+    ///
+    /// The deferred `BEGIN` is right here and only here: nothing in it ever
+    /// asks for the write lock, so there is no upgrade to be refused. A
+    /// transaction that writes anything takes [`Store::begin_write`], even
+    /// when its first statement is itself a write, so that adding a read in
+    /// front of it later cannot turn a concurrent request into a 500.
+    pub(crate) async fn begin_read(
+        &self,
+    ) -> Result<sqlx::Transaction<'_, sqlx::Sqlite>, sqlx::Error> {
+        self.pool.begin().await
+    }
+
     /// Creates a passwordless user. Used by tests and internal fixtures; the
     /// authenticated registration path is [`Store::create_account`].
     pub async fn create_user(&self, username: &str, display_name: &str) -> anyhow::Result<User> {

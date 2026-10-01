@@ -63,7 +63,7 @@ mod error;
 mod escalation;
 mod extract;
 pub mod gifs;
-mod hidden_chars;
+pub(crate) use crate::hidden_chars;
 mod interactions;
 mod invites;
 pub mod link_preview;
