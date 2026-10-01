@@ -37,7 +37,31 @@ TRIGGER = re.compile(r"^  ([a-z_]+):", re.M)
 VOCABULARY = {
     "schedule": r"schedul|daily|weekly|hourly|nightly|cron",
     "workflow_dispatch": r"by hand|dispatch|manual",
+    "workflow_call": r"called by|reusable",
+    "workflow_run": r"completed|finish|after",
+    "release": r"release",
+    "push_tags": r"tag",
 }
+CRON = re.compile(r"cron:\s*[\"']([^\"']+)[\"']")
+
+
+def _cadence_words(cron: str) -> str | None:
+    """The word a row must carry for this cron's cadence, as a regex."""
+    minute, hour, dom, month, dow = cron.split()
+    if hour == "*":
+        return r"hourly|every hour"
+    step = re.fullmatch(r"\*/(\d+)", hour)
+    if step and step.group(1) == "6":
+        return r"six-hourly|every six hours|every 6 hours"
+    if hour.isdigit() and dow != "*":
+        return r"weekly"
+    if hour.isdigit():
+        return r"daily|nightly"
+    return None
+
+
+def _cadences(text: str) -> list[str]:
+    return [w for c in CRON.findall(text) if (w := _cadence_words(c))]
 
 
 def _trigger_kinds(text: str) -> set[str]:
@@ -50,7 +74,10 @@ def _trigger_kinds(text: str) -> set[str]:
         if line.strip() and not line.startswith(" "):
             break
         body.append(line)
-    return set(TRIGGER.findall("\n".join(body)))
+    kinds = set(TRIGGER.findall("\n".join(body)))
+    if re.search(r"^    tags:", "\n".join(body), re.M):
+        kinds.add("push_tags")
+    return kinds
 
 
 class CiDocsTriggersTest(unittest.TestCase):
@@ -87,3 +114,22 @@ class CiDocsTriggersTest(unittest.TestCase):
                         f"docs/ci.md's `{stem}` row describes when it runs but never "
                         f"mentions its {kind} trigger",
                     )
+
+    def test_every_scheduled_row_names_its_cadence(self):
+        for path in self.workflows:
+            row = self.rows.get(path.stem, "")
+            for pattern in _cadences(path.read_text()):
+                self.assertRegex(
+                    row,
+                    pattern,
+                    f"docs/ci.md's `{path.stem}` row does not name the cadence its cron runs at",
+                )
+
+    def test_a_cadence_change_that_the_row_does_not_follow_is_caught(self):
+        (pattern,) = _cadences('on:\n  schedule:\n    - cron: "17 7 * * *"\n')
+        self.assertNotRegex("an hourly schedule, and by hand", pattern)
+        (pattern,) = _cadences('on:\n  schedule:\n    - cron: "17 * * * *"\n')
+        self.assertRegex("an hourly schedule, and by hand", pattern)
+        (pattern,) = _cadences('on:\n  schedule:\n    - cron: "0 */6 * * *"\n')
+        self.assertNotRegex("a daily schedule", pattern)
+        self.assertRegex("a six-hourly schedule", pattern)

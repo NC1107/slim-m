@@ -10,14 +10,14 @@ Each section below is named for its workflow file.
 
 | Workflow | Runs on | What it gates |
 | --- | --- | --- |
-| `server-ci` | changes under `crates/`, `schema/openapi.yaml`, the Cargo files, `rust-toolchain.toml`, `docker/server.Dockerfile` | fmt, clippy, sqlx cache check, tests, release build, binary size budget |
-| `client-ci` | changes under `client/`, or to `schema/openapi.yaml`; `update-golden-references` also by hand (workflow_dispatch) | dart analyze and format in one job, every package's tests plus the web build in another, so a typo reports in about a minute rather than fourteen; `update-golden-references` regenerates design_system's golden PNGs for a human to commit |
+| `server-ci` | changes under `crates/` or `.sqlx/`, `schema/openapi.yaml`, the Cargo files, `rust-toolchain.toml`, `docker/server.Dockerfile`, or its own workflow file | fmt, clippy, sqlx cache check, tests, release build, binary size budget |
+| `client-ci` | changes under `client/`, or to `schema/openapi.yaml`, `scripts/desktop-shell-smoke.sh` or its own workflow file; `update-golden-references` also by hand (workflow_dispatch) | dart analyze and format in one job, every package's tests plus the web build in another, so a typo reports in about a minute rather than fourteen; `update-golden-references` regenerates design_system's golden PNGs for a human to commit |
 | `client-macos-ci` | a nightly schedule, and by hand | that the Dart and Swift compile against the macOS SDK. Compile-only, unsigned, and not a required check |
 | `client-windows-ci` | pushes to `main` that touch `client/` or `packaging/windows/`, a nightly schedule, and by hand; not pull requests | that the native plugin graph links against the Windows SDK, and the Windows launcher's Go tests. Compile-only, and not a required check |
 | `client-ios-ci` | changes under `client/packages/app/ios/`, `rtc/`, `platform/`, the pubspec files, on pull requests and pushes to `main` | every `Runner` source file is registered in `project.pbxproj` (ubuntu, always), the iOS CallKit XCTest and extension-embeds-no-frameworks checks on macOS, and an unsigned Release-configuration device build when a native-relevant path changed |
 | `schema-ci` | changes under `schema/`, `redocly.yaml` on pull requests; every push to `main` unconditionally | redocly lint, the additive-only oasdiff gate against a PR's base on pull requests, and the same gate against the immediate parent commit on every push to `main` (required for a release; see below) |
 | `audio-ci` | changes under `assets/audio/` | the seven notification sounds rebuild to the bytes that are committed, and the family is level with itself |
-| `hygiene` | every push and pull request | iOS purpose strings, the iOS broadcast extension is wired up, orientation is locked on phones only, no emoji in UI source, SPDX headers on Rust source, the file-size budget, the comment cap, and the `scripts/lib` unit tests, which include the two structural gates on `required_checks` |
+| `hygiene` | every pull request, and every push to `main` | iOS purpose strings, the iOS broadcast extension is wired up, orientation is locked on phones only, no emoji in UI source, SPDX headers on Rust source, the file-size budget, the comment cap, and the `scripts/lib` unit tests, which include the two structural gates on `required_checks` |
 | `advisory-watchdog` | a daily schedule, and by hand | nothing. It opens a deduplicated GitHub issue for a security advisory against a dependency and closes it once the tree is clean; the trigger `licenses` deliberately does not carry |
 | `licenses` | changes to any dependency manifest or lockfile or to `deny.toml`; every push to `main` | every Rust crate's and every pub package's license is in the one allowlist |
 | `perf` | changes under `crates/`, `perf/`, the Cargo files; plus published releases | benches compile on PRs, benches run on a release |
@@ -29,12 +29,13 @@ Each section below is named for its workflow file.
 | `web-image` | called by `main-builds` (a client change) and by `release` (a server release) | the web client built into a signed multi-arch `ghcr.io/<owner>/slim-m-web` image, split out into its own file because `main-builds` is at the 500-line ceiling |
 | `server-binaries` | called by `release` | the static musl server binaries per arch, uploaded as run artifacts for `server-release-assets`, split out into its own file because `release` is past the 500-line budget |
 | `copr-publish` | called by `main-builds` and `copr-catch-up` | the Fedora COPR snapshot submission, split out into its own file once `main-builds` hit the 500-line ceiling; a failed submit is retried up to three times and then fails the job |
-| `desktop-clients` | `client-v*` tag pushes, and by hand with a tag input | unsigned Windows and macOS tester archives, attached to the client's GitHub release. The two desktop platforms `release` does not package |
+| `desktop-clients` | `client-v*` tag pushes, and by hand with a tag input | unsigned Windows and macOS tester archives, attached to the client's GitHub release, with the Windows launcher built and its Go tests run on the way, then the signed `update-manifest` job. The two desktop platforms `release` does not package |
 | `update-manifest` | called by `desktop-clients` after its archives attach, and by hand with a tag input | signs a manifest (versions, artifact URLs, sha256s) of the desktop artifacts on a client release with the `UPDATE_SIGNING_KEY` secret, for the self-updater in decision 0041. Skips with a warning while the secret is unset |
 | `release` | pushes to `main`, and by hand on a `server-v*` / `client-v*` tag ref | the whole publish pipeline, including the web image under the server's version |
 | `release-tag-watchdog` | an hourly schedule, and by hand | every release-please manifest's version has a matching git tag, catching a release PR that merged with no tag ever following it, and no merged release PR is still labelled `autorelease: pending`, which silently fails every later release run; and, in a second job, re-dispatches `release.yml` on the tag once when the release run's verify failed and the commit's required checks have since gone green |
-| `red-streak-watchdog` | an hourly schedule, and by hand | opens a GitHub issue once `e2e` or `main-builds` has failed 3 consecutive completed runs on `main`, closes it once that workflow is green again; does not gate anything |
-| `main-builds` | changes under `client/`, `crates/`, `packaging/` or the web image's own files on every push to `main`, excluding a release commit's own files; and by hand, with a boolean per side | a Fedora COPR snapshot, an Android artifact, `latest` on the live server image, `latest` on the web image after a client change, and continuous TestFlight unless the repo variable `CONTINUOUS_TESTFLIGHT` is `false`, in which case iOS builds only from a client release in `release`, or when this is run by hand; never a version bump, changelog or GitHub Release |
+| `release-asset-watchdog` | an hourly schedule, and by hand | nothing. It checks every `client-v*` and `server-v*` release from the last 3 days against the asset set its kind always carries, and opens a deduplicated `release-incomplete` issue (and fails its own run) when one older than 90 minutes is missing a file |
+| `red-streak-watchdog` | a daily schedule, and by hand | opens a GitHub issue once `e2e` or `main-builds` has failed 3 consecutive completed runs on `main`, closes it once that workflow is green again; does not gate anything |
+| `main-builds` | changes under `client/`, `crates/`, `packaging/`, the Cargo files, `rust-toolchain.toml`, `docker/server.Dockerfile`, `.sqlx/`, the web image's own files, the local actions and reusable workflows it calls, or its own workflow file, on every push to `main`, excluding a release commit's own files; and by hand, with a boolean per side | a Fedora COPR snapshot, an Android artifact, `latest` on the live server image, `latest` on the web image after a client change, and continuous TestFlight unless the repo variable `CONTINUOUS_TESTFLIGHT` is `false`, in which case iOS builds only from a client release in `release`, or when this is run by hand; never a version bump, changelog or GitHub Release |
 | `flatpak-ci` | changes to the flatpak manifest or its vendored shared-modules, on pull requests and every push to `main`; and by hand | builds the flatpak for real, installs it, and checks a headless launch does not fail with a missing shared library, the failure class `release.yml` cannot catch before a `client-v*` tag |
 
 ## Keeping this table honest
@@ -403,11 +404,13 @@ See `docs/e2e.md` for what the harness actually covers and what it does not.
 `e2e` has been red for a day, then red for two days a second time, each time with a release shipping over the top of it and nothing anywhere saying so; see PRs #379 and #550 for the two incidents.
 Neither happened because `e2e` gates anything - it does not, on purpose, per this section above - they happened because nothing was watching a check that fails loudly in its own terms but reaches nobody.
 
-`red-streak-watchdog.yml` runs on an hourly schedule (plus `workflow_dispatch`) and asks `scripts/check-workflow-red-streak.sh` a plain question of `e2e`'s own run history on `main`: how many completed runs in a row, most recent first, have failed, treating a cancelled run as neither a failure nor a recovery since it never actually ran the harness (see `e2e.yml`'s own "queued, not cancelled" concurrency comment).
+`red-streak-watchdog.yml` runs on a daily schedule (plus `workflow_dispatch`; PR #688 cut it from hourly on purpose, to stop the watchdogs drowning the run history) and asks `scripts/check-workflow-red-streak.sh` a plain question of `e2e`'s own run history on `main`: how many completed runs in a row, most recent first, have failed, treating a cancelled run as neither a failure nor a recovery since it never actually ran the harness (see `e2e.yml`'s own "queued, not cancelled" concurrency comment).
+A run whose only successful job is the `changes` filter built nothing, so it is skipped the same way: it neither resets the streak nor closes an open issue.
+That shape is what a `main-builds` push whose paths matched no filter produces, and counting it as a recovery would close an issue with nothing proven.
 Three in a row is the threshold - one is ordinary flake in a job driving a real browser and a real SFU, and firing on it would make this exactly the kind of check people learn to ignore, the same reasoning `e2e.yml`'s own header already gives for staying advisory in the first place.
 Replayed against the actual 2026-08-09 incident's run history, three in a row was reached about 1h20m after the regression started, not the two days it took a person to notice.
 
-**The signal is a GitHub issue, not this workflow's own colour.** A cancelled-while-pending run or a required check reading `cancelled` as failure are both already-documented ways a workflow's own status silently misses a problem (see "A release can succeed and still ship no store build" in CLAUDE.md); failing this workflow's job would only add a second thing nobody is watching. `scripts/check-workflow-red-streak.sh` opens an issue, labelled and deduplicated so an hourly run cannot open a second one, once the streak crosses the threshold, and closes it automatically the next time `e2e` succeeds on `main`. The label is created on first use rather than assumed to exist, since nothing else in this repository needs it.
+**The signal is a GitHub issue, not this workflow's own colour.** A cancelled-while-pending run or a required check reading `cancelled` as failure are both already-documented ways a workflow's own status silently misses a problem (see "A release can succeed and still ship no store build" in CLAUDE.md); failing this workflow's job would only add a second thing nobody is watching. `scripts/check-workflow-red-streak.sh` opens an issue, labelled and deduplicated so a repeat run cannot open a second one, once the streak crosses the threshold, and closes it automatically the next time `e2e` succeeds on `main`. The label is created on first use rather than assumed to exist, since nothing else in this repository needs it.
 
 Pulled into a script for the same reason `check-release-tag-lag.sh` was: `scripts/lib/test_check_workflow_red_streak.py` drives it against a fixture run list (`E2E_RUNS_JSON`) and a faked `gh` on PATH, so the threshold and the dedup/close logic are both tested without a real red workflow. One fixture replays the real 2026-08-09 history up to its third failure and asserts the script would have fired; a second is a genuinely mixed history (one failure among real successes) rather than an all-failure fixture, since an all-failure fixture proves nothing about where the threshold actually falls.
 
@@ -650,7 +653,8 @@ Both halves of the fix are in `release.yml`: the condition names `needs.server-i
 `server-release-assets` had the same shape against `server-binaries` and carries the same fix, where the consequence was a GitHub Release with only one arch's binary attached.
 `copr` was the third instance of it, found by an audit on 2026-09-21, in both `release.yml` and `main-builds.yml`: it consumes `linux-client`'s tarball with an `if:` that named only `verify-client-ci` and the `changes` outputs.
 That one degraded quietly rather than publishing something wrong, because both COPR submission scripts run `set -uo pipefail` without `-e`, so a missing tarball became a `::warning::` and an exit 0 - a broken Linux client build showing green in a job nobody was watching.
-All four pairs are pinned by name now in `scripts/lib/test_conditional_jobs_keep_their_needs_gate.py`, which also records why a blanket "every need appears in the `if:`" rule was rejected: nine jobs legitimately omit `release-please`, because the gate reaches them through `verify-server-ci` / `verify-client-ci`.
+`copr-catch-up.yml`'s `copr` job was a fourth, consuming the `tarball` job's artifact behind an `if:` that named only the `check` output; it carries the same fix.
+All five pairs are pinned by name now in `scripts/lib/test_conditional_jobs_keep_their_needs_gate.py`, which also records why a blanket "every need appears in the `if:`" rule was rejected: nine jobs legitimately omit `release-please`, because the gate reaches them through `verify-server-ci` / `verify-client-ci`.
 
 `latest` is the rolling tag deployments track for auto-updates, since Watchtower polls a mutable tag.
 The version and sha tags stay alongside it, for pinning and for tracing an image back to its commit.
@@ -808,6 +812,26 @@ That reasoning names a different trigger as the answer, and this is it.
 It gates nothing, and it does not report by its own colour: a scheduled workflow that only fails itself is a red tab nobody opens, which is the failure `red-streak-watchdog` already exists to correct.
 It opens a deduplicated GitHub issue instead, and closes it once the tree is clean again.
 
+## release-asset-watchdog
+
+release-please publishes the GitHub Release before any asset job runs, so a release is public, and `latest`, from the first second while its builds can still fail.
+Client 0.89.0 shipped that way on 2026-09-30: the Windows job failed, `update-manifest` skipped behind it, and the release had no Windows zip and no `manifest.json` until a hand dispatch backfilled them an hour later.
+Nothing noticed, because `verify-release-checks` judges check-runs before publish and `update-manifest.py --require` only runs inside the job that was skipped.
+
+`scripts/check-release-assets.py` lists releases through `gh api` (GET only) and compares each release's asset names with the set for its kind, kept in one `REQUIRED` table in the script.
+A `client-v*` release must hold `manifest.json`, `manifest.json.sig`, `SHA256SUMS`, `SHA256SUMS.android`, the rpm, the linux tarball, the flatpak, the macOS and Windows zips and the apk.
+A `server-v*` release must hold `SHA256SUMS` and the linux amd64 and arm64 binaries.
+`schema-v*` tags are anchors with no assets by design and are ignored.
+Names that carry the version are patterns filled from the tag, and an asset with size 0 counts as absent.
+The sets were derived from `client-v0.89.0` (10 assets) and `server-v0.77.0` (3), not from memory; change the table when a workflow changes what it attaches.
+
+A release younger than the grace period (90 minutes, `--grace-minutes`) is reported as pending and does not fail, since the asset jobs take about an hour.
+The workflow runs the script hourly over `--recent 3` days and hands the result to `scripts/report-advisory-issue.sh`, the same open, dedupe and close flow `advisory-watchdog` uses, with the label `release-incomplete`.
+Unlike the advisory check it also fails its own run, because an incomplete release is something to act on rather than to read later.
+Releases older than the window are not rechecked, so a release left incomplete for more than 3 days stops alerting; run the script by hand with `--recent` for a longer look.
+It does not check that `manifest.json` lists every platform whose archive is attached; client 0.88.0's manifest once omitted linux-x64 while the tarball arrived later.
+`scripts/lib/test_check_release_assets.py` drives the comparison with fake asset lists.
+
 ## verify-release-checks
 
 Called twice from `release`, once per component, so every publish job - a GHCR push, a cosign signature, a GitHub Release asset, a Play or TestFlight upload - requires this exact commit's own CI to have completed and succeeded first.
@@ -891,7 +915,7 @@ Because a catch-up only submits a Version COPR does not yet have, it cannot coll
 
 ## desktop-clients
 
-The two desktop platforms `release` does not package: iOS goes through TestFlight, Android attaches an apk and aab, and `linux-client` ships a tarball, an rpm and a flatpak, all from `release` itself.
+The two desktop platforms `release` does not package: iOS goes through TestFlight, Android attaches an apk (no aab), and `linux-client` ships a tarball, an rpm and a flatpak, all from `release` itself.
 This fills the gap with unsigned archives good enough to hand a tester, without touching `release`'s gated publish jobs.
 The Windows zip also carries the `slim-m.exe` launcher built from `packaging/windows/launcher`, `install.cmd` and `install.ps1` for the first per-user install, and a `VERSION` file (decision 0041).
 
@@ -910,9 +934,10 @@ The job sets `CL` to a value that begins with a slash, Git Bash rewrites slash-l
 The same tag built under pwsh on the same runner image, with nothing else changed, which is what the fix is.
 The failed run took the manifest job with it, because `manifest` needs both desktop builds and a failed need skips it without a word.
 
-Two things made it expensive, and both still hold.
+Two things made it expensive.
 This workflow runs on a tag and nowhere else, so the pull request that broke it could not have failed: the first run of a change here is the release.
-And nothing compares a published release against the assets it should have, so the release page looked finished.
+That still holds.
+And nothing compared a published release against the assets it should have, so the release page looked finished; `release-asset-watchdog` does that now.
 
 `scripts/lib/test_windows_builds_do_not_run_under_bash.py` refuses `flutter build` under `shell: bash` in any Windows job.
 That closes this exact door and no other.
@@ -943,7 +968,7 @@ A tagged release still supersedes all of this: it wins over any COPR snapshot of
 
 ### What triggers it, and the one filter step that replaces two workflows
 
-A single `on.push.paths` list cannot tell a client-only merge from a server-only one, so the trigger is deliberately wide (`client/**`, `crates/**` or `packaging/**`, minus a release commit's own `client/CHANGELOG.md` and `client/pubspec.yaml`) and a `changes` job built on `dorny/paths-filter` narrows that into the three booleans (`client`, `server`, `packaging`) every downstream job gates on.
+A single `on.push.paths` list cannot tell a client-only merge from a server-only one, so the trigger is deliberately wide (`client/**`, `crates/**` or `packaging/**`, minus a release commit's own `client/CHANGELOG.md` and `client/pubspec.yaml`, plus the root server files and every local action and reusable workflow the file calls) and a `changes` job built on `dorny/paths-filter` narrows that into the three booleans (`client`, `server`, `packaging`) every downstream job gates on.
 The brief allowed splitting this into two workflows with their own top-level `paths` instead; one workflow with one filter step was chosen because it keeps the concurrency group, the header, and this section in one place, and because the filter step is one checkout rather than two.
 
 The filter's own patterns are include-only, and that is load-bearing rather than tidy.
@@ -961,6 +986,12 @@ Without the exclusions, that commit would also match `client/**`, and this workf
 No equivalent exclusion exists for the server side: a server release-please commit touches `crates/slimm-server/Cargo.toml` and `crates/slimm-server/CHANGELOG.md`, both under `crates/**`, so it still re-triggers `server-image` here.
 That is accepted rather than worked around: excluding `Cargo.toml` from the trigger would also hide a real dependency-bump PR that happens to touch only that file, and there is no path-only way to tell the two apart.
 The redundant build pushes the same `latest` the release itself would have pushed moments earlier for the same commit, so nothing wrong reaches production; it is simply a build that did not need to happen.
+
+The trigger must also name everything the workflow calls.
+Commit f453f678 fixed `.github/actions/linux-tarball` and matched no path, so the run it started skipped every job and finished green with nothing built.
+`.github/actions/**` now triggers the run and feeds the `client` filter, and `copr-publish.yml` feeds `packaging`.
+`scripts/lib/test_main_builds_triggers_on_everything_it_uses.py` fails when a `uses: ./.github/...` target is missing from the trigger or the filter, or when a trigger path reaches no filter and is not on its short allowlist.
+A change to `main-builds.yml` itself still triggers a run that builds nothing; that is on the allowlist on purpose.
 
 ### What each side does
 
@@ -1116,7 +1147,7 @@ Two workflows fail without anything else noticing.
 `e2e` is advisory, and its silence let a multi-day regression ship under two releases (PRs #379 and #550).
 `main-builds` puts a build on a phone between releases, and it sat red for five hours on 2026-08-11 with a missing signing profile.
 Neither becomes a required check; the watchdog opens an issue instead of adding a second red workflow.
-It has no concurrency group, since it runs hourly against workflows that run far less often and dedups issues by label.
+It has no concurrency group, since it runs daily against workflows that run far less often and dedups issues by label.
 
 ### client-windows-ci
 
@@ -1124,4 +1155,4 @@ Compile-only and not a required check.
 It was the first CI job to build a Windows target for this client, and `docs/os_backlog/windows_backlog.md` has little confirmed behind it.
 A green run proves the native plugin graph links, not that the app runs or that the tray and window-shell features of decision 0012 work.
 Read that file before promoting it or building on a green run.
-The build is Debug because the job exists to catch link failures, and release packaging is not scheduled.
+The build is Debug because the job exists to catch link failures, and release packaging runs in `desktop-clients`, on `client-v*` tags only.

@@ -45,6 +45,13 @@ if log:
     with open(log, "a") as f:
         f.write(json.dumps(args) + "\n")
 
+if args[:1] == ["api"]:
+    run_id = args[1].split("/runs/")[1].split("/")[0]
+    jobs = json.loads(os.environ.get("FAKE_JOBS_JSON", "{}"))
+    names = jobs.get(run_id, ["e2e"])
+    sys.stdout.write("".join(n + "\n" for n in names))
+    sys.exit(0)
+
 if args[:2] == ["issue", "list"]:
     sys.stdout.write(os.environ.get("FAKE_ISSUE_LIST_JSON", "[]"))
     sys.exit(0)
@@ -66,6 +73,7 @@ sys.exit(1)
 
 def _run_row(created_at, conclusion, sha, status="completed", n=1):
     return {
+        "id": n,
         "status": status,
         "conclusion": conclusion,
         "html_url": f"https://github.com/NC1107/slim-m/actions/runs/{n}",
@@ -120,7 +128,8 @@ class CheckE2eRedStreakTest(unittest.TestCase):
     def _log(self):
         if not self.log_path.exists():
             return []
-        return [json.loads(line) for line in self.log_path.read_text().splitlines()]
+        calls = [json.loads(line) for line in self.log_path.read_text().splitlines()]
+        return [c for c in calls if c[:1] != ["api"]]
 
     def test_all_green_does_nothing(self):
         rows = [
@@ -278,7 +287,45 @@ class CheckE2eRedStreakTest(unittest.TestCase):
         calls = self._log()
         self.assertFalse(any(c[:2] == ["issue", "close"] for c in calls))
 
-    def test_the_real_2026_08_09_incident_would_have_fired_within_the_hour(
+    def test_a_run_that_built_nothing_neither_counts_nor_breaks_the_streak(self):
+        rows = [
+            _run_row("2026-08-01T04:00:00Z", "failure", "ddd", n=4),
+            _run_row("2026-08-01T03:00:00Z", "success", "ccc", n=3),
+            _run_row("2026-08-01T02:00:00Z", "failure", "bbb", n=2),
+            _run_row("2026-08-01T01:00:00Z", "failure", "aaa", n=1),
+            _run_row("2026-08-01T00:00:00Z", "success", "zzz", n=0),
+        ]
+        result = self._run(
+            rows,
+            extra_env={"FAKE_ISSUE_LIST_JSON": "[]",
+                        "FAKE_JOBS_JSON": json.dumps({"3": ["changes"]})},
+            threshold=3)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn("3 consecutive completed runs", result.stdout)
+        self.assertTrue(any(c[:2] == ["issue", "create"] for c in self._log()))
+
+    def test_a_run_that_built_nothing_does_not_close_an_open_issue(self):
+        rows = [_run_row("2026-08-01T01:00:00Z", "success", "aaa", n=1)]
+        result = self._run(
+            rows,
+            extra_env={"FAKE_ISSUE_LIST_JSON": '[{"number": 42}]',
+                        "FAKE_JOBS_JSON": json.dumps({"1": ["changes"]})},
+            threshold=3)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertFalse(any(c[:2] == ["issue", "close"] for c in self._log()))
+
+    def test_a_run_whose_jobs_built_something_still_closes_the_issue(self):
+        rows = [_run_row("2026-08-01T01:00:00Z", "success", "aaa", n=1)]
+        result = self._run(
+            rows,
+            extra_env={"FAKE_ISSUE_LIST_JSON": '[{"number": 42}]',
+                        "FAKE_JOBS_JSON": json.dumps(
+                            {"1": ["changes", "server-image"]})},
+            threshold=3)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertTrue(any(c[:2] == ["issue", "close"] for c in self._log()))
+
+    def test_the_real_2026_08_09_incident_would_have_fired_at_the_third_failure(
             self):
         """The acceptance test the brief asks for: replay the actual
         history as it stood at the third consecutive completed failure,

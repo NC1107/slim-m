@@ -16,8 +16,8 @@ Why no gate caught it: `actionlint` does not model that, so the file passed revi
 The rule: read `vars` and `secrets` in the calling workflow, and pass them to a composite action as inputs.
 `linux-tarball` takes `spotify_client_id`, and `main-builds.yml` passes `${{ vars.SLIMM_SPOTIFY_CLIENT_ID }}` (PR #1531).
 
-Gate: none.
-Review a new composite action for any `${{ vars.* }}` or `${{ secrets.* }}` and treat each as a bug.
+Gate: `scripts/lib/test_composite_actions_read_only_what_they_can.py` refuses `vars`, `secrets`, `needs`, `jobs`, `matrix` and `strategy` in any composite action, and a `run:` step with no `shell:`.
+It returns `vars.SLIMM_SPOTIFY_CLIENT_ID` when run on the version of `linux-tarball` that broke the build.
 
 ## 2. A green `main-builds` run is not a deploy
 
@@ -65,7 +65,8 @@ gh workflow run desktop-clients.yml --ref <branch> -f tag=client-v<newest>
 
 Gate: `scripts/lib/test_windows_builds_do_not_run_under_bash.py` refuses `flutter build` under `shell: bash` in a Windows job.
 It closes that one door only.
-There is no gate for the asset list.
+`release-asset-watchdog.yml` runs `scripts/check-release-assets.py` hourly, which compares every release of the last three days with the asset set its kind always carries and opens an issue labelled `release-incomplete` when one is short.
+It gives a release 90 minutes to finish attaching before it counts.
 
 ## 4. A merge storm cancels `main-builds`
 
