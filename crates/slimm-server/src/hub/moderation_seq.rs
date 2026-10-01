@@ -17,6 +17,11 @@
 //! before. That is the safe direction for an audit trail: "you may have
 //! missed events" when unsure, never silence.
 //!
+//! A backward clock step across a restart can make the head smaller than a
+//! number a consumer already saw, a silent false negative this does not guard
+//! against. The `hello` also hands the head to every connection, so any member
+//! learns roughly when the last moderation event happened; that is accepted.
+//!
 //! Nothing here exposes what happened. The number carries no permission, so
 //! the gates on `GET /roles`, `/reports/history` and `/members/removed` stay
 //! exactly as they were.

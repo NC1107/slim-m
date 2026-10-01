@@ -1,10 +1,9 @@
 // SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 //! Telling an account's other devices when an unfamiliar one signs in.
 //!
-//! Push is not used: the relay's kind vocabulary is fixed (message, mention,
-//! call, wake) and lives in another repository, so this reaches connected
-//! devices over the account-private hub path and the rest through the devices
-//! list they already open.
+//! A connected device hears it over the account-private hub path, an offline
+//! one through a `security` push (`push::security`), and the devices list
+//! shows it either way.
 
 use super::AppState;
 use crate::hub::Event;
