@@ -253,7 +253,7 @@ void openThreadPresenting(
 ) {
   final width = MediaQuery.sizeOf(context).width;
   if (LayoutClass.fromWidth(width).fitsThreadPane(width)) {
-    container.read(openThreadProvider.notifier).state = threadId;
+    dockThread(container, threadId);
   } else {
     GoRouter.of(context).push(Routes.thread(threadId));
   }

@@ -195,7 +195,7 @@ class ThreadRow extends ConsumerWidget {
         final width = MediaQuery.sizeOf(context).width;
         Navigator.of(context).pop();
         if (LayoutClass.fromWidth(width).fitsThreadPane(width)) {
-          container.read(openThreadProvider.notifier).state = thread.id;
+          dockThread(container, thread.id);
         } else {
           router.push(Routes.thread(thread.id));
         }

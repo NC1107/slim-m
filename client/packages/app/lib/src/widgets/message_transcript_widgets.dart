@@ -24,8 +24,9 @@ import '../routing/breakpoints.dart';
 /// empty band above a short conversation (the list is bottom-anchored), and is
 /// the one place the channel topic is shown in the body.
 ///
-/// A thread takes different copy entirely rather than the same sentence with
-/// a name substituted in. A thread channel is stored with an empty `name`
+/// A thread takes a different, compact form entirely rather than the same sentence with
+/// a name substituted in: one quiet line under the parent message, since the
+/// parent already says what the thread is about. A thread channel is stored with an empty `name`
 /// (`Store::open_thread` inserts `''`, since a thread has no name of its
 /// own), so the channel wording rendered as a welcome to a channel called
 /// nothing, and read as one called "Thread". What a person opening an empty
@@ -64,6 +65,20 @@ class ChannelStartHeader extends StatelessWidget {
         ? AppSizes.paneGutterCompact
         : AppSizes.paneGutter;
     final name = this.name;
+    if (isThread) {
+      return Padding(
+        padding: EdgeInsets.fromLTRB(
+          gutter,
+          AppSpacing.s12,
+          gutter,
+          AppSpacing.s8,
+        ),
+        child: Text(
+          'No replies yet',
+          style: AppText.caption.copyWith(color: tokens.textSecondary),
+        ),
+      );
+    }
     return Padding(
       padding: EdgeInsets.fromLTRB(
         gutter,
@@ -83,9 +98,7 @@ class ChannelStartHeader extends StatelessWidget {
               shape: BoxShape.circle,
             ),
             child: Icon(
-              isThread
-                  ? AppIcons.thread
-                  : isVoice
+              isVoice
                   ? AppIcons.voice
                   : name != null
                   ? AppIcons.hash
@@ -96,9 +109,7 @@ class ChannelStartHeader extends StatelessWidget {
           ),
           const SizedBox(height: AppSpacing.s12),
           Text(
-            isThread
-                ? 'Thread'
-                : isVoice && name != null
+            isVoice && name != null
                 ? 'Chat for $name'
                 : name != null
                 ? 'Welcome to #$name'
@@ -106,15 +117,12 @@ class ChannelStartHeader extends StatelessWidget {
             style: AppText.title.copyWith(color: tokens.textPrimary),
           ),
           const SizedBox(height: AppSpacing.s4),
-          Text(switch ((isThread, name)) {
-            (true, _) => 'Replies to the original message appear here.',
-            (false, final String n) when isVoice =>
+          Text(switch (name) {
+            final String n when isVoice =>
               topic ??
                   'This is the start of the chat for the $n voice channel.',
-            (false, final String n) =>
-              topic ?? 'This is the start of the #$n channel.',
-            (false, null) =>
-              'Messages sent here are just between the two of you.',
+            final String n => topic ?? 'This is the start of the #$n channel.',
+            null => 'Messages sent here are just between the two of you.',
           }, style: AppText.body.copyWith(color: tokens.textSecondary)),
         ],
       ),

@@ -340,7 +340,10 @@ class _ThreadDockRedirect extends ConsumerWidget {
             }
             WidgetsBinding.instance.addPostFrameCallback((_) {
               if (!context.mounted) return;
-              ref.read(openThreadProvider.notifier).state = threadId;
+              dockThread(
+                ProviderScope.containerOf(context, listen: false),
+                threadId,
+              );
               context.go(Routes.channel(parentChannelId));
             });
             return const _RedirectSpinner();

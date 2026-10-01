@@ -92,10 +92,12 @@ class _ThreadPaneSlot extends ConsumerWidget {
                 minWidth: kThreadPaneWidth,
                 maxWidth: kThreadPaneWidth,
                 alignment: Alignment.centerLeft,
-                child: DecoratedBox(
+                // Container, not DecoratedBox: only Container insets its child by the border, which an opaque Scaffold would otherwise paint over.
+                child: Container(
                   decoration: BoxDecoration(
+                    // Strong, not subtle: the pane's fill is only a step off the chat's, so the edge carries the division.
                     border: Border(
-                      left: BorderSide(color: tokens.borderSubtle),
+                      left: BorderSide(color: tokens.borderStrong),
                     ),
                   ),
                   child: AppPanelReveal(
