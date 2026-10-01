@@ -191,3 +191,52 @@ async fn a_quiet_reconnect_sees_the_same_head() {
     let (_ws, second) = connect(addr, &ticket_for(&store, bot.id).await).await;
     assert_eq!(first["moderation_seq"], second["moderation_seq"]);
 }
+
+/// Every one of the five events is numbered, past the hello head and past the one before it.
+#[tokio::test]
+async fn each_moderation_event_carries_an_increasing_seq() {
+    use slimm_server::hub::Event;
+    use slimm_server::ids::{RoleId, UserId};
+
+    let (store, _guard) = new_store().await;
+    let bot = store.create_user("bot", "bot").await.unwrap();
+    let state = state_for(&store);
+    let addr = serve(state.clone()).await;
+    let (mut ws, hello) = connect(addr, &ticket_for(&store, bot.id).await).await;
+    let mut last = hello["moderation_seq"].as_u64().unwrap();
+
+    let events = [
+        (
+            "member.timeout",
+            Event::MemberTimeoutChanged {
+                user_id: UserId::generate(),
+                until: Some(1),
+            },
+        ),
+        ("member.removed", Event::MemberRemoved(UserId::generate())),
+        ("member.restored", Event::MemberRestored(UserId::generate())),
+        (
+            "member.role_changed",
+            Event::MemberRoleChanged {
+                user_id: UserId::generate(),
+                role_id: RoleId::generate(),
+            },
+        ),
+        (
+            "role.changed",
+            Event::RoleChanged {
+                role_id: RoleId::generate(),
+            },
+        ),
+    ];
+    for (kind, event) in events {
+        state.hub.publish(event);
+        let frame = read_frame(&mut ws).await;
+        assert_eq!(frame["type"], kind);
+        let seq = frame["seq"]
+            .as_u64()
+            .unwrap_or_else(|| panic!("{kind} carries no seq: {frame}"));
+        assert!(seq > last, "{kind} seq {seq} is not past {last}");
+        last = seq;
+    }
+}
