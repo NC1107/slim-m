@@ -28,6 +28,8 @@ class ForwardTarget {
     required this.channelId,
     required this.label,
     required this.isDm,
+    this.isVoice = false,
+    this.restricted = false,
     this.userId,
     this.username,
     this.avatarUpdatedAt,
@@ -42,6 +44,12 @@ class ForwardTarget {
   /// Whether this is a DM rather than an ordinary channel - the picker's own
   /// choice of leading glyph, nothing that changes how a send to it works.
   final bool isDm;
+
+  /// Whether this is a voice channel, so the picker draws the rail's glyph.
+  final bool isVoice;
+
+  /// Mirrors `Channel.restricted`: the picker draws the rail's lock.
+  final bool restricted;
 
   /// The DM partner, so the picker can draw their real picture rather than a
   /// generic person glyph. Null for an ordinary channel, which has none.
@@ -104,6 +112,8 @@ final forwardTargetsProvider = FutureProvider.autoDispose
               channelId: channel.id,
               label: channel.name,
               isDm: false,
+              isVoice: channel.kind == 'voice',
+              restricted: channel.restricted ?? false,
             ),
         for (final dm in dms)
           // `store/dms.rs`: a blocked party is denied SEND_MESSAGES/ATTACH_FILES both ways, and otherwise a DM always grants both to its two participants, so attachments need no extra check here.

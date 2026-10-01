@@ -29,6 +29,7 @@ import 'sign_in_credential_fields.dart';
 import '../widgets/totp_sign_in_prompt.dart';
 import 'sign_in_error.dart';
 import 'sign_in_invite_notice.dart';
+import 'sign_in_session_ended_notice.dart';
 
 /// Sign in or create an account on a chosen server.
 ///
@@ -419,6 +420,7 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
                 style: AppText.code.copyWith(color: tokens.textSecondary),
               ),
             ),
+          const SessionEndedNotice(),
           if (_addressExpanded) ...[
             LabeledField(
               label: 'Server',

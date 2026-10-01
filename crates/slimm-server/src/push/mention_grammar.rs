@@ -25,6 +25,10 @@ pub(super) fn mentioned_role_names(content: &str) -> HashSet<String> {
     let mut names = HashSet::new();
     let mut rest = content;
     while let Some(open) = rest.find("@[") {
+        if escaped_at(rest.as_bytes(), open) {
+            rest = &rest[open + 2..];
+            continue;
+        }
         let after = &rest[open + 2..];
         match after.find(['\n', ']']) {
             Some(idx) if after.as_bytes()[idx] == b']' => {
@@ -64,7 +68,7 @@ pub(super) fn mentioned_usernames(content: &str) -> HashSet<String> {
             continue;
         }
         let start = i + 1;
-        if start >= bytes.len() || !is_mention_start(bytes[start]) {
+        if escaped_at(bytes, i) || start >= bytes.len() || !is_mention_start(bytes[start]) {
             i += 1;
             continue;
         }
@@ -79,6 +83,18 @@ pub(super) fn mentioned_usernames(content: &str) -> HashSet<String> {
         i = end;
     }
     names
+}
+
+/// Whether the `@` at `at` is escaped: preceded by an odd run of
+/// backslashes, the way `message_inline.dart` reads `\@bob` as text.
+fn escaped_at(bytes: &[u8], at: usize) -> bool {
+    bytes[..at]
+        .iter()
+        .rev()
+        .take_while(|&&b| b == b'\\')
+        .count()
+        % 2
+        == 1
 }
 
 fn is_mention_start(b: u8) -> bool {

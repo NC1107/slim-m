@@ -224,4 +224,29 @@ void main() {
     expect(find.textContaining('Snoozed until'), findsOneWidget);
     expect(find.text('30m'), findsNothing);
   });
+
+  testWidgets('the snooze buttons sit under their own label, and the calls '
+      'caption is secondary text like the other helpers', (tester) async {
+    await _pump(tester, (request) async {
+      if (request.url.path == '/notifications/schedule') {
+        return _json({'schedule': _scheduleJson()});
+      }
+      return http.Response('', 404);
+    });
+
+    final label = tester.getRect(find.text('Snooze notifications for'));
+    final first = tester.getRect(find.text('30m'));
+    expect(label.right, lessThanOrEqualTo(first.left));
+    expect(
+      label.center.dy,
+      closeTo(first.center.dy, first.height),
+      reason: 'the heading leads the same row of buttons',
+    );
+
+    final tokens = AppTokens.light;
+    final caption = tester.widget<Text>(
+      find.textContaining('Calls still ring'),
+    );
+    expect(caption.style?.color, tokens.textSecondary);
+  });
 }
