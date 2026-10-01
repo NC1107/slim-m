@@ -99,6 +99,9 @@ Future<List<String>> _pumpDock(
   required String installedVersion,
   bool enabled = true,
 }) async {
+  // The module screen is taller than the default 800x600 surface.
+  await tester.binding.setSurfaceSize(const Size(800, 1200));
+  addTearDown(() => tester.binding.setSurfaceSize(null));
   final installs = <String>[];
   var version = installedVersion;
   final client = MockClient((request) async {
@@ -180,7 +183,7 @@ void main() {
   testWidgets('an outdated module says so on its row', (tester) async {
     await _pumpDock(tester, offered: '0.3.0', installedVersion: '0.2.0');
     // AppBadge paints its label uppercased, whatever the variant.
-    expect(find.text('V0.2.0 · UPDATE'), findsOneWidget);
+    expect(find.text('UPDATE AVAILABLE'), findsOneWidget);
     expect(
       find.text('INSTALLED'),
       findsNothing,

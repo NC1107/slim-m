@@ -284,4 +284,16 @@ void main() {
     });
     expect(version.inviteRequired, isNull);
   });
+
+  test('claimed parses when present and is unknown on an older server', () {
+    api.Version parse(Map<String, dynamic> extra) => api.Version.fromJson({
+      'name': 'slim-m',
+      'version': '0.90.0',
+      'protocol': 1,
+      ...extra,
+    });
+    expect(parse(const {'claimed': false}).claimed, isFalse);
+    expect(parse(const {'claimed': true}).claimed, isTrue);
+    expect(parse(const {}).claimed, isNull);
+  });
 }

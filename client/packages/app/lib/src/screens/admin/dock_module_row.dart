@@ -38,16 +38,21 @@ class DockModuleRow extends StatelessWidget {
     api.InstalledDockModule installed,
   ) {
     if (installed.version != entry.version) {
-      return AppBadge(
-        variant: AppBadgeVariant.warn,
-        label: 'v${installed.version} · update',
-      );
+      return AppBadge(variant: AppBadgeVariant.warn, label: 'Update available');
     }
     return AppBadge(
       variant: AppBadgeVariant.role,
       label: installed.enabled ? 'Installed' : 'Installed · Off',
     );
   }
+
+  /// Both versions when they differ, so the badge never has to carry one.
+  static String _versionLine(
+    api.DockIndexEntry entry,
+    api.InstalledDockModule? installed,
+  ) => installed == null || installed.version == entry.version
+      ? 'v${entry.version}'
+      : 'Installed v${installed.version}, latest v${entry.version}';
 
   @override
   Widget build(BuildContext context) {
@@ -67,7 +72,7 @@ class DockModuleRow extends StatelessWidget {
           ? null
           : _stateBadge(entry, installed),
       details: [
-        SettingsEntityDetail('v${entry.version}'),
+        SettingsEntityDetail(_versionLine(entry, installed)),
         SettingsEntityDetail(entry.summary, wrap: true),
         if (blocked)
           const SettingsEntityDetail(

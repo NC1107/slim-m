@@ -63,7 +63,12 @@ class DockHostAccessCard extends StatelessWidget {
       title: 'Access to approve',
       children: [
         Padding(
-          padding: const EdgeInsets.only(bottom: AppSpacing.s8),
+          padding: const EdgeInsets.fromLTRB(
+            AppSpacing.s8,
+            AppSpacing.s4,
+            AppSpacing.s8,
+            AppSpacing.s8,
+          ),
           child: Text(
             reapprovePosting
                 ? 'This is a new build, so Post messages needs your approval '
