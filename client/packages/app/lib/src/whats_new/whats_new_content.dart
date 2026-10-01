@@ -352,6 +352,11 @@ const List<WhatsNewEntry> whatsNewEntries = [
         'leaves full screen.',
       ),
       WhatsNewPoint(
+        'Notifications now show who wrote and what they said, on every '
+        'device you use. Turn it off once under Notifications if you prefer '
+        'the plain alert.',
+      ),
+      WhatsNewPoint(
         'Usernames no longer care about capital letters, so a phone that '
         'capitalises the first letter signs you into your own account. '
         'Turning on two-factor or deleting your account now asks for your '
