@@ -43,7 +43,6 @@ import '../widgets/call_mini_player.dart';
 import '../widgets/channel_rail.dart';
 import '../widgets/channel_rail_frame.dart';
 import '../widgets/command_palette.dart';
-import '../widgets/compact_channel_app_bar.dart';
 import '../widgets/compact_drawer_scaffold.dart';
 import '../widgets/member_pane.dart';
 import '../widgets/new_device_banner_host.dart';
