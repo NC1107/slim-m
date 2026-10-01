@@ -29,6 +29,28 @@ pub struct RoomParticipant {
     /// or screen share alike - free from the same response as
     /// `is_sharing_screen`.
     pub has_video: bool,
+    /// When this participant joined the room, in unix milliseconds, as the
+    /// SFU reports it. `None` when the SFU predates the field.
+    pub joined_at_ms: Option<i64>,
+}
+
+/// LiveKit's JSON carries int64 fields as strings; accept either form.
+fn lenient_i64<'de, D>(d: D) -> Result<Option<i64>, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    #[derive(serde::Deserialize)]
+    #[serde(untagged)]
+    enum Raw {
+        Num(i64),
+        Text(String),
+    }
+    use serde::Deserialize as _;
+    Ok(match Option::<Raw>::deserialize(d)? {
+        Some(Raw::Num(n)) => Some(n),
+        Some(Raw::Text(t)) => t.parse().ok(),
+        None => None,
+    })
 }
 
 /// The shape of a LiveKit `ListParticipants` twirp response; only the fields
@@ -46,6 +68,10 @@ struct ParticipantInfo {
     name: Option<String>,
     #[serde(default)]
     tracks: Vec<TrackInfo>,
+    #[serde(default, alias = "joinedAtMs", deserialize_with = "lenient_i64")]
+    joined_at_ms: Option<i64>,
+    #[serde(default, alias = "joinedAt", deserialize_with = "lenient_i64")]
+    joined_at: Option<i64>,
 }
 
 #[derive(serde::Deserialize)]
@@ -113,6 +139,10 @@ impl VoiceService {
                     display_name: p.name.unwrap_or_default(),
                     is_sharing_screen,
                     has_video,
+                    joined_at_ms: p
+                        .joined_at_ms
+                        .filter(|&ms| ms > 0)
+                        .or(p.joined_at.filter(|&s| s > 0).map(|s| s * 1000)),
                 })
             })
             .collect())
@@ -187,6 +217,7 @@ mod tests {
                 display_name: "Alice".to_owned(),
                 is_sharing_screen: false,
                 has_video: false,
+                joined_at_ms: None,
             }]
         );
     }
@@ -222,8 +253,31 @@ mod tests {
                 display_name: "Alice".to_owned(),
                 is_sharing_screen: true,
                 has_video: true,
+                joined_at_ms: None,
             }]
         );
+    }
+
+    #[tokio::test]
+    async fn the_join_time_reads_from_milliseconds_or_the_older_seconds_field() {
+        let (alice, bob) = (UserId::generate(), UserId::generate());
+        let url = spawn_room_service(
+            axum::http::StatusCode::OK,
+            json!({
+                "participants": [
+                    { "identity": alice.to_string(), "joinedAtMs": "1700000000123", "joinedAt": "1700000000" },
+                    { "identity": bob.to_string(), "joined_at": 1700000005 },
+                ]
+            }),
+        )
+        .await;
+
+        let participants = service_at(&url)
+            .list_participants(ChannelId::generate())
+            .await
+            .expect("the mock room service answered");
+        assert_eq!(participants[0].joined_at_ms, Some(1_700_000_000_123));
+        assert_eq!(participants[1].joined_at_ms, Some(1_700_000_005_000));
     }
 
     #[tokio::test]

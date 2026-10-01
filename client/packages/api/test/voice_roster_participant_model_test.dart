@@ -27,4 +27,14 @@ void main() {
     expect(participant.isSharingScreen, isFalse);
     expect(participant.hasVideo, isFalse);
   });
+
+  test('call_age_ms decodes to a Duration, and absence is null', () {
+    final withAge = VoiceRoster.fromJson({
+      'participants': <dynamic>[],
+      'call_age_ms': 61000,
+    });
+    expect(withAge.callAge, const Duration(seconds: 61));
+    final older = VoiceRoster.fromJson({'participants': <dynamic>[]});
+    expect(older.callAge, isNull);
+  });
 }

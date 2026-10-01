@@ -11525,6 +11525,15 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/VoiceRosterParticipant"
+        call_age_ms:
+          type: integer
+          format: int64
+          nullable: true
+          description: >-
+            How long the longest-present listed participant has been in the
+            room, in milliseconds - the call's age. An age rather than a start
+            time so every client reads the same length whatever its clock says.
+            Null when nobody is listed.
 
     VoiceRosterParticipant:
       type: object

@@ -70,6 +70,29 @@ class VoiceRosterParticipant {
       );
 }
 
+/// The listed participants of a voice room and how long the call has run,
+/// from `GET /channels/{id}/voice/roster`.
+///
+/// [callAge] is the age of the longest-present listed participant, measured
+/// by the server, so every client reads the same length whatever its own
+/// clock says. Null when nobody is listed or the server predates the field.
+class VoiceRoster {
+  const VoiceRoster({required this.participants, this.callAge});
+
+  final List<VoiceRosterParticipant> participants;
+  final Duration? callAge;
+
+  factory VoiceRoster.fromJson(Map<String, dynamic> json) {
+    final ageMs = json['call_age_ms'] as int?;
+    return VoiceRoster(
+      participants: (json['participants'] as List<dynamic>)
+          .map((p) => VoiceRosterParticipant.fromJson(p as Map<String, dynamic>))
+          .toList(growable: false),
+      callAge: ageMs == null ? null : Duration(milliseconds: ageMs),
+    );
+  }
+}
+
 /// A DM call ring the caller just started, from `POST
 /// /channels/{id}/voice/ring`.
 class RingStarted {
