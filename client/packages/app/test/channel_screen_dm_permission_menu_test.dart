@@ -160,8 +160,6 @@ void main() {
             'the deployment-wide bit the server can never grant here',
       );
       expect(find.text('Pin'), findsNothing);
-      await tester.tap(find.text('More'));
-      await tester.pumpAndSettle();
       expect(
         find.text('Report message'),
         findsOneWidget,

@@ -23,4 +23,3 @@ The strings live in `client/packages/app/lib/src/action_labels.dart`; a gate in 
 - One create button per pane, in the title bar when the pane has one. A list does not repeat it.
 - A section title never repeats its pane title.
 - Sibling destructive buttons sit at the card's own inner padding, with no extra wrapper.
-- A menu shows at most about 8 rows; the rest sits behind "More" (desktop-vs-mobile.md never-rules).

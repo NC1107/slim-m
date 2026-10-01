@@ -92,8 +92,6 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      await tester.tap(find.text('More'));
-      await tester.pumpAndSettle();
       expect(find.text('Copy link'), findsOneWidget);
       await tester.tap(find.text('Copy link'));
       await tester.pumpAndSettle();

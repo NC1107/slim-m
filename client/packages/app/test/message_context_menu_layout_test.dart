@@ -14,7 +14,6 @@ import 'package:slimm_app/src/widgets/message_row.dart';
 import 'package:slimm_design_system/design_system.dart';
 
 import 'message_row_harness.dart';
-import 'package:slimm_app/src/action_labels.dart';
 
 Future<void> _pump(WidgetTester tester, Size window) async {
   tester.view.physicalSize = window;
@@ -92,9 +91,9 @@ void main() {
 
     await tester.longPressAt(_pressPoint(tester));
     await tester.pumpAndSettle();
-    expect(find.text(ActionLabels.addReaction), findsOneWidget);
+    expect(find.text('Add reaction'), findsOneWidget);
 
-    await tester.tap(find.text(ActionLabels.addReaction));
+    await tester.tap(find.text('Add reaction'));
     await tester.pumpAndSettle();
 
     expect(

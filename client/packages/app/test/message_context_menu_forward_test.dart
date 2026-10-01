@@ -109,8 +109,6 @@ void main() {
     await tester.longPressAt(pressPoint(tester));
     await tester.pumpAndSettle();
 
-    await tester.tap(find.text('More'));
-    await tester.pumpAndSettle();
     await tester.tap(find.text('Forward message'));
     expect(forwarded, isTrue);
   });
