@@ -132,7 +132,14 @@ class _FullscreenImageViewerState extends ConsumerState<FullscreenImageViewer> {
   String? _exportFailure;
 
   @override
+  void initState() {
+    super.initState();
+    HardwareKeyboard.instance.addHandler(_onKey);
+  }
+
+  @override
   void dispose() {
+    HardwareKeyboard.instance.removeHandler(_onKey);
     _pages.dispose();
     super.dispose();
   }
@@ -144,28 +151,42 @@ class _FullscreenImageViewerState extends ConsumerState<FullscreenImageViewer> {
   void _step(int by) {
     final target = _current + by;
     if (target < 0 || target >= widget.images.length) return;
+    final duration = AppMotion.reduced(
+      context,
+      const Duration(milliseconds: 180),
+    );
+    // A zero-length animateToPage never moves the page; reduced motion jumps.
+    if (duration == Duration.zero) {
+      _pages.jumpToPage(target);
+      return;
+    }
     _pages.animateToPage(
       target,
-      duration: AppMotion.reduced(context, const Duration(milliseconds: 180)),
+      duration: duration,
       curve: Curves.easeOutCubic,
     );
   }
 
-  /// The arrow keys, for the desktop window where there is no swipe. Escape is
-  /// left to the route's own pop handling rather than duplicated here.
-  KeyEventResult _onKey(FocusNode node, KeyEvent event) {
-    if (event is! KeyDownEvent && event is! KeyRepeatEvent) {
-      return KeyEventResult.ignored;
-    }
-    if (event.logicalKey == LogicalKeyboardKey.arrowRight) {
+  /// Arrows page and Escape closes, for a desktop window with no swipe.
+  ///
+  /// A hardware handler rather than a focus node's `onKeyEvent`: on web the
+  /// browser moves focus to the semantics layer once the route is open, and a
+  /// key then never reaches the viewer's own node.
+  bool _onKey(KeyEvent event) {
+    if (event is! KeyDownEvent && event is! KeyRepeatEvent) return false;
+    // A dialog opened over the viewer owns the keyboard until it closes.
+    if (ModalRoute.of(context)?.isCurrent != true) return false;
+    final key = event.logicalKey;
+    if (key == LogicalKeyboardKey.escape) {
+      _close();
+    } else if (key == LogicalKeyboardKey.arrowRight) {
       _step(1);
-      return KeyEventResult.handled;
-    }
-    if (event.logicalKey == LogicalKeyboardKey.arrowLeft) {
+    } else if (key == LogicalKeyboardKey.arrowLeft) {
       _step(-1);
-      return KeyEventResult.handled;
+    } else {
+      return false;
     }
-    return KeyEventResult.ignored;
+    return true;
   }
 
   /// One page. The tapped image already has its bytes and must never flash a
@@ -223,7 +244,6 @@ class _FullscreenImageViewerState extends ConsumerState<FullscreenImageViewer> {
           child: SafeArea(
             child: Focus(
               autofocus: true,
-              onKeyEvent: _onKey,
               child: Column(
                 children: [
                   _ViewerHeader(
