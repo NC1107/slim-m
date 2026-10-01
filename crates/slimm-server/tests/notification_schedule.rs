@@ -95,6 +95,7 @@ async fn register(store: &Store, user: UserId, device: DeviceId, token: &str) {
                 voip_push_token: None,
                 push_public_key: &KEY,
                 include_content: Some(false),
+                include_content_chosen: true,
             },
         )
         .await

@@ -151,6 +151,7 @@ async fn removing_a_device_kills_its_session_and_push_registration() {
                 voip_push_token: None,
                 push_public_key: &[7u8; 32],
                 include_content: Some(false),
+                include_content_chosen: true,
             },
         )
         .await

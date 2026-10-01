@@ -43,6 +43,7 @@ async fn register_is_scoped_to_the_callers_own_device() {
                 voip_push_token: None,
                 push_public_key: &KEY_A,
                 include_content: Some(false),
+                include_content_chosen: true,
             },
         )
         .await;
@@ -61,6 +62,7 @@ async fn register_is_scoped_to_the_callers_own_device() {
             voip_push_token: None,
             push_public_key: &KEY_A,
             include_content: Some(false),
+            include_content_chosen: true,
         },
     )
     .await
@@ -81,6 +83,7 @@ async fn register_is_scoped_to_the_callers_own_device() {
                 voip_push_token: None,
                 push_public_key: &KEY_B,
                 include_content: Some(false),
+                include_content_chosen: true,
             },
         )
         .await;
@@ -107,6 +110,7 @@ async fn deregister_is_scoped_to_the_callers_own_device() {
             voip_push_token: None,
             push_public_key: &KEY_A,
             include_content: Some(false),
+            include_content_chosen: true,
         },
     )
     .await
@@ -139,6 +143,7 @@ async fn report_lifecycle_is_scoped_to_the_callers_own_device() {
             voip_push_token: None,
             push_public_key: &KEY_A,
             include_content: Some(false),
+            include_content_chosen: true,
         },
     )
     .await
@@ -177,6 +182,7 @@ async fn a_device_that_never_registered_is_never_a_push_target() {
             voip_push_token: None,
             push_public_key: &KEY_B,
             include_content: Some(false),
+            include_content_chosen: true,
         },
     )
     .await
@@ -203,6 +209,7 @@ async fn clearing_a_dead_token_never_clobbers_a_fresher_registration() {
             voip_push_token: None,
             push_public_key: &KEY_A,
             include_content: Some(false),
+            include_content_chosen: true,
         },
     )
     .await
@@ -224,6 +231,7 @@ async fn clearing_a_dead_token_never_clobbers_a_fresher_registration() {
             voip_push_token: None,
             push_public_key: &KEY_B,
             include_content: Some(false),
+            include_content_chosen: true,
         },
     )
     .await
@@ -258,6 +266,7 @@ async fn clear_push_registration_is_scoped_to_the_owning_device_not_the_bare_tok
             voip_push_token: None,
             push_public_key: &KEY_A,
             include_content: Some(false),
+            include_content_chosen: true,
         },
     )
     .await
@@ -292,6 +301,7 @@ async fn a_logged_out_device_receives_nothing() {
             voip_push_token: None,
             push_public_key: &KEY_A,
             include_content: Some(false),
+            include_content_chosen: true,
         },
     )
     .await
@@ -326,6 +336,7 @@ async fn repeated_logins_do_not_produce_duplicate_targets_for_one_physical_devic
             voip_push_token: None,
             push_public_key: &KEY_A,
             include_content: Some(false),
+            include_content_chosen: true,
         },
     )
     .await
@@ -344,6 +355,7 @@ async fn repeated_logins_do_not_produce_duplicate_targets_for_one_physical_devic
             voip_push_token: None,
             push_public_key: &KEY_A,
             include_content: Some(false),
+            include_content_chosen: true,
         },
     )
     .await
@@ -377,6 +389,7 @@ async fn registering_a_token_on_a_new_login_reclaims_it_even_without_logging_out
             voip_push_token: None,
             push_public_key: &KEY_A,
             include_content: Some(false),
+            include_content_chosen: true,
         },
     )
     .await
@@ -392,6 +405,7 @@ async fn registering_a_token_on_a_new_login_reclaims_it_even_without_logging_out
             voip_push_token: None,
             push_public_key: &KEY_B,
             include_content: Some(false),
+            include_content_chosen: true,
         },
     )
     .await
@@ -421,6 +435,7 @@ async fn a_token_reassigned_to_a_different_account_stops_reaching_the_old_one() 
             voip_push_token: None,
             push_public_key: &KEY_A,
             include_content: Some(false),
+            include_content_chosen: true,
         },
     )
     .await
@@ -437,6 +452,7 @@ async fn a_token_reassigned_to_a_different_account_stops_reaching_the_old_one() 
             voip_push_token: None,
             push_public_key: &KEY_B,
             include_content: Some(false),
+            include_content_chosen: true,
         },
     )
     .await

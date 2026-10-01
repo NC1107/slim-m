@@ -62,6 +62,11 @@ struct RegisterRequest {
     /// carries, and the relay can read neither answer.
     #[serde(default)]
     include_content: Option<bool>,
+    /// Marks `include_content` as a deliberate toggle, so an explicit `false`
+    /// is saved. Without it a `false` is ignored, since a client that predates
+    /// this field sends `false` when the member never toggled.
+    #[serde(default)]
+    include_content_chosen: bool,
 }
 
 #[derive(Deserialize, Serialize)]
@@ -121,6 +126,7 @@ async fn register(
                 voip_push_token,
                 push_public_key: &public_key,
                 include_content: req.include_content,
+                include_content_chosen: req.include_content_chosen,
             },
         )
         .await?;

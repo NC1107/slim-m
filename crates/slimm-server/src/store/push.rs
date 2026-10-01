@@ -70,6 +70,11 @@ pub struct PushRegistration<'a> {
     /// choice (or `DEFAULT_PUSH_PREVIEW`) applies; a registration can never
     /// reset a choice it did not make.
     pub include_content: Option<bool>,
+    /// Set by a client that marks `include_content` as a deliberate toggle.
+    /// An unmarked `false` is ignored, because a client that predates the
+    /// marker sends `false` whenever the member never toggled; an unmarked
+    /// `true` can only be a real opt-in and is always saved.
+    pub include_content_chosen: bool,
 }
 
 impl Store {
@@ -104,10 +109,11 @@ impl Store {
             voip_push_token,
             push_public_key,
             include_content,
+            include_content_chosen,
         } = registration;
         let mut tx = self.begin_write().await?;
 
-        if let Some(choice) = include_content {
+        if let Some(choice) = include_content.filter(|&on| on || include_content_chosen) {
             sqlx::query("UPDATE users SET push_include_content = ? WHERE id = ?")
                 .bind(choice)
                 .bind(user_id)

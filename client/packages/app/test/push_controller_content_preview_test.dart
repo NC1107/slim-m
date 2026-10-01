@@ -101,7 +101,14 @@ void main() {
       final requests = await registerOnce();
 
       expect(requests, hasLength(2));
-      expect(requests.every((r) => !r.containsKey('include_content')), isTrue);
+      expect(
+        requests.every(
+          (r) =>
+              !r.containsKey('include_content') &&
+              !r.containsKey('include_content_chosen'),
+        ),
+        isTrue,
+      );
     });
 
     test('an explicit choice not yet accepted is sent once, then not '
@@ -111,7 +118,9 @@ void main() {
       );
 
       expect(requests[0]['include_content'], isFalse);
+      expect(requests[0]['include_content_chosen'], isTrue);
       expect(requests[1].containsKey('include_content'), isFalse);
+      expect(requests[1].containsKey('include_content_chosen'), isFalse);
     });
 
     test('a preferences read that fails once still sends the pending '

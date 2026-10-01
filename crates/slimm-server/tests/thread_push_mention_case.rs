@@ -73,6 +73,7 @@ async fn a_mention_wakes_its_target_regardless_of_letter_case() {
                     voip_push_token: None,
                     push_public_key: &KEY,
                     include_content: Some(false),
+                    include_content_chosen: true,
                 },
             )
             .await

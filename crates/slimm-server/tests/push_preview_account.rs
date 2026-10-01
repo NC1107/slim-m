@@ -23,7 +23,14 @@ async fn store() -> (Store, support::TestDbGuard) {
     (Store::new(pool), guard)
 }
 
-async fn register(s: &Store, user: UserId, device: DeviceId, token: &str, choice: Option<bool>) {
+async fn register_marked(
+    s: &Store,
+    user: UserId,
+    device: DeviceId,
+    token: &str,
+    choice: Option<bool>,
+    chosen: bool,
+) {
     s.register_push(
         user,
         device,
@@ -33,10 +40,15 @@ async fn register(s: &Store, user: UserId, device: DeviceId, token: &str, choice
             voip_push_token: None,
             push_public_key: &[0xAA; 32],
             include_content: choice,
+            include_content_chosen: chosen,
         },
     )
     .await
     .unwrap();
+}
+
+async fn register(s: &Store, user: UserId, device: DeviceId, token: &str, choice: Option<bool>) {
+    register_marked(s, user, device, token, choice, true).await;
 }
 
 async fn sealed_for(s: &Store, user: UserId) -> Vec<bool> {
@@ -125,4 +137,57 @@ async fn one_accounts_choice_never_reaches_another() {
         s.push_preview(bob.id).await.unwrap(),
         Some(DEFAULT_PUSH_PREVIEW)
     );
+}
+
+#[tokio::test]
+async fn an_unmarked_false_on_an_unset_account_is_ignored() {
+    let (s, _guard) = store().await;
+    let alice = s.create_user("alice", "Alice").await.unwrap();
+    let session = s.open_session(alice.id, "old phone").await.unwrap();
+
+    register_marked(&s, alice.id, session.device_id, "t1", Some(false), false).await;
+
+    assert_eq!(
+        s.push_preview(alice.id).await.unwrap(),
+        Some(DEFAULT_PUSH_PREVIEW)
+    );
+    assert_eq!(sealed_for(&s, alice.id).await, vec![DEFAULT_PUSH_PREVIEW]);
+}
+
+#[tokio::test]
+async fn an_unmarked_false_never_overrides_an_explicit_account_value() {
+    let (s, _guard) = store().await;
+    let alice = s.create_user("alice", "Alice").await.unwrap();
+    let session = s.open_session(alice.id, "old phone").await.unwrap();
+    assert!(s.set_push_preview(alice.id, true).await.unwrap());
+
+    register_marked(&s, alice.id, session.device_id, "t1", Some(false), false).await;
+
+    assert_eq!(s.push_preview(alice.id).await.unwrap(), Some(true));
+    assert_eq!(sealed_for(&s, alice.id).await, vec![true]);
+}
+
+#[tokio::test]
+async fn an_unmarked_true_is_always_saved() {
+    let (s, _guard) = store().await;
+    let alice = s.create_user("alice", "Alice").await.unwrap();
+    let session = s.open_session(alice.id, "old phone").await.unwrap();
+    assert!(s.set_push_preview(alice.id, false).await.unwrap());
+
+    register_marked(&s, alice.id, session.device_id, "t1", Some(true), false).await;
+
+    assert_eq!(s.push_preview(alice.id).await.unwrap(), Some(true));
+}
+
+#[tokio::test]
+async fn a_marked_false_is_always_saved() {
+    let (s, _guard) = store().await;
+    let alice = s.create_user("alice", "Alice").await.unwrap();
+    let session = s.open_session(alice.id, "new phone").await.unwrap();
+    assert!(s.set_push_preview(alice.id, true).await.unwrap());
+
+    register_marked(&s, alice.id, session.device_id, "t1", Some(false), true).await;
+
+    assert_eq!(s.push_preview(alice.id).await.unwrap(), Some(false));
+    assert_eq!(sealed_for(&s, alice.id).await, vec![false]);
 }

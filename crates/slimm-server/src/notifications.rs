@@ -110,7 +110,7 @@ pub fn minute_of_day_utc(now_ms: i64) -> u16 {
 /// What an account that never chose gets for push previews. The preview is
 /// sealed to the device's own key, and the OS lock-screen setting still
 /// applies on top; flip this one constant to make previews opt-in again
-/// (`docs/decisions/0053-push-preview-default-on.md`).
+/// (`docs/decisions/0054-push-preview-default-on.md`).
 pub const DEFAULT_PUSH_PREVIEW: bool = true;
 
 #[cfg(test)]

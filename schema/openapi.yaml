@@ -12085,6 +12085,13 @@ components:
             choice applies, else the server default. It never changes whether
             a device is woken. The preview rides inside the sealed box, so the
             relay and APNs and FCM cannot read it.
+        include_content_chosen:
+          type: boolean
+          description: >
+            Marks `include_content` as a deliberate toggle by the member. An
+            unmarked `false` is ignored, because a client that predates this
+            field sends `false` whenever the member never toggled; an unmarked
+            `true` is always saved. A marked value is always saved.
 
     PushPreview:
       type: object

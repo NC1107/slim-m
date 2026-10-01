@@ -36,7 +36,10 @@ extension SlimmApiPush on SlimmApi {
           'push_token': pushToken,
           'voip_push_token': voipPushToken,
           'push_public_key': pushPublicKey,
-          if (includeContent != null) 'include_content': includeContent,
+          if (includeContent != null) ...{
+            'include_content': includeContent,
+            'include_content_chosen': true,
+          },
         },
         expectNoContent: true,
       );

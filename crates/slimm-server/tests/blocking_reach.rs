@@ -199,6 +199,7 @@ async fn a_blocker_is_not_a_push_recipient_for_the_author_they_blocked() {
                     voip_push_token: None,
                     push_public_key: &KEY,
                     include_content: Some(false),
+                    include_content_chosen: true,
                 },
             )
             .await
