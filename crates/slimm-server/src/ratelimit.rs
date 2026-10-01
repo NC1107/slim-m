@@ -53,6 +53,11 @@ struct State {
     counts: HashMap<Class, ClassCounts>,
 }
 
+/// How many whole seconds until a refused caller's bucket holds what it asked
+/// for, never less than one.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct RetryAfter(pub u64);
+
 /// A cloneable handle to the shared limiter.
 #[derive(Clone)]
 pub struct RateLimiter {
@@ -125,9 +130,29 @@ impl RateLimiter {
     /// [`RateLimiter::check_weighted`] with an explicit clock; see
     /// [`RateLimiter::check_at`].
     pub fn check_weighted_at(&self, class: Class, key: &str, cost: f64, now: Instant) -> bool {
+        self.admit_at(class, key, cost, now).is_ok()
+    }
+
+    /// [`RateLimiter::check`] that says how long to wait when it refuses, so
+    /// every 429 can carry a `Retry-After` computed by the same refill
+    /// arithmetic that refused it.
+    pub fn admit(&self, class: Class, key: &str) -> Result<(), RetryAfter> {
+        self.admit_at(class, key, 1.0, Instant::now())
+    }
+
+    /// The one admission decision; [`RateLimiter::check_weighted_at`] and
+    /// [`RateLimiter::admit`] both read it.
+    pub fn admit_at(
+        &self,
+        class: Class,
+        key: &str,
+        cost: f64,
+        now: Instant,
+    ) -> Result<(), RetryAfter> {
         let (burst, refill) = class.budget();
+        let wait_for = |deficit: f64| RetryAfter((deficit / refill).ceil().max(1.0) as u64);
         if cost > burst {
-            return false;
+            return Err(wait_for(burst));
         }
         let mut state = match self.state.lock() {
             Ok(state) => state,
@@ -144,23 +169,23 @@ impl RateLimiter {
         }
 
         let map_key = (class, key.to_owned());
-        let admitted = match state.buckets.get_mut(&map_key) {
+        let outcome = match state.buckets.get_mut(&map_key) {
             Some(bucket) => {
                 let elapsed = now.duration_since(bucket.last).as_secs_f64();
                 bucket.tokens = (bucket.tokens + elapsed * refill).min(burst);
                 bucket.last = now;
                 if bucket.tokens >= cost {
                     bucket.tokens -= cost;
-                    true
+                    Ok(())
                 } else {
-                    false
+                    Err(wait_for(cost - bucket.tokens))
                 }
             }
             None => {
                 // Refuse rather than admit once the map is full, so a flood of
                 // fresh keys cannot both grow memory and bypass the limit.
                 if state.buckets.len() >= MAX_BUCKETS {
-                    false
+                    Err(wait_for(cost))
                 } else {
                     state.buckets.insert(
                         map_key,
@@ -169,17 +194,17 @@ impl RateLimiter {
                             last: now,
                         },
                     );
-                    true
+                    Ok(())
                 }
             }
         };
         let entry = state.counts.entry(class).or_default();
-        if admitted {
+        if outcome.is_ok() {
             entry.admitted += 1;
         } else {
             entry.refused += 1;
         }
-        admitted
+        outcome
     }
 
     /// How many buckets are currently tracked. For tests and diagnostics.
@@ -428,6 +453,25 @@ mod tests {
         assert_eq!(
             large_admitted, 1,
             "the first full-burst frame spends it all"
+        );
+    }
+
+    #[test]
+    fn a_refusal_says_how_long_until_the_next_token() {
+        let limiter = RateLimiter::new();
+        let start = Instant::now();
+        let (burst, refill) = Class::Password.budget();
+        for _ in 0..burst as usize {
+            assert!(limiter.admit_at(Class::Password, "k", 1.0, start).is_ok());
+        }
+        let wait = limiter
+            .admit_at(Class::Password, "k", 1.0, start)
+            .unwrap_err();
+        assert_eq!(wait, RetryAfter((1.0 / refill).ceil().max(1.0) as u64));
+        let later = start + Duration::from_secs(wait.0);
+        assert!(
+            limiter.admit_at(Class::Password, "k", 1.0, later).is_ok(),
+            "waiting the advertised time is enough"
         );
     }
 }

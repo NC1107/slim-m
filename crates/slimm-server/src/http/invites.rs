@@ -163,6 +163,9 @@ async fn create(
     if req.max_uses.is_some_and(|max| max < 1) {
         return Err(ApiError::BadRequest("max_uses must be at least 1"));
     }
+    if req.expires_at.is_some_and(|at| at <= now_ms()) {
+        return Err(ApiError::BadRequest("expires_at must be in the future"));
+    }
 
     let role_grant = match req.role_grant.as_deref() {
         None => None,
@@ -198,9 +201,9 @@ async fn list(
 
 /// Revokes an invite: anybody's for MANAGE_ROLES, your own otherwise.
 ///
-/// Answers NO_CONTENT either way. A revoke that matched nothing is not
-/// distinguished from one that did, because the alternative tells somebody
-/// holding only CREATE_INVITE whether a code they guessed exists.
+/// A code the caller may not see answers 404 exactly as an unknown one does,
+/// so somebody holding only CREATE_INVITE cannot probe for codes. Revoking a
+/// code of theirs that is already revoked is a retry, and answers NO_CONTENT.
 async fn revoke(
     AuthedLimited(ctx): AuthedLimited<WRITE>,
     Path(code): Path<String>,
@@ -211,8 +214,13 @@ async fn revoke(
         return Err(ApiError::Forbidden);
     }
     let scope = (!permissions.contains(Permissions::MANAGE_ROLES)).then_some(ctx.user_id);
-    state.store.revoke_invite(&code, scope).await?;
-    Ok(StatusCode::NO_CONTENT)
+    if state.store.revoke_invite(&code, scope).await? {
+        return Ok(StatusCode::NO_CONTENT);
+    }
+    if state.store.invite_exists(&code, scope).await? {
+        return Ok(StatusCode::NO_CONTENT);
+    }
+    Err(ApiError::NotFound("no such invite"))
 }
 
 /// Checks a code before signup. Unauthenticated by necessity: the person

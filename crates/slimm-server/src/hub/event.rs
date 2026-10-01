@@ -295,7 +295,10 @@ pub enum Event {
     /// prior state to reconcile against, so whoever can view it right now is
     /// exactly who should be told, the same channel-scoped check every
     /// message event already uses. `Arc`-wrapped for the same reason.
-    ChannelCreated(Arc<Channel>),
+    ///
+    /// The `bool` is `restricted`: the same for every reader, so it rides
+    /// the event once and delivery is still decided per subscriber.
+    ChannelCreated(Arc<Channel>, bool),
     /// A channel was renamed, had its topic replaced, or moved in the
     /// deployment's order. Never changes what a channel's permission model
     /// allows, so the ordinary current-state channel-scoped check is exact
@@ -305,7 +308,7 @@ pub enum Event {
     /// `Arc`-wrapped like [`Event::ChannelCreated`]: the two are matched
     /// together everywhere in `http::ws::authorization`, so only one of them
     /// staying a plain `Channel` would reintroduce the deep clone anyway.
-    ChannelUpdated(Arc<Channel>),
+    ChannelUpdated(Arc<Channel>, bool),
     /// A channel was soft-deleted. Carries only the id: there is nothing left
     /// to show once it is gone. Gated specially in `http::ws::authorize`
     /// rather than through the ordinary channel-scoped check, which would

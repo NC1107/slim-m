@@ -93,6 +93,20 @@ fn check_len(value: &str, max: usize, label: &str) -> Result<usize, ApiError> {
     Ok(len)
 }
 
+/// Refuses a heading-like field that carries a hidden character: these are
+/// read as a name or a title, the places a text-direction override spoofs.
+fn check_visible(value: &str, label: &str) -> Result<(), ApiError> {
+    if value
+        .chars()
+        .any(super::super::hidden_chars::is_hidden_char)
+    {
+        return Err(ApiError::BadRequestDetail(format!(
+            "{label} must not contain control or invisible characters"
+        )));
+    }
+    Ok(())
+}
+
 /// Trims `value`, treats blank as absent, and caps it at `max`.
 fn optional_text(
     value: Option<String>,
@@ -108,6 +122,18 @@ fn optional_text(
     }
     let len = check_len(trimmed, max, label)?;
     Ok((Some(trimmed.to_owned()), len))
+}
+
+/// [`optional_text`] for a single-line field.
+fn optional_heading(
+    value: Option<String>,
+    max: usize,
+    label: &str,
+) -> Result<(Option<String>, usize), ApiError> {
+    if let Some(text) = &value {
+        check_visible(text, label)?;
+    }
+    optional_text(value, max, label)
 }
 
 /// Validates and caps a send or delivery's `embeds`. A text cap 400s; an
@@ -127,7 +153,7 @@ pub(crate) fn build_embeds(
     let mut total = 0usize;
     let mut built = Vec::with_capacity(raw.len());
     for embed in raw {
-        let (title, len) = optional_text(embed.title, TITLE_MAX, "an embed title")?;
+        let (title, len) = optional_heading(embed.title, TITLE_MAX, "an embed title")?;
         total += len;
         let (description, len) =
             optional_text(embed.description, DESCRIPTION_MAX, "an embed description")?;
@@ -135,14 +161,14 @@ pub(crate) fn build_embeds(
         let (author_name, author_url) = match embed.author {
             Some(author) => {
                 let (name, len) =
-                    optional_text(Some(author.name), AUTHOR_NAME_MAX, "an embed author name")?;
+                    optional_heading(Some(author.name), AUTHOR_NAME_MAX, "an embed author name")?;
                 total += len;
                 (name, author.url)
             }
             None => (None, None),
         };
         let (footer_text, len) = match embed.footer {
-            Some(footer) => optional_text(Some(footer.text), FOOTER_MAX, "an embed footer")?,
+            Some(footer) => optional_heading(Some(footer.text), FOOTER_MAX, "an embed footer")?,
             None => (None, 0),
         };
         total += len;
@@ -162,6 +188,7 @@ pub(crate) fn build_embeds(
                     "an embed field name must not be empty",
                 ));
             }
+            check_visible(name, "an embed field name")?;
             let value = field.value.trim();
             if value.is_empty() {
                 return Err(ApiError::BadRequest(

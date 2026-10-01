@@ -98,7 +98,7 @@ class _AvatarMarker extends StatelessWidget {
           Stack(
             clipBehavior: Clip.none,
             children: [
-              UserAvatar(
+              AuthorAvatar(
                 name: participant.name,
                 userId: participant.identity,
                 size: _avatarSize,

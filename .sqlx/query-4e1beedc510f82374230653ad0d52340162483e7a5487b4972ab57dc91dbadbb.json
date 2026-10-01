@@ -1,0 +1,26 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT until, reason FROM member_timeouts WHERE user_id = ?",
+  "describe": {
+    "columns": [
+      {
+        "name": "until",
+        "ordinal": 0,
+        "type_info": "Integer"
+      },
+      {
+        "name": "reason",
+        "ordinal": 1,
+        "type_info": "Text"
+      }
+    ],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": [
+      false,
+      true
+    ]
+  },
+  "hash": "4e1beedc510f82374230653ad0d52340162483e7a5487b4972ab57dc91dbadbb"
+}

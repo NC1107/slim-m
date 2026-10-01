@@ -19,11 +19,12 @@ import 'package:slimm_design_system/design_system.dart';
 import 'message_row_harness.dart';
 
 MessageActions _actions({
+  bool canReply = true,
   bool canEdit = false,
   VoidCallback? onReply,
   VoidCallback? onEdit,
 }) => MessageActions(
-  canReply: true,
+  canReply: canReply,
   onReply: onReply ?? noop,
   canEdit: canEdit,
   onEdit: onEdit ?? noop,
@@ -187,6 +188,19 @@ void main() {
     await tester.tap(find.byKey(MessageHoverToolbar.replyKey));
     await tester.tap(find.byKey(MessageHoverToolbar.editKey));
     expect((replied, edited), (1, 1));
+  });
+
+  testWidgets('no reply slot when the message cannot be replied to', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      harness(_row(message(), actions: _actions(canReply: false))),
+    );
+    final mouse = await _mouse(tester);
+    await _hover(tester, mouse, find.byType(MessageRow));
+
+    expect(find.byKey(MessageHoverToolbar.replyKey), findsNothing);
+    expect(find.byKey(MessageHoverToolbar.threadKey), findsOneWidget);
   });
 
   testWidgets('the overflow opens the existing context menu by the button', (

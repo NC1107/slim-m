@@ -40,6 +40,7 @@ mod channel_create;
 mod channel_join_muted;
 mod channel_notification_prefs;
 mod channel_order;
+mod channel_restricted;
 mod channel_slow_mode;
 mod channels;
 mod code_runs;
@@ -190,7 +191,7 @@ pub use thread_listing::ThreadListItem;
 pub use threads::{
     MAX_THREADS_PER_CHANNEL, OpenThreadError, OpenedThread, ThreadParent, ThreadSummary,
 };
-pub use timeouts::{MAX_TIMEOUT_MS, MemberTimeout};
+pub use timeouts::{MAX_TIMEOUT_MS, MemberTimeout, TimeoutError};
 pub use totp::{RECOVERY_CODE_COUNT, TotpEnrolment, TotpError, TotpPolicy, TotpStatus};
 pub use totp_verify::{ChallengeError, TotpChallenge, TotpProof, TotpSignIn};
 pub use user_notes::UserNote;

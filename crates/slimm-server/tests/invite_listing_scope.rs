@@ -197,8 +197,14 @@ async fn create_invite_alone_cannot_revoke_somebody_elses() {
         ))
         .await
         .unwrap();
-    // Deliberately not distinguished from a real revoke; see the route's doc.
-    assert_eq!(attempt.status(), StatusCode::NO_CONTENT);
+    // The same answer an unknown code gets, so the route cannot probe for codes.
+    assert_eq!(attempt.status(), StatusCode::NOT_FOUND);
+    let unknown = app
+        .clone()
+        .oneshot(request("DELETE", "/invites/zzzzzzzz", &member, None))
+        .await
+        .unwrap();
+    assert_eq!(unknown.status(), attempt.status());
     assert!(
         store.invite_is_usable(&admin_code).await.unwrap(),
         "the answer says nothing, but the invite must be untouched"

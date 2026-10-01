@@ -485,3 +485,13 @@ async fn removing_a_source_leaves_its_modules_installed_and_enabled() {
         .await;
     assert_eq!(status, StatusCode::BAD_REQUEST);
 }
+
+#[tokio::test]
+async fn a_source_with_no_registry_is_a_404_not_a_busy_server() {
+    let w = world("slimm-dock-source-missing").await;
+    let source = w.add_source("owner/nothing-here").await;
+    let uri = format!("/space/dock/modules?source={source}");
+    let (status, body) = w.call("GET", &uri, &w.admin, None).await;
+    assert_eq!(status, StatusCode::NOT_FOUND, "{body}");
+    assert_eq!(body["error"], "no add-on registry was found at that source");
+}

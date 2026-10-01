@@ -578,7 +578,8 @@ paths:
       description: >
         The self-hosted account recovery path chosen in place of email. The
         plaintext code is returned once; only its hash is stored, and it
-        expires on its own even if nobody redeems it.
+        expires on its own even if nobody redeems it. Issuing one is written to
+        the moderation audit log as `reset_code_issue`.
       responses:
         "200":
           description: The issued code and its expiry.
@@ -1193,7 +1194,8 @@ paths:
         used to confirm a message exists in a channel the caller cannot read.
         Idempotent by the optional client-supplied `id`: a retry with the same
         id from the same reporter about the same subject returns the report
-        already filed. The same id naming a different reporter or subject is a
+        already filed. You cannot report yourself or your own message; both
+        are 400. The same id naming a different reporter or subject is a
         conflict, as is a second open report about the same subject under any
         id.
       requestBody:
@@ -1321,7 +1323,8 @@ paths:
       summary: Resolve or dismiss a report. Requires MANAGE_MESSAGES.
       description: >
         The close is a conditional update, so two moderators racing the same
-        report cannot both win it; the loser sees it as already gone.
+        report cannot both win it. A report that is already resolved or
+        dismissed answers 409; one that never existed answers 404.
       requestBody:
         required: true
         content:
@@ -1339,6 +1342,8 @@ paths:
           $ref: "#/components/responses/Forbidden"
         "404":
           $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
         "429":
           $ref: "#/components/responses/TooManyRequests"
 
@@ -1442,6 +1447,10 @@ paths:
       operationId: revokeInvite
       tags: [invites]
       summary: Revoke an invite. Requires CREATE_INVITE.
+      description: >
+        An unknown code, and a code the caller may not revoke, both answer 404,
+        so the route cannot be used to probe for codes. Revoking an invite of
+        the caller's own that is already revoked answers 204.
       responses:
         "204":
           description: The invite was revoked.
@@ -1449,6 +1458,8 @@ paths:
           $ref: "#/components/responses/Unauthorized"
         "403":
           $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
         "429":
           $ref: "#/components/responses/TooManyRequests"
 
@@ -1544,7 +1555,8 @@ paths:
         `id`: a retry with the same id returns the channel already stored
         under it. `channels` also holds DM channels and threads under the
         same id namespace, so an id already used by either is a conflict
-        rather than a wrong-typed 200.
+        rather than a wrong-typed 200. The id of a channel that has since been
+        deleted is a conflict too: it is not a retry, and nothing is created.
       requestBody:
         required: true
         content:
@@ -2313,9 +2325,10 @@ paths:
       tags: [roles]
       summary: Grant a role to a member. Requires MANAGE_ROLES.
       description: >
-        Idempotent. Refused if the role carries a permission the caller does
-        not themselves hold, since granting a role is granting whatever it
-        carries. A bot is a role holder like any other, ADMINISTRATOR
+        Idempotent: granting a role the member already holds changes nothing
+        and publishes nothing. Refused if the role carries a permission the
+        caller does not themselves hold, since granting a role is granting
+        whatever it carries. A bot is a role holder like any other, ADMINISTRATOR
         included; see docs/decisions/0028-bot-accounts.md.
       responses:
         "204":
@@ -2333,7 +2346,8 @@ paths:
       tags: [roles]
       summary: Revoke a role from a member. Requires MANAGE_ROLES.
       description: >
-        Idempotent. Refused if it would leave the deployment with no
+        Idempotent: revoking a role the member does not hold changes nothing
+        and publishes nothing. Refused if it would leave the deployment with no
         administrator.
       responses:
         "204":
@@ -2383,7 +2397,10 @@ paths:
                   maxItems: 64
                 reason:
                   type: string
-                  description: Recorded against every member in the batch.
+                  description: >
+                    Recorded against every member in the batch. Control and
+                    invisible characters are refused, as for every reason;
+                    line breaks and tabs are ordinary text.
       responses:
         "204":
           description: Every named member has been removed.
@@ -2410,7 +2427,8 @@ paths:
         `timeoutMember`. The deadline is computed once for the batch, so every
         member in it comes back at the same moment. Replaces any timeout
         already in force on a named member, as the single verb does. Nothing is
-        applied unless every target passes.
+        applied unless every target passes; an id that is not a member answers
+        404 for the whole batch.
       requestBody:
         required: true
         content:
@@ -2444,6 +2462,8 @@ paths:
           $ref: "#/components/responses/Unauthorized"
         "403":
           $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
         "429":
           $ref: "#/components/responses/TooManyRequests"
 
@@ -2531,6 +2551,8 @@ paths:
           $ref: "#/components/responses/Unauthorized"
         "403":
           $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
         "429":
           $ref: "#/components/responses/TooManyRequests"
     delete:
@@ -2565,7 +2587,8 @@ paths:
       tags: [moderation]
       summary: Delete a member's account outright. Requires ADMINISTRATOR.
       description: >
-        Does to somebody else's account exactly what `deleteAccount` does to
+        Written to the moderation audit log as `account_delete`. Does to
+        somebody else's account exactly what `deleteAccount` does to
         your own: purges their personal data, anonymizes what they wrote,
         tombstones the user, revokes every session, and frees the username
         for reuse.
@@ -2580,7 +2603,8 @@ paths:
 
         Refused on yourself - delete your own account with `deleteAccount`,
         so that an administrator can leave without needing another one to do
-        it for them - and on the last administrator.
+        it for them - and on the last administrator. An account that is
+        already deleted, or never existed, answers 404.
       responses:
         "204":
           description: The account is deleted.
@@ -2702,7 +2726,8 @@ paths:
         checks its one - unknown bits, target existence, and the escalation
         math on what the write actually grants - before any of them writes,
         so one entry failing refuses the whole request rather than partially
-        applying it.
+        applying it. An entry that allows and denies the same bit, and a
+        request that names one role or member twice, are refused with 400.
       requestBody:
         required: true
         content:
@@ -4192,7 +4217,10 @@ paths:
       - name: emoji
         in: path
         required: true
-        description: The reaction emoji, URL-encoded.
+        description: >
+          The reaction, URL-encoded: one emoji, the `:shortcode:` of a custom
+          emoji, or a custom emoji's id. Anything else is refused with 400 when
+          adding; removing is not checked, so an old reaction can always go.
         schema:
           type: string
     put:
@@ -6889,7 +6917,9 @@ paths:
         a host-allowlisted client. Nothing is installed by this call. The
         `source` query parameter picks a community source (decision 0046);
         omitted, it reads the official one. An entry with `shadowed: true`
-        cannot be installed from this source.
+        cannot be installed from this source. A source with no registry at
+        that repository answers 404; 503 is kept for an upstream that is
+        really unreachable.
       responses:
         "200":
           description: The marketplace listing.
@@ -6903,6 +6933,8 @@ paths:
           $ref: "#/components/responses/Unauthorized"
         "403":
           $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
         "429":
           $ref: "#/components/responses/TooManyRequests"
         "502":
@@ -6939,6 +6971,8 @@ paths:
           $ref: "#/components/responses/Unauthorized"
         "403":
           $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
         "429":
           $ref: "#/components/responses/TooManyRequests"
         "502":
@@ -6984,6 +7018,8 @@ paths:
           $ref: "#/components/responses/Unauthorized"
         "403":
           $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
         "409":
           $ref: "#/components/responses/Conflict"
         "429":
@@ -7654,7 +7690,17 @@ components:
           schema:
             $ref: "#/components/schemas/Error"
     TooManyRequests:
-      description: The caller is over its rate budget for this traffic class.
+      description: >
+        The caller is over its rate budget for this traffic class. Carries a
+        `Retry-After` header (whole seconds, at least 1) computed from the
+        class's own refill rate: the time until the caller's bucket holds one
+        more token. The same number is in the body's `retry_after_seconds`.
+      headers:
+        Retry-After:
+          description: Seconds to wait before retrying.
+          schema:
+            type: integer
+            minimum: 1
       content:
         application/json:
           schema:
@@ -7707,9 +7753,10 @@ components:
           format: int64
           description: >
             How many seconds remain before the request would succeed. Present
-            only on a slow-mode 429 from `sendMessage` (also echoed as a
-            `Retry-After` header on that same response); absent everywhere
-            else, including every other 429.
+            on a slow-mode 429 from `sendMessage` and on every rate-limiter
+            429 (both also echoed as a `Retry-After` header); absent
+            everywhere else, including the 429 of a two-factor lockout and of
+            the private-message budget.
         missing_permissions:
           type: integer
           format: int64
@@ -9042,6 +9089,10 @@ components:
           type: string
           minLength: 1
           maxLength: 2000
+          description: >
+            Control and invisible characters are refused with 400; line breaks
+            and tabs are ordinary text. The same holds for the reason on a
+            timeout or a removal.
         channel_id:
           type: string
           format: uuid
@@ -9247,7 +9298,21 @@ components:
           format: uuid
         action:
           type: string
-          enum: [remove, restore, timeout, timeout_cleared, messages_deleted]
+          enum:
+            - remove
+            - restore
+            - timeout
+            - timeout_cleared
+            - messages_deleted
+            - bot_create
+            - bot_revoke
+            - bot_permission_grant
+            - webhook_create
+            - webhook_revoke
+            - webhook_rotate
+            - totp_cleared
+            - account_delete
+            - reset_code_issue
         reason:
           type: [string, "null"]
         until:
@@ -9302,7 +9367,9 @@ components:
         expires_at:
           type: [integer, "null"]
           format: int64
-          description: Unix milliseconds; null means it never expires.
+          description: >
+            Unix milliseconds; null means it never expires. Must be in the
+            future: an invite cannot be created already expired.
         role_grant:
           type: [string, "null"]
           format: uuid
@@ -9851,6 +9918,8 @@ components:
             this label is never checked for collision with a real member's
             name and is never mentionable. Never written to the webhook's own
             account name and never returned as a message's own author name.
+            Refused with 400 when it holds a control, text-direction or
+            invisible character, as a display name is.
         embeds:
           description: >-
             Honoured, in the same shape and with the same caps
@@ -10067,10 +10136,11 @@ components:
             True when @everyone lacks VIEW_CHANNEL here, so the channel is
             hidden from ordinary members rather than visible to anyone in
             the deployment. Identical for every caller, unlike
-            `permissions`. Present only on `listChannels`; absent (not
-            `false`) from a server too old to send it or from any other
-            response, which a client must treat as unknown rather than
-            assuming public.
+            `permissions`. Present on `listChannels`, on the `createChannel`
+            and `updateChannel` responses, and on the live `channel.created`
+            and `channel.updated` frames; absent (not `false`) from a server
+            too old to send it or from any other response, which a client
+            must treat as unknown rather than assuming public.
 
     ChannelCategory:
       type: object
@@ -10139,6 +10209,11 @@ components:
           type: string
           minLength: 1
           maxLength: 64
+          description: >
+            Refused with 400 when it holds a control, text-direction or
+            invisible character. The same rule covers channel and category
+            names and topics, and role names, on create and on rename; a name
+            already stored with one is still listed and can be edited.
         kind:
           type: string
           enum: [text, voice]
@@ -10169,8 +10244,8 @@ components:
         join_muted:
           type: boolean
           description: >
-            True creates a channel whose joins start with the mic off. Absent
-            or false leaves the default off.
+            True creates a voice channel whose joins start with the mic off.
+            Absent or false leaves the default off. Refused on a text channel.
 
     UpdateChannelRequest:
       type: object
@@ -10199,7 +10274,8 @@ components:
         join_muted:
           type: boolean
           description: >
-            Sets the join-muted default. Absent leaves it unchanged.
+            Sets the join-muted default. Absent leaves it unchanged. `true` is
+            refused on a text channel.
 
     ReorderChannelsRequest:
       type: object
@@ -10404,7 +10480,8 @@ components:
           type: integer
           format: int64
           default: 0
-          description: Bits to force off.
+          description: >
+            Bits to force off. A bit may not be in both `allow` and `deny`.
 
     BatchOverwriteEntry:
       type: object

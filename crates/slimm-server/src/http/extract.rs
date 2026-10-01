@@ -122,11 +122,7 @@ pub(crate) fn enforce(
     class: Class,
 ) -> Result<(), ApiError> {
     let key = limit_key(parts, ctx, state.limiter.trusted_hops());
-    if state.limiter.check(class, &key) {
-        Ok(())
-    } else {
-        Err(ApiError::TooManyRequests)
-    }
+    state.limiter.admit(class, &key).map_err(ApiError::from)
 }
 
 /// An unauthenticated request that has passed the rate limit for its class.

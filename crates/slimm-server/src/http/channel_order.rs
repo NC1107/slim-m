@@ -99,7 +99,7 @@ async fn reorder(
         }
     };
 
-    finish(&state, outcome)
+    finish(&state, outcome).await
 }
 
 fn parse_groups(categories: &[ReorderGroupRequest]) -> Result<Vec<ChannelOrderGroup>, ApiError> {
@@ -127,7 +127,7 @@ fn parse_groups(categories: &[ReorderGroupRequest]) -> Result<Vec<ChannelOrderGr
 /// Shared by both the flat and grouped paths: publishes a live update for
 /// every channel the store reports moved, and maps a refusal to the 400 it
 /// should read as.
-fn finish(
+async fn finish(
     state: &AppState,
     outcome: Result<ReorderOutcome, ReorderChannelsError>,
 ) -> Result<Json<Vec<ChannelDto>>, ApiError> {
@@ -135,9 +135,10 @@ fn finish(
         Ok(outcome) => {
             for channel in &outcome.channels {
                 if outcome.moved.contains(&channel.id) {
+                    let restricted = state.store.channel_restricted(channel.id).await?;
                     state
                         .hub
-                        .publish(Event::ChannelUpdated(Arc::new(channel.clone())));
+                        .publish(Event::ChannelUpdated(Arc::new(channel.clone()), restricted));
                 }
             }
             Ok(Json(

@@ -115,7 +115,7 @@ impl CapabilitySurface {
             "kv.store" => kv::handle(kv.as_ref(), module_id, kv_calls_remaining, request),
             "message.post" => match poster {
                 Some(poster) => post::handle(poster.as_ref(), posts_remaining, request),
-                None => refusal("capability not available: message.post"),
+                None => refusal("message.post needs a channel"),
             },
             // Approved, but the host implements no such capability; it fails closed.
             other => refusal(&format!("capability not available: {other}")),
@@ -179,11 +179,11 @@ mod tests {
     }
 
     #[test]
-    fn an_approved_but_unimplemented_capability_is_refused_cleanly() {
+    fn an_approved_post_with_no_poster_is_refused_cleanly() {
         // The gate passes (approved) but the host has no such capability.
         let mut surface = enabled(&["message.post"]);
         let out = text(&surface.dispatch(br#"{"capability":"message.post"}"#));
-        assert!(out.contains("not available: message.post"), "{out}");
+        assert!(out.contains("message.post needs a channel"), "{out}");
         assert!(out.contains(r#""ok":false"#), "{out}");
     }
 

@@ -219,13 +219,13 @@ impl Store {
     /// How many live accounts this deployment has. Used to show a
     /// prospective joiner, via an invite's metadata, roughly how big the
     /// community is before they sign up; a deleted or anonymized account
-    /// does not count, and neither does a removed one, any more than either
+    /// does not count, and neither does a webhook's principal or a removed one, any more than either
     /// appears in [`Store::list_members`] or is counted by
     /// [`super::roles::administrator_count`].
     pub async fn member_count(&self) -> anyhow::Result<i64> {
         let count = sqlx::query_scalar!(
             r#"SELECT COUNT(*) AS "count!: i64" FROM users
-               WHERE deleted_at IS NULL
+               WHERE deleted_at IS NULL AND is_webhook = 0
                AND NOT EXISTS (SELECT 1 FROM space_removals sr WHERE sr.user_id = users.id)"#
         )
         .fetch_one(&self.pool)

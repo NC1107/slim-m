@@ -78,8 +78,8 @@ fn extra_bit(event: &Event) -> Option<Permissions> {
         | Event::MessageComponentsChanged { .. }
         | Event::TypingStarted { .. }
         | Event::TypingStopped { .. }
-        | Event::ChannelCreated(_)
-        | Event::ChannelUpdated(_)
+        | Event::ChannelCreated(..)
+        | Event::ChannelUpdated(..)
         | Event::OverwriteChanged { .. }
         // The same VIEW_CHANNEL gate the roster read route itself uses.
         | Event::VoiceActivityChanged { .. }
@@ -303,7 +303,7 @@ pub(super) async fn authorize_unstamped(
             Event::TypingStarted { channel_id, .. } | Event::TypingStopped { channel_id, .. } => {
                 *channel_id
             }
-            Event::ChannelCreated(channel) | Event::ChannelUpdated(channel) => channel.id,
+            Event::ChannelCreated(channel, _) | Event::ChannelUpdated(channel, _) => channel.id,
             Event::OverwriteChanged { channel_id, .. } => *channel_id,
             Event::VoiceActivityChanged { channel_id } => *channel_id,
             Event::VoiceParticipantJoined { channel_id, .. } => *channel_id,
@@ -585,11 +585,11 @@ pub(super) async fn authorize_unstamped(
             user_id: user_id.to_string(),
         },
         // Cloned only here, past every filter above; see `MessageCreated`'s own note.
-        Event::ChannelCreated(channel) => ServerFrame::ChannelCreated {
-            channel: ChannelDto::from((*channel).clone()),
+        Event::ChannelCreated(channel, restricted) => ServerFrame::ChannelCreated {
+            channel: ChannelDto::with_restricted((*channel).clone(), restricted),
         },
-        Event::ChannelUpdated(channel) => ServerFrame::ChannelUpdated {
-            channel: ChannelDto::from((*channel).clone()),
+        Event::ChannelUpdated(channel, restricted) => ServerFrame::ChannelUpdated {
+            channel: ChannelDto::with_restricted((*channel).clone(), restricted),
         },
         Event::OverwriteChanged { channel_id, .. } => ServerFrame::OverwriteChanged {
             channel_id: channel_id.to_string(),

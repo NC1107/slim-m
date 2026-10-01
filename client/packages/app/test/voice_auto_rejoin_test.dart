@@ -17,6 +17,7 @@ import 'dart:async';
 
 import 'package:fake_async/fake_async.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:slimm_app/src/providers/voice_auto_rejoin.dart';
 import 'package:slimm_rtc/rtc.dart';
 
 import 'voice_controller_harness.dart';
@@ -370,6 +371,24 @@ void main() {
       );
       expect(controller.state.channelId, isNull);
       expect(controller.state.rejoining, isFalse);
+    });
+  });
+
+  test('reset restores the full budget', () {
+    fakeAsync((async) {
+      final rejoin = VoiceAutoRejoin(
+        delays: const [Duration(seconds: 1), Duration(seconds: 2)],
+      );
+      expect(rejoin.schedule(() {}), isTrue);
+      expect(rejoin.schedule(() {}), isTrue);
+      expect(rejoin.schedule(() {}), isFalse, reason: 'budget is spent');
+
+      rejoin.reset();
+
+      expect(rejoin.schedule(() {}), isTrue);
+      expect(rejoin.schedule(() {}), isTrue);
+      expect(rejoin.schedule(() {}), isFalse);
+      rejoin.reset();
     });
   });
 }

@@ -87,6 +87,11 @@ async fn click(
     if !bot_can_hear {
         return Err(GONE);
     }
+    if !state.store.bot_has_live_token(bot_id).await? {
+        return Err(ApiError::NotFound(
+            "that bot has been removed, so its buttons no longer work",
+        ));
+    }
     let rows = state.store.components_for_message(message_id).await?;
     if components::clickable(&rows, &req.custom_id).is_none() {
         return Err(GONE);

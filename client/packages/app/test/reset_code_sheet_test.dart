@@ -123,6 +123,20 @@ void main() {
     expect(find.text(_code), findsNothing);
   });
 
+  testWidgets('the title clears the card edge by the same margin as its '
+      'sides', (tester) async {
+    await _open(tester);
+
+    final card = tester.getRect(
+      find
+          .descendant(of: find.byType(Dialog), matching: find.byType(Material))
+          .first,
+    );
+    final title = tester.getRect(find.text('Password reset code for Ada'));
+    expect(title.top - card.top, greaterThanOrEqualTo(AppSpacing.s16));
+    expect(title.top - card.top, title.left - card.left);
+  });
+
   testWidgets('generating shows the code and names who it is for', (
     tester,
   ) async {

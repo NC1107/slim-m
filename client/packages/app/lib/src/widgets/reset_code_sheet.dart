@@ -124,7 +124,7 @@ class _ResetCodeSheetState extends ConsumerState<_ResetCodeSheet>
     return Padding(
       padding: EdgeInsets.fromLTRB(
         AppSpacing.s16,
-        0,
+        AppSpacing.s16,
         AppSpacing.s16,
         MediaQuery.viewInsetsOf(context).bottom + AppSpacing.s16,
       ),

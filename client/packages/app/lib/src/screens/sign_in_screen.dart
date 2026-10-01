@@ -22,11 +22,13 @@ import '../widgets/onboarding_shell.dart';
 import '../widgets/server_identity_confirmation.dart';
 import '../widgets/server_notice.dart';
 import '../providers/toasts.dart';
+import '../providers/whats_new_controller.dart';
 import 'reset_password_sheet.dart';
 import 'sign_in_alternatives.dart';
 import 'sign_in_credential_fields.dart';
 import '../widgets/totp_sign_in_prompt.dart';
 import 'sign_in_error.dart';
+import 'sign_in_invite_notice.dart';
 
 /// Sign in or create an account on a chosen server.
 ///
@@ -293,6 +295,13 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
       return;
     }
 
+    if (_creatingAccount && !_targetsOfficial()) {
+      if (displayNameError(_displayName.text) case final tooLong?) {
+        setState(() => _error = (SignInErrorField.displayName, tooLong));
+        return;
+      }
+    }
+
     setState(() {
       _busy = true;
       _error = null;
@@ -324,6 +333,8 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
     final invite = ref.read(pendingInviteProvider);
     try {
       if (_creatingAccount) {
+        // Before the call: its session change is what starts the what's-new check.
+        ref.read(justRegisteredProvider.notifier).state = true;
         await api.register(
           username: _username.text.trim(),
           displayName: _displayName.text.trim().isEmpty
@@ -364,6 +375,7 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
       }
       unawaited(ref.read(pushControllerProvider.notifier).register());
     } on ApiException catch (e) {
+      ref.read(justRegisteredProvider.notifier).state = false;
       if (!mounted) return;
       setState(() => _error = signInErrorFor(e));
     } finally {
@@ -426,17 +438,8 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
           // First of the three: the other two are about convenience,
           // this one is about whether you have any recourse here.
           if (_probed case final version?) ServerSafetyNotice(version: version),
-          // Only while creating an account: it is not a fact a
-          // returning member has any use for.
           if (_creatingAccount && _probed?.inviteRequired == true)
-            const ServerNotice(
-              icon: AppIcons.invite,
-              message:
-                  'This Space is invite only. Ask a member for a '
-                  'code, then use "Use a different Space" below '
-                  'to redeem it. An admin can open joining to '
-                  'anyone in Settings, under Space.',
-            ),
+            const InviteRequiredNotice(),
           if (_probed?.pushEnabled == false)
             const ServerNotice(
               icon: AppIcons.notificationsOff,

@@ -42,8 +42,12 @@ http.Client _quietProbe() => MockClient((request) async {
   return http.Response('{}', 200);
 });
 
-Future<void> _pumpSignIn(WidgetTester tester) async {
-  final client = _quietProbe();
+Future<List<String>> _pumpSignIn(WidgetTester tester) async {
+  final requested = <String>[];
+  final client = MockClient((request) async {
+    requested.add(request.url.path);
+    return _quietProbe().send(request).then(http.Response.fromStream);
+  });
   final container = ProviderContainer(
     overrides: [
       keyStoreProvider.overrideWithValue(InMemoryKeyStore()),
@@ -80,7 +84,11 @@ Future<void> _pumpSignIn(WidgetTester tester) async {
     ),
   );
   await tester.pumpAndSettle();
+  return requested;
 }
+
+Finder _input(String label) =>
+    find.byWidgetPredicate((w) => w is AppInput && w.semanticLabel == label);
 
 void main() {
   Future<void> toCreateAccount(WidgetTester tester) async {
@@ -157,6 +165,71 @@ void main() {
       expect(find.text(usernameRule), findsNothing);
       expect(find.text(passwordRule), findsNothing);
     });
+  });
+
+  group('the Trouble signing in link', () {
+    testWidgets('shows while signing in', (tester) async {
+      await _pumpSignIn(tester);
+
+      expect(find.text('Trouble signing in?'), findsOneWidget);
+    });
+
+    testWidgets('is absent on the create-account form', (tester) async {
+      await _pumpSignIn(tester);
+      await toCreateAccount(tester);
+
+      expect(find.text('Trouble signing in?'), findsNothing);
+    });
+  });
+
+  group('an over-long display name', () {
+    final tooLong = 'd' * (displayNameMaxLength + 1);
+
+    Future<List<String>> submitWith(WidgetTester tester, String name) async {
+      final requested = await _pumpSignIn(tester);
+      await toCreateAccount(tester);
+      await tester.enterText(_input('Username'), 'dana');
+      await tester.enterText(_input('Display name'), name);
+      await tester.enterText(_input('Password'), 'long enough pw');
+      await tester.tap(find.text('Create account').last);
+      await tester.pumpAndSettle();
+      return requested;
+    }
+
+    testWidgets('is refused beside its own field before anything is sent', (
+      tester,
+    ) async {
+      final requested = await submitWith(tester, tooLong);
+
+      expect(requested, isNot(contains('/auth/register')));
+      final error = find.text('Display name must be 64 characters or fewer.');
+      expect(error, findsOneWidget);
+      final fieldTop = tester.getTopLeft(_input('Display name')).dy;
+      final passwordTop = tester.getTopLeft(_input('Password')).dy;
+      final errorTop = tester.getTopLeft(error).dy;
+      expect(errorTop, greaterThan(fieldTop));
+      expect(errorTop, lessThan(passwordTop));
+      expect(
+        tester.widget<AppInput>(_input('Display name')).controller!.text,
+        tooLong,
+        reason: 'the typed value is kept',
+      );
+    });
+
+    test('exactly at the limit, counted in characters, is accepted', () {
+      expect(displayNameError('d' * displayNameMaxLength), isNull);
+      expect(displayNameError('\u{1F600}' * displayNameMaxLength), isNull);
+      expect(displayNameError('  ${'d' * displayNameMaxLength}  '), isNull);
+      expect(displayNameError(tooLong), isNotNull);
+    });
+  });
+
+  test('a server display_name rejection lands on the field in plain words', () {
+    final (field, message) = signInErrorFor(
+      const BadRequestException('display_name must be 1 to 64 characters'),
+    );
+    expect(field, SignInErrorField.displayName);
+    expect(message, 'Display name must be 1 to 64 characters.');
   });
 
   test(

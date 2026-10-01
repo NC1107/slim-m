@@ -287,12 +287,9 @@ pub(crate) async fn execute_code_runner(
         return Err(ApiError::Forbidden);
     }
     // An authenticated key, mirroring `extract::limit_key`'s own branch for one.
-    if !state
+    state
         .limiter
-        .check(Class::CodeRunner, &format!("u:{user_id}"))
-    {
-        return Err(ApiError::TooManyRequests);
-    }
+        .admit(Class::CodeRunner, &format!("u:{user_id}"))?;
 
     let outcome = state.code_runner.run(language, code).await;
     Ok(CommandOutcome {

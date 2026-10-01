@@ -37,6 +37,7 @@ use super::error::ApiError;
 use super::escalation::escalation_guard;
 use super::extract::require_manage_roles;
 use super::extract::{AUTHED_READ, Authed, AuthedLimited, Json, enforce};
+use super::hidden_chars::is_hidden_char;
 use super::messages::parse_uuid;
 use crate::hub::Event;
 use crate::ids::{RoleId, UserId};
@@ -296,10 +297,11 @@ async fn assign(
         .ok_or(ApiError::NotFound("role not found"))?;
     escalation_guard(caller_granted(&state, ctx.user_id).await?, role.permissions)?;
 
-    state.store.assign_role(user_id, role_id).await?;
-    state
-        .hub
-        .publish(Event::MemberRoleChanged { user_id, role_id });
+    if state.store.assign_role(user_id, role_id).await? {
+        state
+            .hub
+            .publish(Event::MemberRoleChanged { user_id, role_id });
+    }
     Ok(StatusCode::NO_CONTENT)
 }
 
@@ -326,10 +328,12 @@ async fn unassign(
     }
 
     match state.store.unassign_role(user_id, role_id).await {
-        Ok(()) => {
-            state
-                .hub
-                .publish(Event::MemberRoleChanged { user_id, role_id });
+        Ok(removed) => {
+            if removed {
+                state
+                    .hub
+                    .publish(Event::MemberRoleChanged { user_id, role_id });
+            }
             Ok(StatusCode::NO_CONTENT)
         }
         Err(guard_err) => Err(role_guard_error(guard_err)),
@@ -399,9 +403,9 @@ fn validate_role_name(name: &str) -> Result<&str, ApiError> {
     if trimmed.is_empty() || trimmed.chars().count() > 64 {
         return Err(ApiError::BadRequest("name must be 1 to 64 characters"));
     }
-    if trimmed.chars().any(|c| c.is_control()) {
+    if trimmed.chars().any(is_hidden_char) {
         return Err(ApiError::BadRequest(
-            "name must not contain control characters",
+            "name must not contain control or invisible characters",
         ));
     }
     Ok(trimmed)

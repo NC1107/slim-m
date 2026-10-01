@@ -261,7 +261,6 @@ void main() {
     ) async {
       await _pumpSignIn(
         tester,
-        pendingInvite: true,
         versionBody: const {
           'name': 'slim-m',
           'version': '0.17.0',
@@ -270,7 +269,9 @@ void main() {
           'capabilities': ['report', 'block'],
         },
       );
-      expect(find.textContaining('invite only'), findsOneWidget);
+      await tester.tap(find.text('Create an account instead'));
+      await tester.pumpAndSettle();
+      expect(find.textContaining('invite code'), findsOneWidget);
       await _finish(tester, 'invite-required-notice-desktop');
     });
 

@@ -35,7 +35,9 @@ use crate::hub::Event;
 use crate::ids::{ChannelId, UserId};
 use crate::permissions::Permissions;
 use crate::ratelimit::Class;
-use crate::store::{DeleteAccountError, MAX_TIMEOUT_MS, RemoveMemberError, SpaceRemoval, now_ms};
+use crate::store::{
+    DeleteAccountError, MAX_TIMEOUT_MS, RemoveMemberError, SpaceRemoval, TimeoutError, now_ms,
+};
 use crate::voice::VoiceError;
 
 const BODY_LIMIT: usize = 4 * 1024;
@@ -106,6 +108,15 @@ impl From<SpaceRemoval> for RemovalDto {
     }
 }
 
+impl From<TimeoutError> for ApiError {
+    fn from(err: TimeoutError) -> Self {
+        match err {
+            TimeoutError::UserNotFound => ApiError::NotFound("no such member"),
+            TimeoutError::Internal(err) => err.into(),
+        }
+    }
+}
+
 // --- Handlers ---
 
 /// Times a member out for `duration_seconds`, replacing any timeout already
@@ -140,15 +151,17 @@ async fn apply_timeout(
     let until = now_ms() + duration_ms;
 
     let reason = validate_reason(req.reason.as_deref(), false)?;
-    state
+    let changed = state
         .store
         .set_member_timeout(target, until, reason.as_deref(), ctx.user_id)
         .await?;
-    state.hub.publish(Event::MemberTimeoutChanged {
-        user_id: target,
-        until: Some(until),
-    });
-    evict_from_voice(&state, target).await;
+    if changed {
+        state.hub.publish(Event::MemberTimeoutChanged {
+            user_id: target,
+            until: Some(until),
+        });
+        evict_from_voice(&state, target).await;
+    }
 
     Ok(Json(TimeoutDto {
         user_id: target.to_string(),
@@ -169,14 +182,16 @@ async fn lift_timeout(
     let target = UserId(parse_uuid(&user_id)?);
     authorize(&state, ctx.user_id, target, Permissions::KICK_MEMBERS).await?;
 
-    state
+    if state
         .store
         .clear_member_timeout(target, ctx.user_id)
-        .await?;
-    state.hub.publish(Event::MemberTimeoutChanged {
-        user_id: target,
-        until: None,
-    });
+        .await?
+    {
+        state.hub.publish(Event::MemberTimeoutChanged {
+            user_id: target,
+            until: None,
+        });
+    }
     Ok(StatusCode::NO_CONTENT)
 }
 
@@ -274,13 +289,18 @@ async fn delete_member_account(
         ));
     }
 
-    let revoked = match state.store.delete_account(target).await {
+    let revoked = match state
+        .store
+        .delete_account_by_admin(target, ctx.user_id)
+        .await
+    {
         Ok(revoked) => revoked,
         Err(DeleteAccountError::WouldStrandDeployment) => {
             return Err(ApiError::Conflict(
                 "that is the only administrator; appoint another before deleting it",
             ));
         }
+        Err(DeleteAccountError::UserNotFound) => return Err(ApiError::NotFound("no such member")),
         Err(DeleteAccountError::Internal(e)) => return Err(e.into()),
     };
     for session_id in revoked {

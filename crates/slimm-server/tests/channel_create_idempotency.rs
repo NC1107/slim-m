@@ -168,7 +168,7 @@ async fn create_channel_retry_returns_the_same_row_and_publishes_once() {
         "no duplicate row"
     );
 
-    let created = count_matching(&mut events, |e| matches!(e, Event::ChannelCreated(_)));
+    let created = count_matching(&mut events, |e| matches!(e, Event::ChannelCreated(..)));
     assert_eq!(created, 1, "the retry must not fan out a second event");
 }
 

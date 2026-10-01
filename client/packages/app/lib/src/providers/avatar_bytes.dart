@@ -16,9 +16,8 @@ import 'package:slimm_api/api.dart';
 import 'cache_for.dart';
 import 'providers.dart';
 
-/// [updatedAt] is null when the caller does not know whether an avatar
-/// exists at all (a server older than the field). The fetch is still
-/// attempted; there is just no cache-busting key of its own to key it by.
+/// [updatedAt] is the profile's `avatar_updated_at`; callers do not ask for a
+/// user whose is null.
 typedef AvatarKey = ({String userId, int? updatedAt});
 
 /// Null both while there is genuinely no avatar (a 404) and, transiently,
