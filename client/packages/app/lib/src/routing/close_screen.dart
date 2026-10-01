@@ -42,13 +42,19 @@ class BackToButton extends StatelessWidget {
   final String fallback;
 
   @override
-  Widget build(BuildContext context) => Padding(
-    padding: const EdgeInsets.symmetric(horizontal: AppSpacing.s8),
-    child: AppIconButton(
+  Widget build(BuildContext context) {
+    final button = AppIconButton(
       icon: AppIcons.back,
       semanticLabel: tooltip,
       tooltip: tooltip,
       onPressed: () => closeScreen(context, fallback),
-    ),
-  );
+    );
+    // The 56pt leading slot cannot hold a 44pt button plus the 8pt gutter, which squeezed it to 40.
+    return AppTouchTargets.of(context)
+        ? Center(child: button)
+        : Padding(
+            padding: const EdgeInsets.symmetric(horizontal: AppSpacing.s8),
+            child: button,
+          );
+  }
 }

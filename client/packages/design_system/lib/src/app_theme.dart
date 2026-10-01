@@ -211,11 +211,11 @@ ThemeData buildTheme(Brightness brightness, AppTokens tokens) {
       ),
       border: OutlineInputBorder(
         borderRadius: BorderRadius.circular(AppRadii.control),
-        borderSide: BorderSide(color: tokens.borderSubtle),
+        borderSide: BorderSide(color: tokens.borderStrong),
       ),
       enabledBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(AppRadii.control),
-        borderSide: BorderSide(color: tokens.borderSubtle),
+        borderSide: BorderSide(color: tokens.borderStrong),
       ),
       focusedBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(AppRadii.control),

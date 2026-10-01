@@ -59,13 +59,15 @@ String? _focusedTapTargetLabel() => FocusManager.instance.primaryFocus?.context
     ?.findAncestorWidgetOfExactType<AuthorProfileTapTarget>()
     ?.semanticLabel;
 
-/// Tabs forward until focus lands inside the [AuthorProfileTapTarget] whose
-/// label matches [label], so neither test depends on how many other focusable
-/// things (the row's own context-menu stop, say) happen to sit ahead of it.
+/// Tabs onto the row, then steps right through its controls until focus lands
+/// inside the [AuthorProfileTapTarget] whose label matches [label]. The row is
+/// one tab stop; its avatar and name ride the arrow keys.
 Future<bool> _tabTo(WidgetTester tester, String label) async {
+  await tester.sendKeyEvent(LogicalKeyboardKey.tab);
+  await tester.pumpAndSettle();
   for (var step = 0; step < 8; step++) {
     if (_focusedTapTargetLabel() == label) return true;
-    await tester.sendKeyEvent(LogicalKeyboardKey.tab);
+    await tester.sendKeyEvent(LogicalKeyboardKey.arrowRight);
     await tester.pumpAndSettle();
   }
   return _focusedTapTargetLabel() == label;
@@ -76,6 +78,11 @@ Future<bool> _tabToAvatar(WidgetTester tester) =>
 
 Future<bool> _tabToName(WidgetTester tester) =>
     _tabTo(tester, 'Priya, view profile');
+
+/// The target's own [Semantics], below the hit-area padding that wraps it and
+/// owns no node of its own.
+Finder _ownSemantics(Finder target) =>
+    find.descendant(of: target, matching: find.byType(Semantics)).first;
 
 void main() {
   testWidgets('tapping the avatar opens the author\'s profile popover', (
@@ -152,7 +159,7 @@ void main() {
           FocusHighlightStrategy.automatic;
     });
 
-    testWidgets('Tab reaches the avatar and Enter opens the popover', (
+    testWidgets('the arrow keys reach the avatar and Enter opens the popover', (
       tester,
     ) async {
       await tester.pumpWidget(harness(_row(), overrides: _resolvedProfile()));
@@ -203,10 +210,10 @@ void main() {
         final dump = owner.semanticsOwner!.rootSemanticsNode!.toStringDeep();
 
         final avatarNode = tester.getSemantics(
-          find.byType(AuthorProfileTapTarget).at(0),
+          _ownSemantics(find.byType(AuthorProfileTapTarget).at(0)),
         );
         final nameNode = tester.getSemantics(
-          find.byType(AuthorProfileTapTarget).at(1),
+          _ownSemantics(find.byType(AuthorProfileTapTarget).at(1)),
         );
 
         expect(

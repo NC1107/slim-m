@@ -19,4 +19,5 @@ export 'src/components/forms.dart';
 export 'src/components/surfaces.dart';
 export 'src/high_contrast.dart';
 export 'src/text_context_menu.dart';
+export 'src/touch_hit_area.dart';
 export 'src/touch_targets.dart';

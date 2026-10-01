@@ -247,6 +247,7 @@ class MessageRowLeading extends ConsumerWidget {
       authorId: message.authorId,
       semanticLabel: 'View profile',
       decorativeWhenUnresolved: true,
+      fingerTarget: true,
       child: UserAvatar(
         userId: message.authorId,
         name: authorLabelResolved(
