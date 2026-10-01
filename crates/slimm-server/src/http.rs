@@ -92,6 +92,7 @@ mod polls;
 mod presence;
 mod push;
 mod quiet_hours;
+mod reaction_emoji;
 mod reactions;
 mod read_sync;
 mod recovery;

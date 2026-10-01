@@ -68,9 +68,17 @@ fn validate_live_set(live: &[(RoleId, i64)], ordered: &[RoleId]) -> Result<(), R
     let live_set: HashSet<RoleId> = live.iter().map(|(id, _)| *id).collect();
     let given_set: HashSet<RoleId> = ordered.iter().copied().collect();
     if given_set.len() != ordered.len() || live_set != given_set {
+        let mut seen = HashSet::new();
+        let mut extra = Vec::new();
+        for id in ordered {
+            let repeated = !seen.insert(*id);
+            if (repeated || !live_set.contains(id)) && !extra.contains(id) {
+                extra.push(*id);
+            }
+        }
         return Err(ReorderRolesError::Mismatch {
             missing: live_set.difference(&given_set).copied().collect(),
-            extra: given_set.difference(&live_set).copied().collect(),
+            extra,
         });
     }
     Ok(())

@@ -45,6 +45,20 @@ pub(crate) const TIMEOUT_DENY: Permissions = Permissions::SEND_MESSAGES
     .union(Permissions::CONNECT)
     .union(Permissions::SPEAK);
 
+/// Why a timeout was refused.
+#[derive(Debug)]
+pub enum TimeoutError {
+    /// The account does not exist, or has been deleted.
+    UserNotFound,
+    Internal(anyhow::Error),
+}
+
+impl From<sqlx::Error> for TimeoutError {
+    fn from(err: sqlx::Error) -> Self {
+        TimeoutError::Internal(err.into())
+    }
+}
+
 /// A timeout in force, as a moderator sees it.
 #[derive(Debug, Clone)]
 pub struct MemberTimeout {
@@ -71,7 +85,7 @@ impl Store {
         until: i64,
         reason: Option<&str>,
         issued_by: UserId,
-    ) -> anyhow::Result<()> {
+    ) -> Result<(), TimeoutError> {
         let now = now_ms();
         let mut tx = self.begin_write().await?;
         timeout_one(&mut tx, user_id, until, reason, issued_by, now).await?;
@@ -214,7 +228,16 @@ pub(super) async fn timeout_one(
     reason: Option<&str>,
     issued_by: UserId,
     now: i64,
-) -> Result<(), sqlx::Error> {
+) -> Result<(), TimeoutError> {
+    let exists = sqlx::query_scalar!(
+        r#"SELECT 1 AS "one!: i64" FROM users WHERE id = ? AND deleted_at IS NULL"#,
+        user_id
+    )
+    .fetch_optional(&mut *tx)
+    .await?;
+    if exists.is_none() {
+        return Err(TimeoutError::UserNotFound);
+    }
     sqlx::query!(
         "INSERT INTO member_timeouts (user_id, until, reason, issued_by, issued_at)
          VALUES (?, ?, ?, ?, ?)
@@ -243,5 +266,6 @@ pub(super) async fn timeout_one(
             created_at: now,
         },
     )
-    .await
+    .await?;
+    Ok(())
 }

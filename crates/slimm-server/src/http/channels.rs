@@ -248,6 +248,9 @@ async fn create(
     if !matches!(kind, "text" | "voice") {
         return Err(ApiError::BadRequest("kind must be text or voice"));
     }
+    if req.join_muted == Some(true) && kind != "voice" {
+        return Err(ApiError::BadRequest(JOIN_MUTED_VOICE_ONLY));
+    }
     let id = req
         .id
         .as_deref()
@@ -324,6 +327,16 @@ async fn update(
     if name.is_none() && topic.is_none() && slow_mode_seconds.is_none() && req.join_muted.is_none()
     {
         return Err(ApiError::BadRequest("nothing to update"));
+    }
+    if req.join_muted == Some(true) {
+        let current = state
+            .store
+            .channel(channel_id)
+            .await?
+            .ok_or(ApiError::NotFound("channel not found"))?;
+        if current.kind != "voice" {
+            return Err(ApiError::BadRequest(JOIN_MUTED_VOICE_ONLY));
+        }
     }
 
     let mut channel = if name.is_some() || topic.is_some() {
@@ -469,6 +482,8 @@ fn validate_channel_topic(topic: &str) -> Result<Option<String>, ApiError> {
         Some(trimmed.to_owned())
     })
 }
+
+const JOIN_MUTED_VOICE_ONLY: &str = "join_muted only applies to a voice channel";
 
 fn validate_channel_name(name: &str) -> Result<&str, ApiError> {
     let trimmed = name.trim();

@@ -1442,6 +1442,10 @@ paths:
       operationId: revokeInvite
       tags: [invites]
       summary: Revoke an invite. Requires CREATE_INVITE.
+      description: >
+        An unknown code, and a code the caller may not revoke, both answer 404,
+        so the route cannot be used to probe for codes. Revoking an invite of
+        the caller's own that is already revoked answers 204.
       responses:
         "204":
           description: The invite was revoked.
@@ -1449,6 +1453,8 @@ paths:
           $ref: "#/components/responses/Unauthorized"
         "403":
           $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
         "429":
           $ref: "#/components/responses/TooManyRequests"
 
@@ -1544,7 +1550,8 @@ paths:
         `id`: a retry with the same id returns the channel already stored
         under it. `channels` also holds DM channels and threads under the
         same id namespace, so an id already used by either is a conflict
-        rather than a wrong-typed 200.
+        rather than a wrong-typed 200. The id of a channel that has since been
+        deleted is a conflict too: it is not a retry, and nothing is created.
       requestBody:
         required: true
         content:
@@ -2410,7 +2417,8 @@ paths:
         `timeoutMember`. The deadline is computed once for the batch, so every
         member in it comes back at the same moment. Replaces any timeout
         already in force on a named member, as the single verb does. Nothing is
-        applied unless every target passes.
+        applied unless every target passes; an id that is not a member answers
+        404 for the whole batch.
       requestBody:
         required: true
         content:
@@ -2444,6 +2452,8 @@ paths:
           $ref: "#/components/responses/Unauthorized"
         "403":
           $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
         "429":
           $ref: "#/components/responses/TooManyRequests"
 
@@ -2531,6 +2541,8 @@ paths:
           $ref: "#/components/responses/Unauthorized"
         "403":
           $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
         "429":
           $ref: "#/components/responses/TooManyRequests"
     delete:
@@ -2580,7 +2592,8 @@ paths:
 
         Refused on yourself - delete your own account with `deleteAccount`,
         so that an administrator can leave without needing another one to do
-        it for them - and on the last administrator.
+        it for them - and on the last administrator. An account that is
+        already deleted, or never existed, answers 404.
       responses:
         "204":
           description: The account is deleted.
@@ -2702,7 +2715,8 @@ paths:
         checks its one - unknown bits, target existence, and the escalation
         math on what the write actually grants - before any of them writes,
         so one entry failing refuses the whole request rather than partially
-        applying it.
+        applying it. An entry that allows and denies the same bit, and a
+        request that names one role or member twice, are refused with 400.
       requestBody:
         required: true
         content:
@@ -4192,7 +4206,10 @@ paths:
       - name: emoji
         in: path
         required: true
-        description: The reaction emoji, URL-encoded.
+        description: >
+          The reaction, URL-encoded: one emoji, the `:shortcode:` of a custom
+          emoji, or a custom emoji's id. Anything else is refused with 400 when
+          adding; removing is not checked, so an old reaction can always go.
         schema:
           type: string
     put:
@@ -6889,7 +6906,9 @@ paths:
         a host-allowlisted client. Nothing is installed by this call. The
         `source` query parameter picks a community source (decision 0046);
         omitted, it reads the official one. An entry with `shadowed: true`
-        cannot be installed from this source.
+        cannot be installed from this source. A source with no registry at
+        that repository answers 404; 503 is kept for an upstream that is
+        really unreachable.
       responses:
         "200":
           description: The marketplace listing.
@@ -6903,6 +6922,8 @@ paths:
           $ref: "#/components/responses/Unauthorized"
         "403":
           $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
         "429":
           $ref: "#/components/responses/TooManyRequests"
         "502":
@@ -6939,6 +6960,8 @@ paths:
           $ref: "#/components/responses/Unauthorized"
         "403":
           $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
         "429":
           $ref: "#/components/responses/TooManyRequests"
         "502":
@@ -6984,6 +7007,8 @@ paths:
           $ref: "#/components/responses/Unauthorized"
         "403":
           $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
         "409":
           $ref: "#/components/responses/Conflict"
         "429":
@@ -9302,7 +9327,9 @@ components:
         expires_at:
           type: [integer, "null"]
           format: int64
-          description: Unix milliseconds; null means it never expires.
+          description: >
+            Unix milliseconds; null means it never expires. Must be in the
+            future: an invite cannot be created already expired.
         role_grant:
           type: [string, "null"]
           format: uuid
@@ -10169,8 +10196,8 @@ components:
         join_muted:
           type: boolean
           description: >
-            True creates a channel whose joins start with the mic off. Absent
-            or false leaves the default off.
+            True creates a voice channel whose joins start with the mic off.
+            Absent or false leaves the default off. Refused on a text channel.
 
     UpdateChannelRequest:
       type: object
@@ -10199,7 +10226,8 @@ components:
         join_muted:
           type: boolean
           description: >
-            Sets the join-muted default. Absent leaves it unchanged.
+            Sets the join-muted default. Absent leaves it unchanged. `true` is
+            refused on a text channel.
 
     ReorderChannelsRequest:
       type: object
@@ -10404,7 +10432,8 @@ components:
           type: integer
           format: int64
           default: 0
-          description: Bits to force off.
+          description: >
+            Bits to force off. A bit may not be in both `allow` and `deny`.
 
     BatchOverwriteEntry:
       type: object

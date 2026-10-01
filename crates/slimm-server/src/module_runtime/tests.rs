@@ -200,7 +200,7 @@ async fn an_enabled_host_call_instantiates_and_an_unimplemented_capability_is_re
 
     let text = String::from_utf8(output).expect("the response is UTF-8 JSON");
     assert!(text.contains(r#""ok":false"#), "{text}");
-    assert!(text.contains("not available: message.post"), "{text}");
+    assert!(text.contains("message.post needs a channel"), "{text}");
 }
 
 /// The `kv.store` capability, end to end through the real wasm `host_call`: a

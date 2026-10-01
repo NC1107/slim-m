@@ -341,6 +341,7 @@ async fn delete_account(
                 "you are the only administrator; appoint another before deleting your account",
             ));
         }
+        Err(DeleteAccountError::UserNotFound) => return Err(ApiError::NotFound("no such account")),
         Err(DeleteAccountError::Internal(e)) => return Err(e.into()),
     };
     for session_id in revoked {

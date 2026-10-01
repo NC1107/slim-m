@@ -173,7 +173,7 @@ async fn a_live_reaction_from_a_blocked_user_is_absent_for_the_blocker_alone() {
     let mut alice_ws = connect(addr, &alice_ticket).await;
     let mut carol_ws = connect(addr, &carol_ticket).await;
 
-    let uri = format!("/messages/{message}/reactions/wave");
+    let uri = format!("/messages/{message}/reactions/:wave:");
     let response = http::router(state.clone())
         .oneshot(
             Request::builder()
@@ -201,7 +201,7 @@ async fn a_live_reaction_from_a_blocked_user_is_absent_for_the_blocker_alone() {
         1,
         "nothing was removed for anybody else: {for_carol}"
     );
-    assert_eq!(carols[0]["emoji"], "wave");
+    assert_eq!(carols[0]["emoji"], ":wave:");
     assert_eq!(carols[0]["count"], 1);
 
     // Her own reaction still reaches her: the filter is about the reactor.
@@ -276,7 +276,7 @@ async fn a_live_reactions_frame_never_carries_a_reactor_id_and_mixes_blocked_wit
     let addr = serve(state.clone()).await;
     let mut alice_ws = connect(addr, &alice_ticket).await;
 
-    let uri = format!("/messages/{message}/reactions/wave");
+    let uri = format!("/messages/{message}/reactions/:wave:");
     let response = http::router(state.clone())
         .oneshot(
             Request::builder()
@@ -317,7 +317,7 @@ async fn a_live_reactions_frame_never_carries_a_reactor_id_and_mixes_blocked_wit
         1,
         "carol's unblocked reaction brings the emoji back: {for_alice}"
     );
-    assert_eq!(reactions[0]["emoji"], "wave");
+    assert_eq!(reactions[0]["emoji"], ":wave:");
     assert_eq!(
         reactions[0]["count"], 1,
         "pest still does not count, only carol does: {for_alice}"
@@ -384,8 +384,8 @@ async fn a_blocked_reactors_early_timestamp_cannot_reorder_an_emoji_for_the_bloc
     let mut alice_ws = connect(addr, &alice_ticket).await;
     let mut dana_ws = connect(addr, &dana_ticket).await;
 
-    let apple_uri = format!("/messages/{message}/reactions/apple");
-    let banana_uri = format!("/messages/{message}/reactions/banana");
+    let apple_uri = format!("/messages/{message}/reactions/:apple:");
+    let banana_uri = format!("/messages/{message}/reactions/:banana:");
 
     let react = |uri: String, access: String| {
         let state = state.clone();
@@ -430,7 +430,7 @@ async fn a_blocked_reactors_early_timestamp_cannot_reorder_an_emoji_for_the_bloc
         .collect();
     assert_eq!(
         alice_order,
-        vec!["banana", "apple"],
+        vec![":banana:", ":apple:"],
         "apple's only visible reactor for alice reacted last, so banana sorts first: {for_alice}"
     );
 
@@ -442,7 +442,7 @@ async fn a_blocked_reactors_early_timestamp_cannot_reorder_an_emoji_for_the_bloc
         .collect();
     assert_eq!(
         dana_order,
-        vec!["apple", "banana"],
+        vec![":apple:", ":banana:"],
         "dana blocks nobody, so the unfiltered order holds: apple was reacted to first: {for_dana}"
     );
 }

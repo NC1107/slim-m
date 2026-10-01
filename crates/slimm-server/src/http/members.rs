@@ -35,7 +35,9 @@ use crate::hub::Event;
 use crate::ids::{ChannelId, UserId};
 use crate::permissions::Permissions;
 use crate::ratelimit::Class;
-use crate::store::{DeleteAccountError, MAX_TIMEOUT_MS, RemoveMemberError, SpaceRemoval, now_ms};
+use crate::store::{
+    DeleteAccountError, MAX_TIMEOUT_MS, RemoveMemberError, SpaceRemoval, TimeoutError, now_ms,
+};
 use crate::voice::VoiceError;
 
 const BODY_LIMIT: usize = 4 * 1024;
@@ -102,6 +104,15 @@ impl From<SpaceRemoval> for RemovalDto {
             removed_by: removal.removed_by.map(|id| id.to_string()),
             removed_at: removal.removed_at,
             invite_code: removal.invite_code,
+        }
+    }
+}
+
+impl From<TimeoutError> for ApiError {
+    fn from(err: TimeoutError) -> Self {
+        match err {
+            TimeoutError::UserNotFound => ApiError::NotFound("no such member"),
+            TimeoutError::Internal(err) => err.into(),
         }
     }
 }
@@ -281,6 +292,7 @@ async fn delete_member_account(
                 "that is the only administrator; appoint another before deleting it",
             ));
         }
+        Err(DeleteAccountError::UserNotFound) => return Err(ApiError::NotFound("no such member")),
         Err(DeleteAccountError::Internal(e)) => return Err(e.into()),
     };
     for session_id in revoked {

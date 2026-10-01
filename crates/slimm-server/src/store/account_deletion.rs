@@ -22,6 +22,8 @@ pub enum DeleteAccountError {
     /// Doing it would leave other people in a deployment with no administrator
     /// and no way to appoint one.
     WouldStrandDeployment,
+    /// The account does not exist, or has already been deleted.
+    UserNotFound,
     Internal(anyhow::Error),
 }
 
@@ -82,7 +84,17 @@ impl Store {
         let now = now_ms();
         let mut tx = self.begin_write().await?;
 
-        // Write-first: takes the lock up front; deleting devices cascades these.
+        let live = sqlx::query_scalar!(
+            r#"SELECT 1 AS "one!: i64" FROM users WHERE id = ? AND deleted_at IS NULL"#,
+            user_id
+        )
+        .fetch_optional(&mut *tx)
+        .await?;
+        if live.is_none() {
+            return Err(DeleteAccountError::UserNotFound);
+        }
+
+        // Deleting devices cascades these.
         let revoked: Vec<SessionId> = sqlx::query!(
             r#"UPDATE sessions SET revoked_at = ? WHERE user_id = ?
                RETURNING id AS "id!: SessionId""#,

@@ -180,7 +180,10 @@ impl From<FetchError> for ApiError {
         match err {
             // Unreachable unless the Dock's own fixed-base URL construction broke, never a caller's doing.
             FetchError::Refused => ApiError::Internal,
-            FetchError::Unavailable | FetchError::Missing => ApiError::Unavailable,
+            FetchError::Missing => {
+                ApiError::NotFound("no add-on registry was found at that source")
+            }
+            FetchError::Unavailable => ApiError::Unavailable,
         }
     }
 }

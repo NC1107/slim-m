@@ -24,7 +24,7 @@
 //! done to this person", and a single row naming thirty subjects could not.
 
 use super::removals::remove_one;
-use super::timeouts::timeout_one;
+use super::timeouts::{TimeoutError, timeout_one};
 use super::{RemoveMemberError, Store, now_ms};
 use crate::ids::{SessionId, UserId};
 
@@ -71,7 +71,7 @@ impl Store {
         until: i64,
         reason: Option<&str>,
         issued_by: UserId,
-    ) -> anyhow::Result<()> {
+    ) -> Result<(), TimeoutError> {
         if user_ids.is_empty() {
             return Ok(());
         }

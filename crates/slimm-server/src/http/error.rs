@@ -228,6 +228,9 @@ impl From<CreateChannelError> for ApiError {
             CreateChannelError::IdConflict => {
                 ApiError::Conflict("channel id already used by a dm or a thread")
             }
+            CreateChannelError::Deleted => {
+                ApiError::Conflict("that channel id belonged to a channel that was deleted")
+            }
             CreateChannelError::UnknownCategory => {
                 ApiError::BadRequest("category_id must name a category that exists")
             }

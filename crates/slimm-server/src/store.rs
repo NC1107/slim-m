@@ -190,7 +190,7 @@ pub use thread_listing::ThreadListItem;
 pub use threads::{
     MAX_THREADS_PER_CHANNEL, OpenThreadError, OpenedThread, ThreadParent, ThreadSummary,
 };
-pub use timeouts::{MAX_TIMEOUT_MS, MemberTimeout};
+pub use timeouts::{MAX_TIMEOUT_MS, MemberTimeout, TimeoutError};
 pub use totp::{RECOVERY_CODE_COUNT, TotpEnrolment, TotpError, TotpPolicy, TotpStatus};
 pub use totp_verify::{ChallengeError, TotpChallenge, TotpProof, TotpSignIn};
 pub use user_notes::UserNote;
