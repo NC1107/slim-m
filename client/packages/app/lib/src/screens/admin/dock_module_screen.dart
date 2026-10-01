@@ -26,6 +26,7 @@ import '../../providers/app_launch.dart';
 import '../../providers/code_block_runner.dart';
 import '../../providers/slash_command.dart';
 import '../../providers/providers.dart';
+import '../../widgets/app_snackbar.dart';
 import '../../widgets/confirm_dialog.dart';
 import '../../routing/routes.dart';
 import '../../widgets/run_guarded.dart';
@@ -137,6 +138,12 @@ class _DockModuleScreenState extends ConsumerState<DockModuleScreen>
       if (ok) _hostApproved = null;
     });
     if (!ok) return;
+    showAppSnackbar(
+      context,
+      wasInstalled
+          ? '${manifest.name} updated to v${manifest.version}'
+          : '${manifest.name} installed',
+    );
     ref.invalidate(dockCatalogProvider);
     ref.invalidate(modulePermissionsProvider);
     // A new version can declare different extension points; see this doc.
