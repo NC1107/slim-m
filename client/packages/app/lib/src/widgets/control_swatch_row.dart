@@ -20,9 +20,13 @@ class ControlSwatch {
     required this.onSelected,
     this.color,
     this.lineWidth,
+    this.mark,
   }) : assert(
-         (color == null) != (lineWidth == null),
-         'a tile shows either a colour dot or a line sample',
+         (color == null ? 0 : 1) +
+                 (lineWidth == null ? 0 : 1) +
+                 (mark == null ? 0 : 1) ==
+             1,
+         'a tile shows one of a colour dot, a line sample or a mark',
        );
 
   final String label;
@@ -34,6 +38,10 @@ class ControlSwatch {
 
   /// Draws a horizontal line sample this thick.
   final double? lineWidth;
+
+  /// Draws this widget as it is, for a choice neither a colour nor a width
+  /// describes, such as an emoji.
+  final Widget? mark;
 }
 
 /// A [heading] and its [swatches] on a single line.
@@ -145,6 +153,7 @@ class _SwatchTileState extends State<_SwatchTile> {
   Widget _mark(AppTokens tokens) {
     final swatch = widget.swatch;
     final selected = swatch.selected;
+    if (swatch.mark != null) return swatch.mark!;
     if (swatch.color != null) {
       // The ring is a shape cue, so the pick never depends on hue alone.
       return Container(

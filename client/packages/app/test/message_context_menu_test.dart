@@ -335,6 +335,9 @@ void main() {
     await tester.longPressAt(pressPoint(tester));
     await tester.pumpAndSettle();
 
+    expect(find.text('Report message'), findsNothing, reason: 'behind More');
+    await tester.tap(find.text('More'));
+    await tester.pumpAndSettle();
     expect(find.text('Report message'), findsOneWidget);
     expect(find.text('Block user'), findsOneWidget);
 
@@ -343,6 +346,8 @@ void main() {
     expect(reported, isTrue);
 
     await tester.longPressAt(pressPoint(tester));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('More'));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Block user'));
     expect(blocked, isTrue);
@@ -360,9 +365,9 @@ void main() {
 
     await tester.longPressAt(pressPoint(tester));
     await tester.pumpAndSettle();
-    expect(find.text('Add reaction'), findsOneWidget);
+    expect(find.byTooltip('Add reaction'), findsOneWidget);
 
-    await tester.tap(find.text('Add reaction'));
+    await tester.tap(find.byTooltip('Add reaction'));
     await tester.pumpAndSettle();
     expect(
       find.byType(EmojiPickerPanel),

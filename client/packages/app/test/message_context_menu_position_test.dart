@@ -41,6 +41,7 @@ Future<Rect> _pumpAndOpen(
         content: 'hello',
         actions: noActions,
         onAddReaction: () {},
+        onPickReaction: (_) {},
         child: _tallRegion(),
       ),
     ),

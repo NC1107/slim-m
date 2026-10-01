@@ -240,6 +240,11 @@ class MessageRow extends StatelessWidget {
             actions: actions,
             onAddReaction: () =>
                 showEmojiPickerSheet(context, onSelect: onPickReaction),
+            onPickReaction: onPickReaction,
+            reactedEmoji: {
+              for (final r in reactions)
+                if (r.reacted) r.emoji,
+            },
             // A failed row is marked by a red hairline down its left edge
             // (error grammar 01) - the row itself stays at full strength,
             // because its content is still the author's to act on.

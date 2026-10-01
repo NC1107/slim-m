@@ -91,9 +91,9 @@ void main() {
 
     await tester.longPressAt(_pressPoint(tester));
     await tester.pumpAndSettle();
-    expect(find.text('Add reaction'), findsOneWidget);
+    expect(find.byTooltip('Add reaction'), findsOneWidget);
 
-    await tester.tap(find.text('Add reaction'));
+    await tester.tap(find.byTooltip('Add reaction'));
     await tester.pumpAndSettle();
 
     expect(
