@@ -54,6 +54,7 @@ Widget _row(
   int? editedAt,
   int? threadReplies,
   int? threadUnread,
+  Duration threadAgo = const Duration(hours: 2),
   List<api.ReactionSummary> reactions = const [],
   VoidCallback? onHistory,
 }) => MessageRow(
@@ -75,7 +76,9 @@ Widget _row(
   reactions: reactions,
   threadReplyCount: threadReplies,
   threadUnreadCount: threadUnread,
-  threadLastReplyAt: threadReplies == null ? null : 1700000600000,
+  threadLastReplyAt: threadReplies == null
+      ? null
+      : DateTime.now().subtract(threadAgo).millisecondsSinceEpoch,
 );
 
 const _longBody =
@@ -117,6 +120,14 @@ Map<String, ({List<Widget> rows, int? menuOn, bool own})> _scenes() => {
         editedAt: 1700000900000,
         threadReplies: 1,
         threadUnread: 0,
+        threadAgo: const Duration(days: 1),
+      ),
+      _row(
+        'd',
+        'older thread',
+        threadReplies: 12,
+        threadUnread: 0,
+        threadAgo: const Duration(days: 40),
       ),
       _row(
         'c',
