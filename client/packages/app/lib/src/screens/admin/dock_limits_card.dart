@@ -130,13 +130,13 @@ class _LimitRow extends StatelessWidget {
             width: AppSpacing.s64,
             child: Text(
               label,
-              style: AppText.body.copyWith(color: tokens.textPrimary),
+              style: AppText.caption.copyWith(color: tokens.textSecondary),
             ),
           ),
           Expanded(
             child: Text(
               value,
-              style: AppText.caption.copyWith(color: tokens.textSecondary),
+              style: AppText.caption.copyWith(color: tokens.textPrimary),
             ),
           ),
         ],
