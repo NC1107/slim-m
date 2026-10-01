@@ -67,6 +67,17 @@ final selfUpdateProvider = Provider<SelfUpdateController>(
   SelfUpdateController.new,
 );
 
+/// [SelfUpdateController.countStart] for `main`, which has no container yet at
+/// the point it must run: ahead of every step that can crash.
+Future<void> countLaunch() async {
+  final container = ProviderContainer();
+  try {
+    await container.read(selfUpdateProvider).countStart();
+  } finally {
+    container.dispose();
+  }
+}
+
 class SelfUpdateController {
   SelfUpdateController(
     this.ref, {
@@ -133,6 +144,26 @@ class SelfUpdateController {
     }
   }
 
+  /// Counts this launch and, where the app is its own launcher (macOS), puts
+  /// the previous version back when the new one keeps failing, then restarts.
+  ///
+  /// Called before anything in startup can throw: counting from [confirmStart],
+  /// which only runs once the app is ready, never saw the native-load,
+  /// bootstrap and database failures that rollback exists for.
+  Future<void> countStart({
+    String? resolvedExecutable,
+    String? os,
+    String? home,
+  }) async {
+    if (resolvedExecutable == null && !isDesktopHost) return;
+    final target = installTargetFor(
+      resolvedExecutable ?? Platform.resolvedExecutable,
+      os ?? Platform.operatingSystem,
+      home: home,
+    );
+    if (target != null && target.rollBackIfStuck()) await _restart();
+  }
+
   /// Startup bookkeeping: report a rollback the launcher performed, and after
   /// [settle] of staying up mark this launch clean so old versions are pruned.
   Future<void> confirmStart({
@@ -148,10 +179,6 @@ class SelfUpdateController {
       home: home,
     );
     if (target == null) return;
-    if (target.rollBackIfStuck()) {
-      await _restart();
-      return;
-    }
     final failed = target.takeRollbackNotice();
     if (failed != null) {
       ref.read(selfUpdateFailureProvider.notifier).state = SelfUpdateFailure(
