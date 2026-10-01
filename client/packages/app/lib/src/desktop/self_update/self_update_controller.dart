@@ -13,6 +13,7 @@ import 'package:slimm_platform/platform.dart';
 
 import '../relaunch.dart';
 import 'linux_install.dart' show Unpack;
+import 'rollback_record.dart';
 import 'self_update.dart';
 import 'self_update_failure.dart';
 import 'self_update_target.dart';
@@ -68,6 +69,17 @@ final selfUpdateProvider = Provider<SelfUpdateController>(
   SelfUpdateController.new,
 );
 
+/// [SelfUpdateController.countStart] for `main`, which has no container yet at
+/// the point it must run: ahead of every step that can crash.
+Future<void> countLaunch() async {
+  final container = ProviderContainer();
+  try {
+    await container.read(selfUpdateProvider).countStart();
+  } finally {
+    container.dispose();
+  }
+}
+
 class SelfUpdateController {
   SelfUpdateController(
     this.ref, {
@@ -111,8 +123,12 @@ class SelfUpdateController {
           'This install is updated by its package manager, not by slim-m.',
         );
       }
+      // A rolled-back version counts as installed, or it is fetched again on every launch.
       final update = await _fetch(
-        currentVersion: currentVersion,
+        currentVersion: versionToUpdateFrom(
+          currentVersion,
+          target.failedVersion(),
+        ),
         platformKey: target.platformKey,
         stagingDir: target.stagingDir,
         client: client,
@@ -130,6 +146,26 @@ class SelfUpdateController {
     }
   }
 
+  /// Counts this launch and, where the app is its own launcher (macOS), puts
+  /// the previous version back when the new one keeps failing, then restarts.
+  ///
+  /// Called before anything in startup can throw: counting from [confirmStart],
+  /// which only runs once the app is ready, never saw the native-load,
+  /// bootstrap and database failures that rollback exists for.
+  Future<void> countStart({
+    String? resolvedExecutable,
+    String? os,
+    String? home,
+  }) async {
+    if (resolvedExecutable == null && !isDesktopHost) return;
+    final target = installTargetFor(
+      resolvedExecutable ?? Platform.resolvedExecutable,
+      os ?? Platform.operatingSystem,
+      home: home,
+    );
+    if (target != null && target.rollBackIfStuck()) await _restart();
+  }
+
   /// Startup bookkeeping: report a rollback the launcher performed, and after
   /// [settle] of staying up mark this launch clean so old versions are pruned.
   Future<void> confirmStart({
@@ -145,10 +181,6 @@ class SelfUpdateController {
       home: home,
     );
     if (target == null) return;
-    if (target.rollBackIfStuck()) {
-      await _restart();
-      return;
-    }
     final failed = target.takeRollbackNotice();
     if (failed != null) {
       ref.read(selfUpdateFailureProvider.notifier).state = SelfUpdateFailure(

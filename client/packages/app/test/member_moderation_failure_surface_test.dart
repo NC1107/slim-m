@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
-/// A refused moderation write is a persistent error in the member pane, never
-/// a SnackBar that floats away.
+/// A refused moderation write is a persistent error state, shown by the
+/// app-level host the pane reports to, never a SnackBar that floats away.
 ///
 /// Covers the bulk timeout and bulk remove in the selection bar, and the row
 /// menu's remove: the three that reported through `showAppSnackbar` even
@@ -15,6 +15,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 import 'package:slimm_api/api.dart';
+import 'package:slimm_app/main.dart' show appChromeBuilder;
 import 'package:slimm_app/src/permissions.dart';
 import 'package:slimm_app/src/providers/admin_providers.dart';
 import 'package:slimm_app/src/providers/member_presence.dart';
@@ -85,6 +86,7 @@ Future<ProviderContainer> _pumpPane(WidgetTester tester) async {
       container: container,
       child: MaterialApp(
         theme: buildTheme(Brightness.light, AppTokens.light),
+        builder: appChromeBuilder,
         home: const Scaffold(body: AppMemberPane(channelId: 'c1')),
       ),
     ),

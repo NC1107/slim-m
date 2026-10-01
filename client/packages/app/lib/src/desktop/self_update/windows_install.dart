@@ -15,6 +15,7 @@ import 'package:slimm_platform/platform.dart';
 
 import 'linux_install.dart' show Unpack;
 import 'linux_layout.dart' show LayoutNames;
+import 'rollback_record.dart';
 import 'self_update.dart';
 import 'self_update_failure.dart';
 import 'windows_layout.dart';
@@ -145,11 +146,10 @@ void confirmWindowsCleanStart(WindowsInstallLayout layout) {
 }
 
 /// The version the launcher rolled back from since the last call, if any.
-/// Reading it clears it, so the failure is reported once.
-String? takeWindowsRollbackNotice(WindowsInstallLayout layout) {
-  final marker = File(layout.path(LayoutNames.rolledBack));
-  if (!marker.existsSync()) return null;
-  final version = marker.readAsStringSync().trim();
-  _delete(marker);
-  return version.isEmpty ? null : version;
-}
+/// Reading it clears the marker so the failure is reported once, and records it
+/// so the update pass never installs it again.
+String? takeWindowsRollbackNotice(WindowsInstallLayout layout) =>
+    takeRolledBack(
+      rolledBack: File(layout.path(LayoutNames.rolledBack)),
+      record: File(layout.path(LayoutNames.failedVersion)),
+    );

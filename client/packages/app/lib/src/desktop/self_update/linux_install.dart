@@ -13,6 +13,7 @@ import 'package:slimm_platform/platform.dart';
 
 import '../update_check.dart' show parseVersion;
 import 'linux_layout.dart';
+import 'rollback_record.dart';
 import 'self_update.dart';
 import 'self_update_failure.dart';
 
@@ -136,11 +137,9 @@ void confirmCleanStart(LinuxInstallLayout layout) {
 }
 
 /// The version the launcher rolled back from since the last call, if any.
-/// Reading it clears it, so the failure is reported once.
-String? takeRollbackNotice(LinuxInstallLayout layout) {
-  final marker = File(layout.path(LayoutNames.rolledBack));
-  if (!marker.existsSync()) return null;
-  final version = marker.readAsStringSync().trim();
-  _delete(marker);
-  return version.isEmpty ? null : version;
-}
+/// Reading it clears the marker so the failure is reported once, and records it
+/// so the update pass never installs it again.
+String? takeRollbackNotice(LinuxInstallLayout layout) => takeRolledBack(
+  rolledBack: File(layout.path(LayoutNames.rolledBack)),
+  record: File(layout.path(LayoutNames.failedVersion)),
+);

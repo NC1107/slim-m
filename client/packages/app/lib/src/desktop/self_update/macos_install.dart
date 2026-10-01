@@ -13,6 +13,7 @@ import 'package:slimm_platform/platform.dart';
 
 import 'linux_install.dart' show Unpack;
 import 'macos_layout.dart';
+import 'rollback_record.dart';
 import 'self_update.dart';
 import 'self_update_failure.dart';
 
@@ -203,12 +204,10 @@ void confirmMacosCleanStart(MacosInstallLayout layout) {
   _delete(layout.stagingDir);
 }
 
-/// The version the app rolled back from since the last call, if any. Reading
-/// it clears it, so the failure is reported once.
-String? takeMacosRollbackNotice(MacosInstallLayout layout) {
-  final marker = File(layout.path(MacosNames.rolledBack));
-  if (!marker.existsSync()) return null;
-  final version = marker.readAsStringSync().trim();
-  _delete(marker);
-  return version.isEmpty ? null : version;
-}
+/// The version the app rolled back from since the last call, if any.
+/// Reading it clears the marker so the failure is reported once, and records it
+/// so the update pass never installs it again.
+String? takeMacosRollbackNotice(MacosInstallLayout layout) => takeRolledBack(
+  rolledBack: File(layout.path(MacosNames.rolledBack)),
+  record: File(layout.path(MacosNames.failedVersion)),
+);

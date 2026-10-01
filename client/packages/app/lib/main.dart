@@ -52,6 +52,7 @@ import 'src/widgets/server_identity_change_gate.dart';
 import 'src/widgets/incoming_call_overlay.dart';
 import 'src/widgets/picture_in_picture_gate.dart';
 import 'src/widgets/popout_host.dart';
+import 'src/widgets/moderation_error_host.dart';
 import 'src/widgets/toast_overlay.dart';
 
 /// Entry point.
@@ -85,6 +86,8 @@ import 'src/widgets/toast_overlay.dart';
 /// size. Waiting for the real first frame avoids that race entirely.
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  // First, so a launch that dies in any later step still counts toward a rollback.
+  await countLaunch();
   // The browser's own menu otherwise lands on top of every in-app one.
   if (kIsWeb) unawaited(BrowserContextMenu.disableContextMenu());
   // Registers media_kit's player backend; every inline video attachment goes through it (attachment_video_player.dart).
@@ -328,9 +331,11 @@ Widget appChromeBuilder(BuildContext context, Widget? child) => Consumer(
           child: Stack(
             children: [
               // Outside everything routed: a client the server refuses has nothing useful behind this. Fail-open.
-              ClientTooOldGate(
-                child: ServerIdentityChangeGate(
-                  child: PictureInPictureGate(child: densityWrapped),
+              ModerationErrorHost(
+                child: ClientTooOldGate(
+                  child: ServerIdentityChangeGate(
+                    child: PictureInPictureGate(child: densityWrapped),
+                  ),
                 ),
               ),
               const Positioned.fill(child: ToastOverlay()),

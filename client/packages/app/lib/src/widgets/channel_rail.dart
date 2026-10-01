@@ -27,6 +27,7 @@ import 'command_palette.dart';
 import 'context_menu_region.dart';
 import 'create_category_sheet.dart';
 import 'create_channel_sheet.dart';
+import 'personal_account_sections.dart';
 
 /// The channel id in [path], or null when [path] is not a channel route.
 ///
@@ -222,6 +223,7 @@ class _ChannelRailState extends ConsumerState<ChannelRail> {
       error: (e, _) => RailFailureNotice(
         failure: localStoreRailFailure(e),
         onRetry: () => ref.invalidate(storeProvider),
+        onSignInAgain: () => unawaited(SignOutRow.signOut(ref)),
       ),
       data: (store) => StreamBuilder<List<Channel>>(
         // Deduped to what the rail draws; see MessageStore.watchRailChannels.
@@ -244,12 +246,19 @@ class _ChannelRailState extends ConsumerState<ChannelRail> {
                 final failure = emptyRailFailure(
                   ref.watch(syncFailureProvider),
                 );
+                // The stale failure under a live Retry reads as the tap doing nothing.
+                final retrying =
+                    ref.watch(syncControllerProvider) == SyncStatus.connecting;
+                if (failure != null && retrying) {
+                  return const Center(child: CircularProgressIndicator());
+                }
                 if (failure != null) {
                   return RailFailureNotice(
                     failure: failure,
                     onRetry: () => unawaited(
                       ref.read(syncControllerProvider.notifier).start(),
                     ),
+                    onSignInAgain: () => unawaited(SignOutRow.signOut(ref)),
                   );
                 }
               }
