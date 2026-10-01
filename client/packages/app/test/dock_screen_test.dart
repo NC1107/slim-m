@@ -205,11 +205,8 @@ void main() {
 
     // Before install, its manifest shows the permission it adds and the capability it asks for.
     expect(find.text('Execute code blocks'), findsOneWidget);
-    expect(
-      find.text('COMMAND.REGISTER'),
-      findsOneWidget,
-      reason: 'capability badge (AppBadge renders its label uppercased)',
-    );
+    expect(find.text('COMMAND.REGISTER'), findsNothing);
+    expect(find.text('about 500 million instructions'), findsOneWidget);
     expect(find.text('Install v1.2.0'), findsOneWidget);
 
     await tester.tap(find.text('Install v1.2.0'));
