@@ -203,8 +203,13 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(find.text('Show the game I am playing'), findsOneWidget);
-    expect(find.text('Show what I am listening to'), findsNothing);
+    final feeds = ProviderContainer().read(activityFeedsProvider);
+    final game = feeds.firstWhere((f) => f.enabled == shareGameProvider);
+    final listening = feeds.firstWhere(
+      (f) => f.enabled == shareListeningProvider,
+    );
+    expect(find.text(game.label), findsOneWidget);
+    expect(find.text(listening.label), findsNothing);
     expect(find.text('Sharing right now: nothing'), findsOneWidget);
     expect(find.textContaining('Counter-Strike 2'), findsNothing);
 

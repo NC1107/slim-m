@@ -190,9 +190,7 @@ class _NotificationScheduleSectionState
       children: [
         SettingsToggleRow(
           label: 'Notification schedule',
-          description:
-              'Only notify me during hours I set. Outside them, choose '
-              'below what still gets through.',
+          description: 'Only notify during the hours you set.',
           value: enabled,
           onChanged: schedule.isLoading ? null : (v) => _toggle(v, current),
           semanticLabel: 'Notification schedule',

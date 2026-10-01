@@ -39,9 +39,7 @@ class ReportStatusSection extends ConsumerWidget {
         SettingsSectionCard(
           title: 'Reports you filed',
           description:
-              'Reports you filed from this device, and whether each is '
-              'still open. Nothing here says who looked at one, or what '
-              'they decided.',
+              'Reports from this device, and whether each is still open.',
           children: [
             if (filedIds.isEmpty)
               Padding(
@@ -201,9 +199,7 @@ class _CheckByIdSectionState extends ConsumerState<_CheckByIdSection> {
     final tokens = Theme.of(context).extension<AppTokens>()!;
     return SettingsSectionCard(
       title: 'Check a report by ID',
-      description:
-          'Paste the ID of a report filed on a different device, or from '
-          'before this list existed.',
+      description: 'Paste the ID of a report from another device.',
       children: [
         Row(
           crossAxisAlignment: CrossAxisAlignment.start,

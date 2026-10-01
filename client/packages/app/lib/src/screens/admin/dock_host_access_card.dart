@@ -15,16 +15,14 @@ import '../../widgets/settings_section_header.dart';
 import '../../widgets/settings_toggle_row.dart';
 
 /// The host capabilities the server can grant, in the order they are listed.
-const dockHostCapabilities = <String, (String, String)>{
+const dockHostCapabilities = <String, ({String label, String description})>{
   'kv.store': (
-    'Remember data',
-    'Keeps a small private store for this module: up to 256 entries and '
-        '64 KB. No other module can read it, and uninstalling deletes it.',
+    label: 'Remember data',
+    description: 'A small private store for this module.',
   ),
   'message.post': (
-    'Post messages',
-    'Posts into a channel as whoever runs it, marked "via" this module. Only '
-        'where that person could post, and rate limited.',
+    label: 'Post messages',
+    description: 'Posts as whoever runs it, marked "via" this module.',
   ),
 };
 
@@ -71,21 +69,19 @@ class DockHostAccessCard extends StatelessWidget {
           ),
           child: Text(
             reapprovePosting
-                ? 'This is a new build, so Post messages needs your approval '
-                      'again. Other access carries over. Applied when you '
-                      'update or save.'
-                : 'Off unless you turn it on. Applied when you install or save.',
+                ? 'A new build needs Post messages approved again.'
+                : 'Off unless you turn it on.',
             style: AppText.caption.copyWith(color: tokens.textSecondary),
           ),
         ),
         for (final capability in grantable)
           SettingsToggleRow(
-            label: dockHostCapabilities[capability]!.$1,
-            description: dockHostCapabilities[capability]!.$2,
+            label: dockHostCapabilities[capability]!.label,
+            description: dockHostCapabilities[capability]!.description,
             value: approved.contains(capability),
             onChanged: enabled ? (v) => onChanged(capability, v) : null,
             semanticLabel:
-                '${dockHostCapabilities[capability]!.$1} for $moduleName',
+                '${dockHostCapabilities[capability]!.label} for $moduleName',
           ),
       ],
     );

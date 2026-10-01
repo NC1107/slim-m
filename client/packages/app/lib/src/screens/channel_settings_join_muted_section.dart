@@ -62,9 +62,7 @@ class _ChannelJoinMutedSectionState
       children: [
         SettingsToggleRow(
           label: 'Join muted',
-          description:
-              'Members start with their mic off and can unmute. '
-              'To stop people speaking, deny Speak instead.',
+          description: 'Members start with their mic off and can unmute.',
           value: _optimistic ?? widget.channel.joinMuted,
           onChanged: _saving ? null : _set,
           semanticLabel: 'Members join this channel muted',

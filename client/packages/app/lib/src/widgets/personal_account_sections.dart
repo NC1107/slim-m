@@ -34,6 +34,9 @@ export 'devices_section.dart' show DevicesSection, devicesProvider;
 /// Says what blocking really does rather than the old blanket promise: messages,
 /// reactions and typing are hidden and no notification arrives, and the person
 /// is still in the member list, which is where the row that offers this lives.
+const accountDeletionDescription =
+    'Permanently removes you and signs out every device.';
+
 class BlockedSection extends ConsumerWidget {
   const BlockedSection({super.key});
 
@@ -43,10 +46,7 @@ class BlockedSection extends ConsumerWidget {
 
     return SettingsSectionCard(
       title: 'People you blocked',
-      description:
-          'They are not told. You stop seeing their messages, reactions '
-          'and typing, and stop being notified about them. They stay in '
-          'the member list. Unblocking restores everything.',
+      description: 'You stop seeing and hearing from them; they are not told.',
       children: [
         if (!blocks.settled)
           const Padding(
@@ -155,9 +155,7 @@ class _AccountSectionState extends ConsumerState<AccountSection> {
   Widget build(BuildContext context) {
     return SettingsSectionCard(
       title: 'Account',
-      description:
-          'Removes you from this Space and signs out every device. '
-          'Cannot be undone.',
+      description: accountDeletionDescription,
       children: [
         // Matches channel_settings_danger_zone.dart's own "Delete channel":
         // an irreversible action reads as a button, not a navigation row.
@@ -233,8 +231,7 @@ class _AccountSectionState extends ConsumerState<AccountSection> {
       context,
       title: 'Confirm it is you',
       description: needsCode
-          ? 'Enter your password and a current code from your authenticator '
-                'app to delete this account.'
+          ? 'Enter your password and a current code to delete this account.'
           : 'Enter your password to delete this account.',
       submitLabel: 'Delete permanently',
       askForCode: needsCode,

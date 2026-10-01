@@ -15,6 +15,7 @@ import 'package:http/testing.dart';
 import 'package:slimm_api/api.dart' as api;
 import 'package:slimm_app/src/providers/providers.dart';
 import 'package:slimm_app/src/routing/routes.dart';
+import 'package:slimm_app/src/screens/admin/dock_limits_card.dart';
 import 'package:slimm_app/src/screens/admin/dock_module_access_screen.dart';
 import 'package:slimm_app/src/screens/admin/dock_module_screen.dart';
 import 'package:slimm_app/src/screens/admin/dock_screen.dart';
@@ -198,12 +199,7 @@ void main() {
   ) async {
     await _pump(tester, width: 800, location: _modulePage);
     expect(find.text('COMMAND.REGISTER'), findsNothing);
-    expect(
-      find.text(
-        'It asks for no access to your space. It only answers its own commands.',
-      ),
-      findsOneWidget,
-    );
+    expect(find.text(dockNoAccessNote), findsOneWidget);
   });
 
   testWidgets('a grantable capability keeps its switch and no chip', (
@@ -217,7 +213,7 @@ void main() {
     );
     expect(find.text('Post messages'), findsOneWidget);
     expect(find.text('MESSAGE.POST'), findsNothing);
-    expect(find.textContaining('asks for no access'), findsNothing);
+    expect(find.text(dockNoAccessNote), findsNothing);
   });
 
   for (final width in [390.0, 800.0, 1280.0]) {

@@ -16,6 +16,7 @@ library;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:slimm_app/src/widgets/personal_account_sections.dart';
 import 'package:slimm_app/src/widgets/settings_section_header.dart';
 import 'package:slimm_design_system/design_system.dart';
 
@@ -130,7 +131,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(
-      find.textContaining('Cannot be undone'),
+      find.text(accountDeletionDescription),
       findsOneWidget,
       reason:
           'moving this off the row must not drop it: it is the whole warning '

@@ -24,6 +24,7 @@ import 'package:slimm_app/src/providers/admin_providers.dart';
 import 'package:slimm_app/src/providers/providers.dart';
 import 'package:slimm_app/src/screens/admin/analytics_ghost.dart';
 import 'package:slimm_app/src/screens/admin/analytics_screen.dart';
+import 'package:slimm_app/src/screens/admin/analytics_toggle.dart';
 import 'package:slimm_app/src/widgets/analytics_bar_chart.dart';
 import 'package:slimm_design_system/design_system.dart';
 import 'package:slimm_platform/platform.dart';
@@ -102,7 +103,7 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.text('Record Space analytics'), findsOneWidget);
-      expect(find.textContaining('Off by default'), findsOneWidget);
+      expect(find.text(analyticsToggleDescription), findsOneWidget);
       expect(find.byType(AnalyticsGhostPreview), findsOneWidget);
       expect(find.textContaining('Total messages'), findsNothing);
       expect(find.byType(AnalyticsBarChart), findsNothing);
@@ -163,17 +164,17 @@ void main() {
 
       // Collapsed: the label shows, the paragraph does not.
       expect(find.text('Space analytics is on'), findsOneWidget);
-      expect(find.textContaining('Off by default'), findsNothing);
+      expect(find.text(analyticsToggleDescription), findsNothing);
 
       // The info button reveals it in place.
       await tester.tap(find.byTooltip('What this records'));
       await tester.pumpAndSettle();
-      expect(find.textContaining('Off by default'), findsOneWidget);
+      expect(find.text(analyticsToggleDescription), findsOneWidget);
 
       // And hides it again on a second tap.
       await tester.tap(find.byTooltip('Hide what this records'));
       await tester.pumpAndSettle();
-      expect(find.textContaining('Off by default'), findsNothing);
+      expect(find.text(analyticsToggleDescription), findsNothing);
     },
   );
 

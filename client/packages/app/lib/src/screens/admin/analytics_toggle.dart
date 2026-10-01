@@ -19,10 +19,8 @@ import '../../widgets/settings_toggle_row.dart';
 
 /// Full explanation, kept in one place: shown open in the off state and
 /// reachable behind an info toggle once on.
-const _analyticsDescription =
-    'Off by default. Counts messages and reads this server\'s own memory '
-    'use; never a per-member activity log. Turning this off hides the '
-    'numbers below but keeps whatever was already recorded.';
+const analyticsToggleDescription =
+    'Counts messages and server memory use, never per-member activity.';
 
 class AnalyticsToggleHeader extends StatefulWidget {
   const AnalyticsToggleHeader({
@@ -59,7 +57,7 @@ class _AnalyticsToggleHeaderState extends State<AnalyticsToggleHeader> {
         children: [
           SettingsToggleRow(
             label: 'Record Space analytics',
-            description: _analyticsDescription,
+            description: analyticsToggleDescription,
             value: false,
             onChanged: widget.busy ? null : widget.onChanged,
             semanticLabel: 'Space analytics off',
@@ -104,7 +102,7 @@ class _AnalyticsToggleHeaderState extends State<AnalyticsToggleHeader> {
         if (_explanationOpen) ...[
           const SizedBox(height: AppSpacing.s8),
           Text(
-            _analyticsDescription,
+            analyticsToggleDescription,
             style: AppText.caption.copyWith(color: tokens.textSecondary),
           ),
         ],

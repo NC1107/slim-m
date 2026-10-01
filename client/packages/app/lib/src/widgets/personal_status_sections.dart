@@ -53,18 +53,15 @@ class NotificationsSection extends ConsumerWidget {
           label: status.label,
         ),
         SettingsToggleRow(
-          label: 'Play a sound for messages, mentions and errors',
+          label: 'Message, mention and error sounds',
           value: soundsEnabled,
           onChanged: (value) =>
               ref.read(messageSoundSettingsProvider.notifier).setEnabled(value),
           semanticLabel: 'Play a sound for messages, mentions and errors',
         ),
         SettingsToggleRow(
-          label: 'Let Dock modules play sound effects',
-          description:
-              'A module can ask to play a short synthesised cue when you '
-              'interact with it. Off stops every module sound; it never '
-              'plays on its own.',
+          label: 'Dock module sounds',
+          description: 'Lets modules play short sounds.',
           value: moduleSoundsEnabled,
           onChanged: (value) =>
               ref.read(moduleSoundSettingsProvider.notifier).setEnabled(value),

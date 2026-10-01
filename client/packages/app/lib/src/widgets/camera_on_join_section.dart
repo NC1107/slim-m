@@ -39,11 +39,8 @@ class CameraOnJoinSection extends ConsumerWidget {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         SettingsToggleRow(
-          label: 'Join calls with your camera on',
-          description:
-              'Off by default. A call still connects with no camera or '
-              'denied permission; it just starts with no video, the same '
-              'as starting muted.',
+          label: 'Join with camera on',
+          description: 'Calls still connect without a camera.',
           value: settings.cameraOnJoin,
           // Fixed, not state-conditional; see the library doc above for why.
           semanticLabel: 'Join calls with your camera on',

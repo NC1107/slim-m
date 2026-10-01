@@ -40,16 +40,12 @@ String screenShareCapConsequence(int maxHeight) {
   );
   if (tier != null) {
     final mbps = (tier.maxBitrate / 1000000).toStringAsFixed(1);
-    return 'Bounds a share to ${tier.width}x${tier.height}. The sharer\'s '
-        'quality tier still sets the bitrate, up to $mbps Mbps here - this '
-        'only decides how many pixels that budget covers.';
+    return 'Shares are capped at ${tier.width}x${tier.height}, up to $mbps Mbps.';
   }
   final maxTierHeight = ScreenShareQuality.values
       .map((q) => q.height)
       .reduce((a, b) => a > b ? a : b);
-  return 'No resolution ceiling. Every quality tier this build can publish '
-      'already tops out at ${maxTierHeight}p, so this currently behaves the '
-      'same as no cap at all.';
+  return 'No cap: every quality tier already tops out at ${maxTierHeight}p.';
 }
 
 /// The screen-share resolution ceiling: client-advertised, so this is the
@@ -91,7 +87,6 @@ class _ScreenShareCapSectionState extends ConsumerState<ScreenShareCapSection>
 
   @override
   Widget build(BuildContext context) {
-    final tokens = Theme.of(context).extension<AppTokens>()!;
     final ceiling = ref.watch(spaceScreenShareCeilingProvider);
     ref.listen(spaceScreenShareCeilingProvider, (previous, next) {
       if (next.hasValue && !next.isLoading && _optimisticMaxHeight != null) {
@@ -105,13 +100,8 @@ class _ScreenShareCapSectionState extends ConsumerState<ScreenShareCapSection>
 
     return SettingsSectionCard(
       title: 'Screen share quality',
+      description: 'The tallest resolution a share may use.',
       children: [
-        Text(
-          'The tallest resolution a screen share may publish at. Lower it to '
-          'keep shares light on bandwidth; the sharing client enforces it.',
-          style: AppText.caption.copyWith(color: tokens.textSecondary),
-        ),
-        const SizedBox(height: AppSpacing.s12),
         AppSegmentedControl.inline(
           semanticLabel: 'Screen share resolution ceiling',
           options: [

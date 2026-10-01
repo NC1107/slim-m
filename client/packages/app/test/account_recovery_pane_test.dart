@@ -103,7 +103,7 @@ void main() {
     await _pump(tester, permissions: Perm.administrator);
 
     // The pane explains recovery, because there is no email path to guess at.
-    expect(find.textContaining('no recovery email'), findsOneWidget);
+    expect(find.text(resetCodesDescription), findsOneWidget);
 
     await tester.tap(find.text(ActionLabels.createResetCode));
     await tester.pumpAndSettle();

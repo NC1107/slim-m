@@ -36,6 +36,9 @@ import '../settings_screen_scaffold.dart';
 import 'overwrite_target_picker_sheets.dart';
 import '../../action_labels.dart';
 
+const resetCodesDescription =
+    'Locked-out members get back in with an administrator\'s one-time code.';
+
 class AccountRecoveryScreen extends StatelessWidget {
   const AccountRecoveryScreen({super.key});
 
@@ -64,10 +67,7 @@ class AccountRecoveryPane extends ConsumerWidget {
     if (!canIssue) {
       return const SettingsNotice(
         message: 'Issuing a reset code needs the administrator permission.',
-        detail:
-            'Somebody locked out of their account gets back in with a '
-            'one-time code an administrator issues them. There is no '
-            'recovery email.',
+        detail: 'Locked-out members get back in with a one-time code.',
       );
     }
 
@@ -77,11 +77,7 @@ class AccountRecoveryPane extends ConsumerWidget {
         // Titled because a description only renders under a title.
         SettingsSectionCard(
           title: 'Reset codes',
-          description:
-              'There is no recovery email. Somebody locked out of their '
-              'account gets back in with a one-time code an administrator '
-              'issues them, spent through "Trouble signing in?" on the '
-              'sign-in screen.',
+          description: resetCodesDescription,
           children: [
             AppListRow(
               label: ActionLabels.createResetCode,

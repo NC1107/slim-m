@@ -136,9 +136,7 @@ class _WebhooksPaneState extends ConsumerState<WebhooksPane>
             const SizedBox(height: AppSpacing.s16),
             LabeledField(
               label: 'Label',
-              helper:
-                  'Shown in this list, and beside its posts if the sending '
-                  'tool sets a username - Sonarr, Grafana, and all that.',
+              helper: 'Shown in this list and beside its posts.',
               child: AppInput(
                 controller: _label,
                 semanticLabel: 'Webhook label',

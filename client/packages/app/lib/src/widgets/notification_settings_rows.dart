@@ -49,12 +49,8 @@ class PushContentPreviewRow extends ConsumerWidget {
     final enabled = ref.watch(pushContentPreviewSettingsProvider);
 
     return SettingsToggleRow(
-      label: 'Show message text on your lock screen',
-      description:
-          'On by default. When on, a locked iPhone shows who sent a '
-          'message and part of what it says - decrypted on this device, '
-          'never by the relay that delivers the push. Applies to all your '
-          'devices.',
+      label: 'Message text on lock screen',
+      description: 'On every device you use.',
       value: enabled ?? false,
       semanticLabel: 'Show message text on your lock screen',
       onChanged: enabled == null

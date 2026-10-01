@@ -219,8 +219,7 @@ class _ModuleAccessPaneState extends ConsumerState<ModuleAccessPane>
                 label: widget.manifest.name,
                 description: installed.enabled
                     ? 'Running in this space.'
-                    : 'Installed but switched off, so nothing it adds appears '
-                          'yet. Granting a role below turns it on.',
+                    : 'Off until you grant a role below.',
                 semanticLabel: 'Run ${widget.manifest.name} in this space',
                 value: installed.enabled,
                 onChanged: _busy ? null : _setModuleEnabled,

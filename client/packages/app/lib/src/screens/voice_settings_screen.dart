@@ -61,10 +61,7 @@ class _SensitivitySection extends ConsumerWidget {
 
     return SettingsSectionCard(
       title: 'Voice activity sensitivity',
-      description:
-          'How much reported volume is needed before the speaking ring '
-          'lights up. Lower requires a louder voice; higher lights up on '
-          'quieter sound.',
+      description: 'Lower needs a louder voice to light the speaking ring.',
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         AppSlider(
@@ -94,14 +91,11 @@ class _PushToTalkSection extends ConsumerWidget {
 
     return SettingsSectionCard(
       title: 'Push-to-talk',
-      description:
-          'Hold the key below to unmute for as long as you hold it, and '
-          'mute again the moment you let go. Held while the message box has '
-          'focus types normally instead - it never opens your microphone.',
+      description: 'Hold the key to unmute, release to mute.',
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         SettingsToggleRow(
-          label: 'Hold a key to talk, instead of toggling the microphone',
+          label: 'Hold a key to talk',
           value: settings.pushToTalkEnabled,
           semanticLabel: 'Push-to-talk',
           onChanged: (value) => ref
@@ -204,10 +198,7 @@ class _ScreenShareSection extends ConsumerWidget {
 
     return SettingsSectionCard(
       title: 'Screen share quality',
-      description:
-          'A ceiling on resolution and frame rate, not a '
-          'preference: it keeps a share from starving the audio '
-          'alongside it.',
+      description: 'A cap on resolution and frame rate, to protect call audio.',
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         AppSegmentedControl.inline(
@@ -225,7 +216,7 @@ class _ScreenShareSection extends ConsumerWidget {
         if (supportsAudio) ...[
           const SizedBox(height: AppSpacing.s8),
           SettingsToggleRow(
-            label: "Share this device's audio with the screen",
+            label: 'Share device audio',
             value: settings.screenShareIncludeAudio,
             semanticLabel: 'Share audio with a screen share',
             onChanged: (value) => ref
@@ -256,7 +247,8 @@ class _SoundsSection extends ConsumerWidget {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         SettingsToggleRow(
-          label: 'Play a sound when someone joins or leaves a call',
+          label: 'Join and leave sounds',
+          description: 'Off automatically in busy calls.',
           value: settings.joinLeaveSoundsEnabled,
           semanticLabel: 'Play join and leave sounds',
           onChanged: (value) => ref
@@ -264,16 +256,8 @@ class _SoundsSection extends ConsumerWidget {
               .setJoinLeaveSoundsEnabled(value),
         ),
         const SizedBox(height: AppSpacing.s8),
-        const AppCallout(
-          tone: AppCalloutTone.info,
-          child: Text(
-            'These turn off on their own in a call above about 8 people, '
-            'so a busy channel does not turn into a wall of chimes.',
-          ),
-        ),
-        const SizedBox(height: AppSpacing.s8),
         SettingsToggleRow(
-          label: 'Play a sound for an incoming call',
+          label: 'Incoming call sound',
           value: settings.callRingSoundEnabled,
           semanticLabel: 'Play a sound for an incoming call',
           onChanged: (value) => ref
@@ -282,7 +266,7 @@ class _SoundsSection extends ConsumerWidget {
         ),
         const SizedBox(height: AppSpacing.s8),
         SettingsToggleRow(
-          label: 'Play soft music while you are alone in a call',
+          label: 'Music while alone',
           value: settings.holdMusicEnabled,
           semanticLabel: 'Play hold music while alone in a call',
           onChanged: (value) => ref
