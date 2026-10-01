@@ -170,7 +170,7 @@ void main() {
       await pumpAtWidth(tester, s.container, 1400, location: '/channels/c1');
       expect(find.bySemanticsLabel('Toggle member list'), findsOneWidget);
 
-      // Medium: the pane never shows here, so a lit toggle over it would lie.
+      // Medium: the pane never docks here, so no lit toggle; the roster opens as a drawer instead (home_shell_medium_members_test.dart).
       await pumpAtWidth(tester, s.container, 700, location: '/channels/c1');
       expect(find.byType(AppMemberPane), findsNothing);
       expect(find.bySemanticsLabel('Toggle member list'), findsNothing);

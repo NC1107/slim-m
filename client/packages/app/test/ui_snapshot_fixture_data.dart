@@ -13,6 +13,8 @@ import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 import 'package:slimm_api/api.dart' as api;
 
+import 'ui_snapshot_dock.dart' show dockFixtureBody;
+
 /// The members every surface can see, one of them with the longest display
 /// name the server allows (64 characters is the real ceiling; this sits
 /// close to it) so a row that only ever renders "Nick" and "Ada Lovelace"
@@ -239,6 +241,7 @@ Future<http.Response> fixtureResponse(http.Request request) async {
   if (path.endsWith('/avatar')) return http.Response('', 404);
 
   final Object body = switch (path) {
+    _ when dockFixtureBody(path) != null => dockFixtureBody(path)!,
     '/me' => {
       'id': 'user-nick',
       'username': 'nick',

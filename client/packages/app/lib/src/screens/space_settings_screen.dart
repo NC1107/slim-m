@@ -22,7 +22,17 @@ import '../widgets/space_settings_section.dart';
 import 'settings_screen_scaffold.dart';
 
 class SpaceSettingsScreen extends ConsumerWidget {
-  const SpaceSettingsScreen({super.key});
+  const SpaceSettingsScreen({
+    super.key,
+    this.initialPaneId,
+    this.onPaneChanged,
+  });
+
+  /// See [SettingsPanesScaffold.initialPaneId].
+  final String? initialPaneId;
+
+  /// See [SettingsPanesScaffold.onPaneChanged].
+  final ValueChanged<String?>? onPaneChanged;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -43,6 +53,8 @@ class SpaceSettingsScreen extends ConsumerWidget {
       );
     }
     return SettingsPanesScaffold(
+      initialPaneId: initialPaneId,
+      onPaneChanged: onPaneChanged,
       title: 'Space settings',
       backTooltip: 'Back to channels',
       backFallback: Routes.channels,

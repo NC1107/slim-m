@@ -15,6 +15,7 @@ import 'package:slimm_design_system/design_system.dart';
 import 'live_events.dart';
 import 'presence_controller.dart';
 import 'providers.dart';
+import 'sync_controller.dart';
 
 /// The server's own per-page ceiling (`MEMBERS_MAX_LIMIT` in
 /// `crates/slimm-server/src/http/users.rs`), requested explicitly on every
@@ -120,6 +121,12 @@ final memberModerationWatcherProvider = Provider.autoDispose<void>((ref) {
       // A role change can also change who may view a channel at all.
       ref.invalidate(channelMembersProvider);
     }
+  });
+  // A roster that failed during an outage has no event coming to refill it. Watches the latch rather than the controller, which a pane has no business starting.
+  ref.listen<bool>(hasFailedSinceLiveProvider, (previous, failed) {
+    if (previous != true || failed) return;
+    ref.invalidate(membersProvider);
+    ref.invalidate(channelMembersProvider);
   });
   ref.onDispose(() => unawaited(sub.cancel()));
 });

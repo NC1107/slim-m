@@ -77,9 +77,9 @@ IconData _channelIcon(Channel channel) => switch (channel.kind) {
   _ => AppIcons.hash,
 };
 
-/// Channels and DMs matching [query], text and voice and direct alike: the
-/// rail already renders all three from one stream, and the palette does the
-/// same rather than picking a kind up front.
+/// Channels matching [query], text and voice alike. A DM is a person and is
+/// found under Members, so listing it here too showed everyone twice; only the
+/// personal space, which has no member row, stays.
 ///
 /// [personalSpaceHidden] keeps a removed personal space out of a blank-query
 /// browse of everything - the whole point of removing its row - while
@@ -94,6 +94,7 @@ List<PaletteResultItem> buildChannelItems(
 }) => [
   for (final channel
       in channels
+          .where((c) => c.kind != dmChannelKind || c.isPersonalSpace)
           .where(
             (c) =>
                 query.isNotEmpty || !(c.isPersonalSpace && personalSpaceHidden),

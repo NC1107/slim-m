@@ -2,6 +2,21 @@
 part of 'home_shell.dart';
 
 // The two docked third-pane slots (member roster, thread), split from home_shell.dart for the line budget; kept as private part-of classes so the shell's Row still names them.
+/// Builds [build] with whether [channelId] is a DM, resolved from the local store.
+Widget _withChannelKind(
+  WidgetRef ref,
+  String channelId,
+  Widget Function(bool isDm) build,
+) => ref
+    .watch(storeProvider)
+    .maybeWhen(
+      orElse: () => build(false),
+      data: (store) => StreamBuilder<Channel?>(
+        stream: store.watchChannelRow(channelId),
+        builder: (context, snapshot) => build(snapshot.data?.kind == 'dm'),
+      ),
+    );
+
 /// The wide-layout member pane's slot: width-animated, and withheld for a
 /// DM regardless of [requested] (the header toggle's own answer, already
 /// `memberPaneVisibleProvider`-gated) - that provider defaults open, so

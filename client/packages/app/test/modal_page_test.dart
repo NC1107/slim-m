@@ -216,14 +216,15 @@ void main() {
     });
 
     testWidgets('takes the slide off the phone screen', (tester) async {
+      final moving = await _pageFor(tester, _phone, reduceMotion: false);
       expect(
-        await _pageFor(tester, _phone, reduceMotion: false),
-        isA<MaterialPage<void>>(),
+        (moving as CustomTransitionPage<void>).transitionDuration,
+        greaterThan(Duration.zero),
       );
-      // A page route's length is fixed, so skipping it needs a different page.
+      final still = await _pageFor(tester, _phone, reduceMotion: true);
       expect(
-        await _pageFor(tester, _phone, reduceMotion: true),
-        isA<NoTransitionPage<void>>(),
+        (still as CustomTransitionPage<void>).transitionDuration,
+        Duration.zero,
       );
     });
   });

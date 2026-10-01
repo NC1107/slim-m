@@ -65,15 +65,23 @@ import '../widgets/totp_section.dart';
 import 'voice_settings_screen.dart';
 
 class PersonalSettingsScreen extends StatelessWidget {
-  const PersonalSettingsScreen({super.key, this.initialPaneId});
+  const PersonalSettingsScreen({
+    super.key,
+    this.initialPaneId,
+    this.onPaneChanged,
+  });
 
   /// The pane to open on, when something deep-links to one.
   final String? initialPaneId;
+
+  /// See [SettingsPanesScaffold.onPaneChanged].
+  final ValueChanged<String?>? onPaneChanged;
 
   @override
   Widget build(BuildContext context) {
     return SettingsPanesScaffold(
       initialPaneId: initialPaneId,
+      onPaneChanged: onPaneChanged,
       title: 'Settings',
       // Reached with go(), which replaces, so there is no stack to pop.
       backTooltip: 'Back to channels',

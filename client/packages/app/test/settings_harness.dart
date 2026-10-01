@@ -107,6 +107,9 @@ ProviderContainer _container(int permissions) {
   );
 }
 
+/// [_container] for a suite that mounts the screens on a router itself.
+ProviderContainer settingsContainer(int permissions) => _container(permissions);
+
 /// Renders the personal settings screen with `/me` reporting [permissions],
 /// scrolled down to the section under test.
 ///

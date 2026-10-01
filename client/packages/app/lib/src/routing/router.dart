@@ -12,6 +12,7 @@ import 'package:go_router/go_router.dart';
 
 import '../providers/providers.dart';
 import '../providers/threads.dart';
+import '../screens/not_found_screen.dart';
 import '../screens/admin/account_recovery_screen.dart';
 import '../screens/admin/analytics_screen.dart';
 import '../screens/admin/bots_screen.dart';
@@ -36,8 +37,6 @@ import '../screens/channel_settings_screen.dart';
 import '../screens/home_shell.dart';
 import '../screens/message_deep_link.dart';
 import '../screens/debug_log_screen.dart';
-import '../screens/personal_settings_screen.dart';
-import '../screens/space_settings_screen.dart';
 import '../screens/onboarding_screen.dart';
 import '../screens/sign_in_screen.dart';
 import '../screens/thread_screen.dart';
@@ -46,6 +45,7 @@ import 'breakpoints.dart';
 import 'modal_page.dart';
 import 'page_transitions.dart';
 import 'routes.dart';
+import 'settings_pages.dart';
 
 /// The app's router.
 ///
@@ -85,6 +85,7 @@ final routerProvider = Provider<GoRouter>((ref) {
       if (onJoinFlow) return Routes.channels;
       return null;
     },
+    errorBuilder: (context, state) => const NotFoundScreen(),
     routes: [
       // The join flow fades through like the shell's own pages, so signing in hands off into the app as one motion.
       GoRoute(
@@ -109,20 +110,8 @@ final routerProvider = Provider<GoRouter>((ref) {
           key: const ValueKey('sign-in'),
         ),
       ),
-      GoRoute(
-        path: Routes.personalSettings,
-        pageBuilder: (context, state) => modalPage(
-          context,
-          PersonalSettingsScreen(
-            initialPaneId: state.uri.queryParameters[settingsPaneQuery],
-          ),
-        ),
-      ),
-      GoRoute(
-        path: Routes.spaceSettings,
-        pageBuilder: (context, state) =>
-            modalPage(context, const SpaceSettingsScreen()),
-      ),
+      GoRoute(path: Routes.personalSettings, pageBuilder: personalSettingsPage),
+      GoRoute(path: Routes.spaceSettings, pageBuilder: spaceSettingsPage),
       GoRoute(
         path: Routes.adminReports,
         pageBuilder: (context, state) =>

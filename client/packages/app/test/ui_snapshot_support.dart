@@ -37,7 +37,6 @@ import 'package:slimm_app/src/routing/modal_page.dart';
 import 'package:slimm_app/src/screens/admin/account_recovery_screen.dart';
 import 'package:slimm_app/src/screens/admin/analytics_screen.dart';
 import 'package:slimm_app/src/screens/admin/channel_permissions_screen.dart';
-import 'package:slimm_app/src/screens/admin/dock_screen.dart';
 import 'package:slimm_app/src/screens/admin/emoji_screen.dart';
 import 'package:slimm_app/src/screens/admin/invites_screen.dart';
 import 'package:slimm_app/src/screens/admin/performance_screen.dart';
@@ -58,6 +57,7 @@ import 'package:slimm_platform/platform.dart';
 import 'support/mid_flight_capture.dart';
 import 'support/real_shadows.dart';
 import 'ui_snapshot_channel_settings.dart';
+import 'ui_snapshot_dock.dart';
 import 'ui_snapshot_fixture_data.dart';
 
 export 'ui_snapshot_fonts.dart'
@@ -286,10 +286,7 @@ GoRouter fixtureRouter(String location) => GoRouter(
       pageBuilder: (context, state) =>
           modalPage(context, const AccountRecoveryScreen()),
     ),
-    GoRoute(
-      path: '/settings/dock',
-      pageBuilder: (context, state) => modalPage(context, const DockScreen()),
-    ),
+    ...dockFixtureRoutes,
     GoRoute(
       path: '/settings/debug-log',
       pageBuilder: (context, state) =>

@@ -32,18 +32,13 @@ const Color kScrimColor = Color(0x99000000);
 /// [child] is the screen itself, unchanged: it keeps its own app bar, which
 /// becomes the panel's title bar, so neither the screen nor its tests need to
 /// know which of the two it is being shown as.
+///
+/// One page type at every width: a different page per layout made the
+/// navigator replace the route when a window crossed [kCompactWidth], which
+/// threw away whatever the screen and any sheet over it were holding.
+/// [_ModalSurface] re-lays the same [child] out instead, and the transition
+/// follows the width the same way.
 Page<void> modalPage(BuildContext context, Widget child) {
-  if (MediaQuery.sizeOf(context).width < kCompactWidth) {
-    final screen = Column(
-      children: [
-        const _ActiveCallReminder(),
-        Expanded(child: child),
-      ],
-    );
-    return AppMotion.isReduced(context)
-        ? NoTransitionPage<void>(child: screen)
-        : MaterialPage<void>(child: screen);
-  }
   // The motion spec's one 280ms moment: scrim and panel enter together, the
   // panel rising 16px; the exit runs faster (180ms, ease-in) because leaving
   // should always feel quicker than arriving.
@@ -54,7 +49,16 @@ Page<void> modalPage(BuildContext context, Widget child) {
     barrierLabel: 'Dismiss',
     transitionDuration: AppMotion.reduced(context, AppMotion.slow),
     reverseTransitionDuration: AppMotion.reduced(context, AppMotion.base),
-    transitionsBuilder: (context, animation, _, child) {
+    transitionsBuilder: (context, animation, secondary, child) {
+      if (MediaQuery.sizeOf(context).width < kCompactWidth) {
+        return Theme.of(context).pageTransitionsTheme.buildTransitions<void>(
+          ModalRoute.of(context)! as PageRoute<void>,
+          context,
+          animation,
+          secondary,
+          child,
+        );
+      }
       final curved = CurvedAnimation(
         parent: animation,
         curve: AppMotion.entrance,
@@ -72,8 +76,41 @@ Page<void> modalPage(BuildContext context, Widget child) {
         ),
       );
     },
-    child: _ModalPanel(child: child),
+    child: _ModalSurface(child: child),
   );
+}
+
+/// The whole window on a phone, the floating panel on a desktop, around one
+/// [child] whose state moves with it when the window crosses the width.
+class _ModalSurface extends StatefulWidget {
+  const _ModalSurface({required this.child});
+
+  final Widget child;
+
+  @override
+  State<_ModalSurface> createState() => _ModalSurfaceState();
+}
+
+class _ModalSurfaceState extends State<_ModalSurface> {
+  final _contentKey = GlobalKey();
+
+  @override
+  Widget build(BuildContext context) {
+    final content = KeyedSubtree(key: _contentKey, child: widget.child);
+    if (MediaQuery.sizeOf(context).width >= kCompactWidth) {
+      return _ModalPanel(child: content);
+    }
+    final tokens = Theme.of(context).extension<AppTokens>()!;
+    return ColoredBox(
+      color: tokens.surfaceBase,
+      child: Column(
+        children: [
+          const _ActiveCallReminder(),
+          Expanded(child: content),
+        ],
+      ),
+    );
+  }
 }
 
 /// A phone-width settings/admin screen takes the whole window, so an active

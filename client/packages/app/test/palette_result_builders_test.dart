@@ -11,25 +11,39 @@ import 'package:slimm_api/api.dart' as api;
 import 'package:slimm_app/src/widgets/command_palette_items.dart';
 import 'package:slimm_data/data.dart' show Channel;
 
-Channel _channel(String name, {bool personal = false}) => Channel(
-  id: 'c-$name',
-  name: name,
-  kind: 'text',
-  createdAt: 0,
-  position: 0,
-  cursor: 0,
-  lastReadSeq: 0,
-  mentionedSeq: 0,
-  slowModeSeconds: 0,
-  joinMuted: false,
-  isPersonalSpace: personal,
-);
+Channel _channel(String name, {bool personal = false, String kind = 'text'}) =>
+    Channel(
+      id: 'c-$name',
+      name: name,
+      kind: kind,
+      createdAt: 0,
+      position: 0,
+      cursor: 0,
+      lastReadSeq: 0,
+      mentionedSeq: 0,
+      slowModeSeconds: 0,
+      joinMuted: false,
+      isPersonalSpace: personal,
+    );
 
 api.UserProfile _member(String id) =>
     api.UserProfile(id: id, username: id, displayName: id, createdAt: 0);
 
 void main() {
   group('buildChannelItems', () {
+    test('a DM is found under Members, not repeated as a channel', () {
+      final channels = [
+        _channel('general'),
+        _channel('Bob', kind: 'dm'),
+        _channel('Notes', kind: 'dm', personal: true),
+      ];
+
+      final labels = buildChannelItems(channels, '').map((i) => i.label);
+
+      expect(labels, ['general', 'Notes']);
+      expect(buildChannelItems(channels, 'bob'), isEmpty);
+    });
+
     test('caps the result list at paletteResultLimit', () {
       final channels = [for (var i = 0; i < 12; i++) _channel('chan-$i')];
       expect(buildChannelItems(channels, '').length, paletteResultLimit);
