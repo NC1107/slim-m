@@ -70,4 +70,25 @@ void main() {
       );
     }
   });
+
+  testWidgets('the Shape hint only points at the caret once it exists', (
+    tester,
+  ) async {
+    AppIconButton shapeButton() => tester.widget<AppIconButton>(
+      find.ancestor(
+        of: find.bySemanticsLabel('Shape'),
+        matching: find.byType(AppIconButton),
+      ),
+    );
+
+    await tester.pumpWidget(wrapCanvasToolsRow(buildCanvasToolsRow()));
+    expect(find.bySemanticsLabel('Shape options'), findsNothing);
+    expect(shapeButton().tooltip, isNot(contains('caret')));
+
+    await tester.pumpWidget(
+      wrapCanvasToolsRow(buildCanvasToolsRow(tool: CanvasTool.shape)),
+    );
+    expect(find.bySemanticsLabel('Shape options'), findsOneWidget);
+    expect(shapeButton().tooltip, contains('caret'));
+  });
 }
