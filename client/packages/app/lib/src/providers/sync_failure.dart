@@ -19,19 +19,19 @@ enum SyncFailure {
   /// the backoff loop keeps trying and it comes back on its own.
   unreachable,
 
-  /// The server answered and said no. Waiting changes nothing; signing in
-  /// again, or being granted the permission back, is what fixes it.
+  /// The server answered 401: the session itself is no good. Waiting changes
+  /// nothing; signing in again is what fixes it.
   refused,
 }
 
 /// Which failure [error] is.
 ///
-/// Anything that is not an outright refusal counts as unreachable, including a
-/// local database failure: those are also transient from the reader's side,
-/// and claiming the server refused something it never saw would be worse.
+/// Only a 401 is a refused session. A 403 is also the answer for one channel
+/// that was deleted or hidden mid catch-up, which signing in again cannot fix,
+/// so it counts as unreachable with everything else (a local database failure
+/// included: claiming the server refused something it never saw is worse).
 SyncFailure syncFailureFor(Object error) => switch (error) {
-  api.UnauthorizedException() ||
-  api.ForbiddenException() => SyncFailure.refused,
+  api.UnauthorizedException() => SyncFailure.refused,
   _ => SyncFailure.unreachable,
 };
 

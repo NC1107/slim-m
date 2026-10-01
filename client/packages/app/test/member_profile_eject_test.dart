@@ -265,7 +265,7 @@ void main() {
     await wired.container.read(voiceControllerProvider.notifier).leave();
   });
 
-  testWidgets('a refused eject is held for the member pane, not snackbarred', (
+  testWidgets('a refused eject is held for the error host, not snackbarred', (
     tester,
   ) async {
     _giveDesktopMenuRoom(tester);
