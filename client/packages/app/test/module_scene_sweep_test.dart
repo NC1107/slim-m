@@ -36,6 +36,18 @@ void main() {
       expect(sweep.end, SceneSweep.maxTimelineSeconds);
     });
 
+    test('a delay at or past the ceiling is clamped and never throws', () {
+      for (final delay in ['9.8', '9.89', '9.9', '9.95', '10', '10.1', '1e9']) {
+        final sweep = _sweepOf(_scene(_rect('{"delay":$delay,"secs":1}')));
+        expect(sweep.delay, inInclusiveRange(0, SceneSweep.maxTimelineSeconds));
+        expect(sweep.secs, greaterThanOrEqualTo(SceneSweep.minSeconds));
+        expect(
+          sweep.delay + sweep.secs,
+          lessThanOrEqualTo(SceneSweep.maxTimelineSeconds + 1e-9),
+        );
+      }
+    });
+
     test('a missing, zero or negative duration gets the minimum', () {
       for (final body in ['{}', '{"secs":0}', '{"secs":-3}']) {
         expect(_sweepOf(_scene(_rect(body))).secs, SceneSweep.minSeconds);

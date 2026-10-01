@@ -51,9 +51,14 @@ class SceneSweep {
 
     double delta(String key) => number(key).clamp(-maxDelta, maxDelta);
     final delay = number('delay').clamp(0.0, maxTimelineSeconds - minSeconds);
+    // 10.0 - 9.9 is a hair under 0.1 in floating point, and clamp throws when its bounds cross.
+    final longest = (maxTimelineSeconds - delay).clamp(
+      minSeconds,
+      maxTimelineSeconds,
+    );
     return SceneSweep(
       delay: delay,
-      secs: number('secs').clamp(minSeconds, maxTimelineSeconds - delay),
+      secs: number('secs').clamp(minSeconds, longest),
       dx: delta('dx'),
       dy: delta('dy'),
       dw: delta('dw'),
