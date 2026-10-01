@@ -50,6 +50,37 @@ void HandleReadImage(FlMethodCall* call) {
   fl_method_call_respond_success(call, result, nullptr);
 }
 
+// The bytes arrive as PNG (the Dart side converts); GTK offers the pixbuf to
+// other apps in whatever image formats they ask for.
+void HandleWriteImage(FlMethodCall* call) {
+  FlValue* args = fl_method_call_get_args(call);
+  if (fl_value_get_type(args) != FL_VALUE_TYPE_UINT8_LIST) {
+    fl_method_call_respond_error(call, "write_failed",
+                                 "The image could not be copied.", nullptr,
+                                 nullptr);
+    return;
+  }
+
+  GdkPixbufLoader* loader = gdk_pixbuf_loader_new();
+  g_autoptr(GError) error = nullptr;
+  gboolean decoded =
+      gdk_pixbuf_loader_write(loader, fl_value_get_uint8_list(args),
+                              fl_value_get_length(args), &error) &&
+      gdk_pixbuf_loader_close(loader, &error);
+  GdkPixbuf* pixbuf = decoded ? gdk_pixbuf_loader_get_pixbuf(loader) : nullptr;
+  if (pixbuf == nullptr) {
+    g_object_unref(loader);
+    fl_method_call_respond_error(call, "write_failed",
+                                 "The image could not be copied.", nullptr,
+                                 nullptr);
+    return;
+  }
+
+  gtk_clipboard_set_image(DefaultClipboard(), pixbuf);
+  g_object_unref(loader);
+  fl_method_call_respond_success(call, nullptr, nullptr);
+}
+
 void HandleMethodCall(FlMethodChannel* channel, FlMethodCall* method_call,
                       gpointer user_data) {
   const gchar* method = fl_method_call_get_name(method_call);
@@ -57,6 +88,8 @@ void HandleMethodCall(FlMethodChannel* channel, FlMethodCall* method_call,
     HandleHasImage(method_call);
   } else if (g_strcmp0(method, "readImage") == 0) {
     HandleReadImage(method_call);
+  } else if (g_strcmp0(method, "writeImage") == 0) {
+    HandleWriteImage(method_call);
   } else {
     fl_method_call_respond_not_implemented(method_call, nullptr);
   }

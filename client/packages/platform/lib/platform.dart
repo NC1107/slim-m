@@ -8,6 +8,8 @@ export 'src/app_lock_window_channel.dart';
 export 'src/biometric_auth_channel.dart';
 export 'src/call_lifecycle_channel.dart';
 export 'src/call_notifications.dart';
+export 'src/clipboard_image_png.dart' show isPng, toPng;
+export 'src/clipboard_image_writer.dart';
 export 'src/device_push_keys.dart';
 export 'src/fcm_token_channel.dart';
 export 'src/game_allowlist.dart';

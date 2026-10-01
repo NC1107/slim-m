@@ -57,6 +57,7 @@ import 'package:slimm_design_system/design_system.dart';
 import '../providers/attachment_bytes.dart';
 import 'fullscreen_image_actions.dart';
 import 'fullscreen_image_page.dart';
+import 'image_actions_menu.dart';
 import 'message_row_parts.dart';
 
 /// How large the floating viewer is allowed to get on a desktop window.
@@ -271,18 +272,24 @@ class _FullscreenImageViewerState extends ConsumerState<FullscreenImageViewer> {
                       ),
                     ),
                   Expanded(
-                    child: PageView.builder(
-                      controller: _pages,
-                      // Zoomed in, a horizontal drag is a pan across this image, never a turn to the next one.
-                      physics: _zoomed
-                          ? const NeverScrollableScrollPhysics()
-                          : null,
-                      itemCount: widget.images.length,
-                      onPageChanged: (index) => setState(() {
-                        _current = index;
-                        _exportFailure = null;
-                      }),
-                      itemBuilder: (_, index) => _page(index),
+                    child: ImageActionsMenuRegion(
+                      image: widget.images[_current],
+                      loadBytes: _currentBytes,
+                      onFailure: (message) =>
+                          setState(() => _exportFailure = message),
+                      child: PageView.builder(
+                        controller: _pages,
+                        // Zoomed in, a horizontal drag is a pan across this image, never a turn to the next one.
+                        physics: _zoomed
+                            ? const NeverScrollableScrollPhysics()
+                            : null,
+                        itemCount: widget.images.length,
+                        onPageChanged: (index) => setState(() {
+                          _current = index;
+                          _exportFailure = null;
+                        }),
+                        itemBuilder: (_, index) => _page(index),
+                      ),
                     ),
                   ),
                 ],
