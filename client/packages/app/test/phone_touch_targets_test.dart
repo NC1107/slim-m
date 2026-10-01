@@ -123,20 +123,34 @@ void main() {
     expect(find.text('Message'), findsNothing);
   });
 
-  testWidgets('the reply quote jumps to its parent', (tester) async {
-    await _pump(
-      tester,
-      Scaffold(
-        body: _row(replyTo: message(content: 'the parent')),
-      ),
-      overrides: _resolved,
-    );
-    expectTouchTarget(
-      tester,
-      find.descendant(
-        of: find.byType(ReplyQuote),
-        matching: find.byType(InkWell),
-      ),
+  testWidgets('the reply quote keeps its height at touch density', (
+    tester,
+  ) async {
+    Future<double> quoteHeight(Size size) async {
+      tester.view.physicalSize = size;
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: _resolved,
+          child: MaterialApp(
+            theme: buildTheme(Brightness.light, AppTokens.light),
+            home: Scaffold(
+              body: _row(replyTo: message(content: 'the parent')),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      return tester.getSize(find.byType(ReplyQuote)).height;
+    }
+
+    final desktop = await quoteHeight(const Size(1280, 800));
+    final phone = await quoteHeight(const Size(390, 844));
+    expect(
+      phone,
+      desktop,
+      reason: 'a 44pt quote adds a 24px gap to every reply',
     );
   });
 

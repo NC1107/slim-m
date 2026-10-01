@@ -63,10 +63,8 @@ class ReplyQuote extends ConsumerWidget {
       color: tokens.textSecondary,
       fontStyle: resolved == null ? FontStyle.italic : null,
     );
-    final touch = AppTouchTargets.of(context);
     return Padding(
-      // A touch row carries this 4pt inside its 44pt hit area instead.
-      padding: EdgeInsets.only(bottom: touch ? 0 : AppSpacing.s4),
+      padding: const EdgeInsets.only(bottom: AppSpacing.s4),
       child: Semantics(
         button: true,
         label: label == null
@@ -80,51 +78,32 @@ class ReplyQuote extends ConsumerWidget {
             focusColor: Colors.transparent,
             onFocusChange: onFocusChange,
             borderRadius: BorderRadius.circular(AppRadii.control),
-            child: ConstrainedBox(
-              constraints: BoxConstraints(
-                minHeight: touch ? AppSizes.rowTouch : 0,
-              ),
-              // Bottom-aligned so the quote stays beside its own message, not the one above.
-              child: Align(
-                alignment: Alignment.bottomLeft,
-                widthFactor: 1,
-                child: Padding(
-                  padding: EdgeInsets.only(bottom: touch ? AppSpacing.s4 : 0),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(
-                        AppIcons.reply,
-                        size: 13,
-                        color: tokens.textSecondary,
-                      ),
-                      const SizedBox(width: AppSpacing.s4),
-                      if (label == null)
-                        // A long snippet alone would overflow the row otherwise.
-                        Flexible(
-                          child: Text(
-                            snippet,
-                            style: textStyle,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        )
-                      else
-                        Flexible(
-                          child: AuthorNameLine(
-                            name: label,
-                            profile: resolution?.profile,
-                            style: textStyle.copyWith(
-                              fontWeight: AppWeights.semi,
-                            ),
-                            secondary: snippet,
-                            secondaryStyle: textStyle,
-                          ),
-                        ),
-                    ],
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(AppIcons.reply, size: 13, color: tokens.textSecondary),
+                const SizedBox(width: AppSpacing.s4),
+                if (label == null)
+                  // A long snippet alone would overflow the row otherwise.
+                  Flexible(
+                    child: Text(
+                      snippet,
+                      style: textStyle,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  )
+                else
+                  Flexible(
+                    child: AuthorNameLine(
+                      name: label,
+                      profile: resolution?.profile,
+                      style: textStyle.copyWith(fontWeight: AppWeights.semi),
+                      secondary: snippet,
+                      secondaryStyle: textStyle,
+                    ),
                   ),
-                ),
-              ),
+              ],
             ),
           ),
         ),
