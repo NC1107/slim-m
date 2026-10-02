@@ -60,6 +60,9 @@ def label_constants():
             continue
         if name.isupper() and isinstance(value, str):
             yield name, value
+        elif name.isupper() and isinstance(value, tuple):
+            for item in value:
+                yield f"{name}[{item}]", item
 
 
 class LabelsStillExistTest(unittest.TestCase):

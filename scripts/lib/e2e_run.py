@@ -14,6 +14,7 @@ import tempfile
 import time
 import traceback
 
+import e2e_accounts
 import e2e_admin
 import e2e_canvas
 import e2e_canvas_shapes
@@ -21,7 +22,10 @@ import e2e_labels as L
 import e2e_media_slots
 import e2e_messaging
 import e2e_markdown
+import e2e_composer
 import e2e_dm_call
+import e2e_members
+import e2e_message_menu
 import e2e_reconcile
 import e2e_replies
 import e2e_settings
@@ -68,7 +72,7 @@ def go_home(client):
         time.sleep(2)
 
 
-def scenarios(a, b, admin, member, room_id, server):
+def scenarios(a, b, admin, member, room_id, server, secret):
     """Every scenario, as (name, callable). Named so a failure says which."""
     picture = os.path.join(FIXTURES, "avatar.png")
     upload = os.path.join(FIXTURES, "attachment.png")
@@ -91,6 +95,22 @@ def scenarios(a, b, admin, member, room_id, server):
         ("messaging: a thread stays off the ordinary channel list",
          lambda: e2e_threads.open_reply_and_stay_off_the_rail(
              a, b, L.TEXT_CHANNEL, admin, member)),
+        ("messaging: holding a reaction lists who left it",
+         lambda: e2e_message_menu.who_reacted_lists_the_people(
+             a, b, admin, member, L.TEXT_CHANNEL)),
+        ("messaging: the message menu opens on quick reactions, More holds "
+         "the rest",
+         lambda: e2e_message_menu.message_menu_quick_row_then_more(
+             a, b, admin, member, L.TEXT_CHANNEL)),
+        ("composer: Tab and Shift+Tab move a list item, an empty item ends it",
+         lambda: e2e_composer.list_keys_indent_outdent_and_end(
+             a, L.TEXT_CHANNEL)),
+        ("composer: a typed :shortcode: becomes its emoji",
+         lambda: e2e_composer.a_typed_shortcode_becomes_its_emoji(
+             a, L.TEXT_CHANNEL, admin)),
+        ("emoji: a custom emoji cannot take a standard shortcode's name",
+         lambda: e2e_composer.a_custom_emoji_cannot_take_a_standard_name(
+             admin, picture)),
         ("markdown: formatting applies without reaching the wire",
          lambda: e2e_markdown.formats_without_storing_the_markers(
              a, b, L.TEXT_CHANNEL, admin)),
@@ -118,6 +138,11 @@ def scenarios(a, b, admin, member, room_id, server):
         ("settings: who can join", lambda: e2e_settings.change_join_policy(
             a, admin)),
         ("admin: creating a role", lambda: e2e_admin.create_role(a, admin)),
+        ("admin: renaming a member shows the nickname everywhere",
+         lambda: e2e_members.admin_renames_a_member(
+             a, L.TEXT_CHANNEL, admin, member)),
+        ("account: the push preview is one choice across devices",
+         lambda: e2e_accounts.push_preview_is_account_wide(server, secret)),
         ("api: the routes the UI scenarios do not reach",
          lambda: e2e_sweep.run_all(
              admin, admin.channel_named(L.TEXT_CHANNEL)["id"],
@@ -187,6 +212,10 @@ def scenarios(a, b, admin, member, room_id, server):
         ("voice: a call nobody answers shows up in the dm",
          lambda: e2e_dm_call.a_missed_call_shows_up_in_the_dm(
              a, b, admin, member)),
+        # Last, because it wipes bob's browser storage and signs him in again.
+        ("account: usernames ignore case, registering and signing in",
+         lambda: e2e_accounts.usernames_ignore_case(
+             b, sign_in, server, secret, admin)),
     ]
 
 
@@ -206,7 +235,7 @@ def main():
     sign_in(b, server, "bob", secret)
 
     failures = []
-    for name, run in scenarios(a, b, admin, member, room_id, server):
+    for name, run in scenarios(a, b, admin, member, room_id, server, secret):
         if only and only not in name:
             continue
         print(f"\n== {name} ==")
