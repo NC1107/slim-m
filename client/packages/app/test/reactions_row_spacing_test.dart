@@ -32,11 +32,7 @@ Widget _harness(List<api.ReactionSummary> reactions) => MaterialApp(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         const SizedBox(height: 20, key: _above),
-        ReactionsRow(
-          reactions: reactions,
-          onReactionTap: (_) {},
-          onPickReaction: (_) {},
-        ),
+        ReactionsRow(reactions: reactions, onReactionTap: (_) {}),
       ],
     ),
   ),
