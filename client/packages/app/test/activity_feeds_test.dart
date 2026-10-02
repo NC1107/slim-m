@@ -37,6 +37,7 @@ class _FakeFeed {
       label: key,
       description: key,
       enabled: activitySwitchProvider(key),
+      via: key,
       available: Provider<bool>((ref) => available),
       open: (ref) {
         opens++;

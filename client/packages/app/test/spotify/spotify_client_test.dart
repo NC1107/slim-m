@@ -29,6 +29,9 @@ String _track({
   bool playing = true,
   String type = 'track',
   List<String> artists = const ['A', 'B'],
+  List<Map<String, Object>> images = const [
+    {'url': 'https://example.invalid/cover.jpg'},
+  ],
 }) => jsonEncode({
   'is_playing': playing,
   'currently_playing_type': type,
@@ -37,11 +40,7 @@ String _track({
     'artists': [
       for (final name in artists) {'name': name},
     ],
-    'album': {
-      'images': [
-        {'url': 'https://example.invalid/cover.jpg'},
-      ],
-    },
+    'album': {'images': images},
   },
 });
 
@@ -143,12 +142,31 @@ void main() {
     Future<SpotifyPlayback> read(http.Response response) =>
         _client((_) async => response).currentlyPlaying('token');
 
-    test('a playing track gives title and joined artists, never art', () async {
+    test('a playing track gives title and joined artists', () async {
       final playback = await read(http.Response(_track(), 200));
       expect(playback, isA<SpotifyPlaying>());
       playback as SpotifyPlaying;
       expect(playback.title, 'Song');
       expect(playback.artist, 'A, B');
+    });
+
+    const base = 'https://i.scdn.co/image/ab67616d0000';
+    const ids = {640: 'b273', 300: '1e02', 64: '4851'};
+    Map<String, Object> image(int size) => {
+      'url': '$base${ids[size]}bc2dd68b840b1d4b7c9e5ad9',
+      'width': size,
+    };
+
+    test('the cover is the smallest image that still draws sharp', () async {
+      final playback = await read(
+        http.Response(_track(images: [image(640), image(300), image(64)]), 200),
+      );
+      expect((playback as SpotifyPlaying).artUrl, image(300)['url']);
+    });
+
+    test('a cover off the Spotify CDN is never taken', () async {
+      final playback = await read(http.Response(_track(), 200));
+      expect((playback as SpotifyPlaying).artUrl, isNull);
     });
 
     test('paused, an episode, an ad and nothing are all idle', () async {

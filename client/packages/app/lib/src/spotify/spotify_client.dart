@@ -1,12 +1,14 @@
 // SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// The three Spotify calls linking needs: trade a code for tokens, refresh
-/// them, and read what is playing. Nothing else is ever requested, and no
-/// cover art URL is read (decision 0044).
+/// them, and read what is playing and whose account it is. Nothing else is
+/// ever requested. A cover URL is kept only when it passes the same
+/// allowlist the server enforces (decisions 0044 and 0056).
 library;
 
 import 'dart:convert';
 
 import 'package:http/http.dart' as http;
+import 'package:slimm_api/api.dart' show isAllowedArtUrl;
 
 import 'spotify_config.dart';
 
@@ -42,10 +44,11 @@ sealed class SpotifyPlayback {
 }
 
 class SpotifyPlaying extends SpotifyPlayback {
-  const SpotifyPlaying({required this.title, this.artist});
+  const SpotifyPlaying({required this.title, this.artist, this.artUrl});
 
   final String title;
   final String? artist;
+  final String? artUrl;
 }
 
 /// Nothing playing, paused, an ad or a podcast episode.
@@ -87,6 +90,8 @@ class SpotifyClient {
   final DateTime Function() _now;
 
   static final _tokenUri = Uri.https('accounts.spotify.com', '/api/token');
+  static const _coverWidth = 128;
+  static final _profileUri = Uri.https('api.spotify.com', '/v1/me');
   static final _playingUri = Uri.https(
     'api.spotify.com',
     '/v1/me/player/currently-playing',
@@ -173,6 +178,45 @@ class SpotifyClient {
     return SpotifyPlaying(
       title: title.trim(),
       artist: names.isEmpty ? null : names,
+      artUrl: _coverUrl(item['album']),
     );
+  }
+
+  /// The smallest allowlisted image at least [_coverWidth] wide, else the
+  /// largest allowlisted one; null when there is none.
+  String? _coverUrl(Object? album) {
+    final images = album is Map ? album['images'] : null;
+    if (images is! List) return null;
+    final covers = <({String url, int width})>[
+      for (final image in images)
+        if (image is Map &&
+            image['url'] is String &&
+            isAllowedArtUrl(image['url'] as String))
+          (url: image['url'] as String, width: image['width'] as int? ?? 0),
+    ]..sort((a, b) => a.width.compareTo(b.width));
+    if (covers.isEmpty) return null;
+    return covers
+        .firstWhere(
+          (cover) => cover.width >= _coverWidth,
+          orElse: () => covers.last,
+        )
+        .url;
+  }
+
+  /// The account's display name, or null when Spotify will not say. Linking
+  /// never fails over it: the name is only there to confirm who linked.
+  Future<String?> profileName(String accessToken) async {
+    final response = await _http.get(
+      _profileUri,
+      headers: {'Authorization': 'Bearer $accessToken'},
+    );
+    if (response.statusCode != 200) return null;
+    final json = jsonDecode(response.body);
+    if (json is! Map<String, dynamic>) return null;
+    for (final key in ['display_name', 'id']) {
+      final name = json[key];
+      if (name is String && name.trim().isNotEmpty) return name.trim();
+    }
+    return null;
   }
 }

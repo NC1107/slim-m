@@ -11,17 +11,33 @@ import 'now_playing_stub.dart' if (dart.library.io) 'now_playing_io.dart'
 
 /// One track a local player reports as playing.
 class NowPlaying {
-  const NowPlaying({required this.title, this.artist});
+  const NowPlaying({
+    required this.title,
+    this.artist,
+    this.source,
+    this.artUrl,
+  });
 
   final String title;
   final String? artist;
 
-  @override
-  bool operator ==(Object other) =>
-      other is NowPlaying && other.title == title && other.artist == artist;
+  /// The player's own name ("Spotify", "Mozilla Firefox"), when it gives one.
+  final String? source;
+
+  /// A cover image address the player reported. Not yet vetted: whoever
+  /// shares it is responsible for refusing anything but a known host.
+  final String? artUrl;
 
   @override
-  int get hashCode => Object.hash(title, artist);
+  bool operator ==(Object other) =>
+      other is NowPlaying &&
+      other.title == title &&
+      other.artist == artist &&
+      other.source == source &&
+      other.artUrl == artUrl;
+
+  @override
+  int get hashCode => Object.hash(title, artist, source, artUrl);
 }
 
 /// A local player's playback state.

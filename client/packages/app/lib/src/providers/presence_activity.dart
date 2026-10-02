@@ -68,6 +68,17 @@ String describeActivity(api.PresenceActivity activity) {
       : '$verb ${activity.title} - $subtitle';
 }
 
+/// "Listening on Spotify", "Listening", or "Playing": the line above the
+/// title, naming the reporting player when it said so.
+String activityHeading(api.PresenceActivity activity) {
+  final verb = switch (activity.kind) {
+    api.ActivityKind.listening => 'Listening',
+    api.ActivityKind.playing => 'Playing',
+  };
+  final source = activity.source;
+  return source == null ? verb : '$verb on $source';
+}
+
 /// The Lucide glyph for a kind of activity.
 IconData activityIcon(api.ActivityKind kind) => switch (kind) {
   api.ActivityKind.listening => AppIcons.listening,

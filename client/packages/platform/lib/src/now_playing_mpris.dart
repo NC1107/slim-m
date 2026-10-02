@@ -14,13 +14,23 @@ import 'polled_stream.dart';
 
 const _mprisPrefix = 'org.mpris.MediaPlayer2.';
 const _playerInterface = 'org.mpris.MediaPlayer2.Player';
+const _rootInterface = 'org.mpris.MediaPlayer2';
+const _spotifyWebArt = 'https://open.spotify.com/image/';
+const _spotifyCdnArt = 'https://i.scdn.co/image/';
 const _defaultPollInterval = Duration(seconds: 5);
 
 /// A player's own report, before deciding which one is "the" track.
 class MprisPlayerState {
-  const MprisPlayerState({required this.status, required this.metadata});
+  const MprisPlayerState({
+    required this.status,
+    required this.metadata,
+    this.identity,
+  });
 
   final String status;
+
+  /// The player's `Identity` ("Spotify", "Mozilla Firefox"), when it has one.
+  final String? identity;
   final Map<String, DBusValue> metadata;
 }
 
@@ -32,12 +42,26 @@ NowPlaying? pickNowPlaying(Iterable<MprisPlayerState> players) {
     if (title.isEmpty) continue;
     final artists = player.metadata['xesam:artist']?.asStringArray().toList();
     final artist = artists?.where((a) => a.trim().isNotEmpty).join(', ');
+    final identity = player.identity?.trim();
     return NowPlaying(
       title: title,
       artist: artist == null || artist.isEmpty ? null : artist,
+      source: identity == null || identity.isEmpty ? null : identity,
+      artUrl: _coverArt(player.metadata['mpris:artUrl']),
     );
   }
   return null;
+}
+
+/// Spotify's desktop app reports its covers on open.spotify.com, which serves
+/// the same image id as the CDN the wire accepts.
+String? _coverArt(DBusValue? value) {
+  if (value is! DBusString) return null;
+  final url = value.asString();
+  if (url.startsWith(_spotifyWebArt)) {
+    return _spotifyCdnArt + url.substring(_spotifyWebArt.length);
+  }
+  return url.isEmpty ? null : url;
 }
 
 class MprisNowPlayingSource implements NowPlayingSource {
@@ -81,6 +105,7 @@ class MprisNowPlayingSource implements NowPlayingSource {
           MprisPlayerState(
             status: status.asString(),
             metadata: metadata.asStringVariantDict(),
+            identity: await _identity(object),
           ),
         );
       } on Object {
@@ -88,5 +113,13 @@ class MprisNowPlayingSource implements NowPlayingSource {
       }
     }
     return players;
+  }
+
+  Future<String?> _identity(DBusRemoteObject object) async {
+    try {
+      return (await object.getProperty(_rootInterface, 'Identity')).asString();
+    } on Object {
+      return null;
+    }
   }
 }

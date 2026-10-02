@@ -10,12 +10,16 @@ MprisPlayerState _player(
   String status, {
   String? title,
   List<String> artists = const [],
+  String? identity,
+  String? art,
 }) =>
     MprisPlayerState(
       status: status,
+      identity: identity,
       metadata: {
         if (title != null) 'xesam:title': DBusString(title),
         'xesam:artist': DBusArray.string(artists),
+        if (art != null) 'mpris:artUrl': DBusString(art),
       },
     );
 
@@ -44,5 +48,30 @@ void main() {
 
   test('no players means nothing playing', () {
     expect(pickNowPlaying(const []), isNull);
+  });
+
+  test('names the player so a browser tab is not read as Spotify', () {
+    final picked = pickNowPlaying([
+      _player('Playing', title: 'Video', identity: ' Mozilla Firefox '),
+    ]);
+    expect(picked?.source, 'Mozilla Firefox');
+    expect(pickNowPlaying([_player('Playing', title: 'x')])?.source, isNull);
+  });
+
+  test('keeps cover art, and maps the open.spotify.com host to the CDN', () {
+    const id = 'ab67616d0000b273bc2dd68b840b1d4b7c9e5ad9';
+    expect(
+      pickNowPlaying([
+        _player('Playing', title: 'S', art: 'https://i.scdn.co/image/$id'),
+      ])?.artUrl,
+      'https://i.scdn.co/image/$id',
+    );
+    expect(
+      pickNowPlaying([
+        _player('Playing',
+            title: 'S', art: 'https://open.spotify.com/image/$id'),
+      ])?.artUrl,
+      'https://i.scdn.co/image/$id',
+    );
   });
 }

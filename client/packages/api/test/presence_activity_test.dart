@@ -30,6 +30,48 @@ void main() {
     expect(activity.startedAt, 1700000000000);
   });
 
+  test('source and art survive the wire both ways', () {
+    const art =
+        'https://i.scdn.co/image/ab67616d0000b273bc2dd68b840b1d4b7c9e5ad9';
+    final activity = PresenceActivity.tryFromJson({
+      'type': 'listening',
+      'title': 'Song',
+      'source': 'Spotify',
+      'art_url': art,
+    })!;
+    expect(activity.source, 'Spotify');
+    expect(activity.artUrl, art);
+    expect(activity.toJson(), containsPair('source', 'Spotify'));
+    expect(activity.toJson(), containsPair('art_url', art));
+  });
+
+  test('art that is not a Spotify cover is dropped on read and on write', () {
+    final id = 'ab67616d0000b273bc2dd68b840b1d4b7c9e5ad9';
+    for (final url in [
+      'http://i.scdn.co/image/$id',
+      'https://evil.example/image/$id',
+      'https://i.scdn.co/image/$id?x=1',
+      'https://i.scdn.co.evil.example/image/$id',
+      'https://i.scdn.co/image/${id.toUpperCase()}',
+      'file:///home/me/cover.png',
+    ]) {
+      expect(isAllowedArtUrl(url), isFalse, reason: url);
+      final read = PresenceActivity.tryFromJson({
+        'type': 'listening',
+        'title': 'Song',
+        'art_url': url,
+      })!;
+      expect(read.artUrl, isNull, reason: url);
+      expect(
+        PresenceActivity(kind: ActivityKind.listening, title: 'S', artUrl: url)
+            .toJson(),
+        isNot(contains('art_url')),
+        reason: url,
+      );
+    }
+    expect(isAllowedArtUrl('https://i.scdn.co/image/$id'), isTrue);
+  });
+
   test('a frame without one, or with an unknown kind, has no activity', () {
     for (final extra in <Map<String, Object?>>[
       {},

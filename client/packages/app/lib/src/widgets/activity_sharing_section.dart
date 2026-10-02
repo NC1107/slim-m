@@ -13,11 +13,12 @@ import 'package:slimm_design_system/design_system.dart';
 
 import '../providers/activity_feeds.dart';
 import '../providers/activity_sharing_settings.dart';
-import '../providers/presence_activity.dart';
 import '../spotify/spotify_link.dart';
+import 'activity_card.dart';
 import 'activity_game_list.dart';
 import 'settings_section_header.dart';
 import 'settings_toggle_row.dart';
+import 'spotify_link_row.dart';
 
 class ActivitySharingSection extends ConsumerWidget {
   const ActivitySharingSection({super.key});
@@ -46,26 +47,12 @@ class ActivitySharingSection extends ConsumerWidget {
                 semanticLabel: feed.label,
               ),
               if (feed.enabled == shareGameProvider) const ActivityGameList(),
+              if (feed.enabled == shareSpotifyProvider) const SpotifyLinkRow(),
             ],
-            const _LinkError(),
             const _SharingNow(),
           ],
         ),
       ],
-    );
-  }
-}
-
-class _LinkError extends ConsumerWidget {
-  const _LinkError();
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final message = ref.watch(spotifyLinkErrorProvider);
-    if (message == null) return const SizedBox.shrink();
-    return AppErrorState(
-      message: message,
-      onDismiss: () => ref.read(spotifyLinkErrorProvider.notifier).state = null,
     );
   }
 }
@@ -76,17 +63,24 @@ class _SharingNow extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final shared = ref.watch(sharedActivityProvider);
+    final via = ref.watch(sharedFeedProvider)?.via;
     final tokens = Theme.of(context).extension<AppTokens>()!;
     return Padding(
-      padding: const EdgeInsets.symmetric(
-        horizontal: AppSpacing.s8,
-        vertical: AppSpacing.s8,
-      ),
-      child: Text(
-        shared == null
-            ? 'Sharing right now: nothing'
-            : 'Sharing right now: ${describeActivity(shared)}',
-        style: AppText.caption.copyWith(color: tokens.textSecondary),
+      padding: const EdgeInsets.all(AppSpacing.s8),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            shared == null
+                ? 'Sharing right now: nothing'
+                : 'Sharing right now, from $via:',
+            style: AppText.caption.copyWith(color: tokens.textSecondary),
+          ),
+          if (shared != null) ...[
+            const SizedBox(height: AppSpacing.s8),
+            ActivityCard(activity: shared),
+          ],
+        ],
       ),
     );
   }

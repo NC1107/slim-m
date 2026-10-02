@@ -81,17 +81,18 @@ class ActivityPublisher {
     unawaited(_push());
   }
 
-  api.PresenceActivity? _choose() {
+  (ActivityFeed, api.PresenceActivity)? _choose() {
     if (_hidden) return null;
     for (final feed in _ref.read(activityFeedsProvider)) {
       final reading = _readings[feed];
-      if (reading != null && _wanted(feed)) return reading;
+      if (reading != null && _wanted(feed)) return (feed, reading);
     }
     return null;
   }
 
   Future<void> _push() async {
-    final wanted = _choose();
+    final choice = _choose();
+    final wanted = choice?.$2;
     if (wanted == _sent) return;
     final client = _ref.read(apiProvider);
     final previous = _sent;
@@ -103,6 +104,7 @@ class ActivityPublisher {
         await client.setPresenceActivity(wanted);
       }
       _ref.read(sharedActivityProvider.notifier).state = wanted;
+      _ref.read(sharedFeedProvider.notifier).state = choice?.$1;
     } on api.ApiException {
       // Retried by the next change; the server forgets it with the socket anyway.
       _sent = previous;
