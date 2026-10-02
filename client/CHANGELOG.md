@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.92.0](https://github.com/Slim-m-org/slim-m/compare/client-v0.91.1...client-v0.92.0) (2026-10-02)
+
+
+### Features
+
+* **client:** copy or save an image from a right-click or long-press menu ([#1588](https://github.com/Slim-m-org/slim-m/issues/1588)) ([9a6d3b3](https://github.com/Slim-m-org/slim-m/commit/9a6d3b3f44e11a8a39f1cead88c40c7188ea8585))
+* **client:** the update notice is a compact chip in the title bar ([#1587](https://github.com/Slim-m-org/slim-m/issues/1587)) ([bd40dd9](https://github.com/Slim-m-org/slim-m/commit/bd40dd9f5b3c68c9c91e0657b2a3ae3896c9071c))
+
+
+### Bug Fixes
+
+* linking Spotify reports what happened, and the listening box shows cover art and its source ([#1593](https://github.com/Slim-m-org/slim-m/issues/1593)) ([c8f3f3c](https://github.com/Slim-m-org/slim-m/commit/c8f3f3c770c81027524e1ade919519a21ceaade9))
+
 ## [0.91.1](https://github.com/Slim-m-org/slim-m/compare/client-v0.91.0...client-v0.91.1) (2026-10-02)
 
 
