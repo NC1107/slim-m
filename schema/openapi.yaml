@@ -9268,8 +9268,8 @@ components:
       description: >
         What a member is doing right now. Absent when they are doing nothing
         they chose to share, when they are offline, and to every viewer but
-        themselves when they chose `hidden`. There is deliberately no image
-        field: art is never fetched from a sender-supplied URL.
+        themselves when they chose `hidden`. The only image is `art_url`,
+        which the server accepts only as a Spotify cover URL.
       properties:
         type:
           type: string
@@ -9284,6 +9284,17 @@ components:
           type: integer
           format: int64
           description: Epoch milliseconds the activity began, when known.
+        source:
+          type: string
+          description: >
+            Which player reported it, for example Spotify or Firefox. At most
+            32 characters, never empty, no control characters.
+        art_url:
+          type: string
+          description: >
+            Cover art. Accepted only as `https://i.scdn.co/image/` followed by
+            40 lowercase hex characters, with no port, query or fragment;
+            anything else is refused with 400. Decision 0056.
 
     SetVisibilityRequest:
       type: object

@@ -71,7 +71,7 @@ An optional `activity` object on presence, in both `PresenceStatus` (`GET /prese
 Text with control characters or direction-changing marks is refused, not trimmed, so what viewers read is exactly what was sent.
 Two routes set it: `PUT /presence/activity` and `DELETE /presence/activity`.
 
-**Art is not in the first shape.**
+**Art is not in the first shape** (amended by [0056](0056-activity-art-source-and-spotify-link-feedback.md): Spotify cover URLs only, matched exactly).
 When it is added it will be an attachment or a hash the server already holds, never a URL a client supplies and the server or other clients fetch.
 A URL field would let one member make every other client (or the server) request an arbitrary address.
 Spotify's cover URLs would be fetched by the sender's client and re-uploaded, or skipped.

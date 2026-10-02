@@ -285,6 +285,55 @@ async fn malformed_and_over_long_activity_is_refused() {
     }
 }
 
+const ART: &str = "https://i.scdn.co/image/ab67616d0000b273bc2dd68b840b1d4b7c9e5ad9";
+
+#[tokio::test]
+async fn art_and_source_round_trip_for_a_viewer() {
+    let (store, _guard) = new_store().await;
+    let state = state_for(&store, Hub::new());
+    let (alice_access, alice_ticket, alice_id) = user_ticket(&store, "alice").await;
+    let (bob_access, _bob_ticket, _bob_id) = user_ticket(&store, "bob").await;
+    let alice = alice_id.to_string();
+    let _alice_ws = connect(serve(state.clone()).await, &alice_ticket).await;
+
+    let body = json!({
+        "type": "listening", "title": "Song", "subtitle": "Artist",
+        "source": "Spotify", "art_url": ART,
+    });
+    assert_eq!(
+        put_activity(&state, &alice_access, body).await,
+        StatusCode::NO_CONTENT
+    );
+    let seen = lookup(&state, &bob_access, &alice).await;
+    assert_eq!(seen["activity"]["source"], "Spotify");
+    assert_eq!(seen["activity"]["art_url"], ART);
+}
+
+#[tokio::test]
+async fn art_url_outside_the_allowlist_is_refused() {
+    let (store, _guard) = new_store().await;
+    let state = state_for(&store, Hub::new());
+    let (access, _ticket, _id) = user_ticket(&store, "alice").await;
+    let long_source = "s".repeat(slimm_server::presence_activity::MAX_SOURCE_CHARS + 1);
+    for extra in [
+        json!({ "art_url": "http://i.scdn.co/image/ab67616d0000b273bc2dd68b840b1d4b7c9e5ad9" }),
+        json!({ "art_url": "https://evil.example/image/ab67616d0000b273bc2dd68b840b1d4b7c9e5ad9" }),
+        json!({ "art_url": "" }),
+        json!({ "source": long_source }),
+        json!({ "source": "Fire\nfox" }),
+    ] {
+        let mut body = json!({ "type": "listening", "title": "x" });
+        body.as_object_mut()
+            .unwrap()
+            .extend(extra.as_object().unwrap().clone());
+        assert_eq!(
+            put_activity(&state, &access, body.clone()).await,
+            StatusCode::BAD_REQUEST,
+            "{body}"
+        );
+    }
+}
+
 #[tokio::test]
 async fn activity_writes_are_rate_limited() {
     let (store, _guard) = new_store().await;
