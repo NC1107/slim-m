@@ -1,0 +1,2 @@
+# Releases scripts/check-release-assets.py skips: the tag, then why. Keep this short.
+client-v0.91.0 the macOS build crashed (a compile bug), so it has no macOS zip or update manifest; superseded by client-v0.91.1
