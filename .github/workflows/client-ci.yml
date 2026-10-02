@@ -3,6 +3,7 @@ name: client-ci
 
 # Path-gated: a server-only or schema-only change never triggers the Flutter client build.
 on:
+  merge_group:
   push:
     branches: [main]
     paths:
