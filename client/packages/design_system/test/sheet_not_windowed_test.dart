@@ -44,15 +44,13 @@ void main() {
   setUp(() {
     windowing = features.isWindowingEnabled;
     features.isWindowingEnabled = true;
-    debugDefaultTargetPlatformOverride = TargetPlatform.linux;
   });
-  tearDown(() {
-    features.isWindowingEnabled = windowing;
-    debugDefaultTargetPlatformOverride = null;
-  });
+  tearDown(() => features.isWindowingEnabled = windowing);
 
   testWidgets('showAppSheet at desktop width pushes an in-window DialogRoute',
       (tester) async {
+    // Only the Linux build enables windowing, so only it takes the in-window route.
+    debugDefaultTargetPlatformOverride = TargetPlatform.linux;
     final observer = await _pump(
       tester,
       (context) => TextButton(
@@ -68,10 +66,13 @@ void main() {
 
     expect(observer.pushed.last, isA<DialogRoute<void>>());
     expect(find.text('sheet body'), findsOneWidget);
+    debugDefaultTargetPlatformOverride = null;
   });
 
   testWidgets('showAppTimePicker pushes an in-window DialogRoute',
       (tester) async {
+    // Only the Linux build enables windowing, so only it takes the in-window route.
+    debugDefaultTargetPlatformOverride = TargetPlatform.linux;
     final observer = await _pump(
       tester,
       (context) => TextButton(
@@ -87,5 +88,6 @@ void main() {
 
     expect(observer.pushed.last, isA<DialogRoute<TimeOfDay>>());
     expect(find.byType(TimePickerDialog), findsOneWidget);
+    debugDefaultTargetPlatformOverride = null;
   });
 }
