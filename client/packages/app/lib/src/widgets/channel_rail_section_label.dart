@@ -17,6 +17,10 @@ import 'package:slimm_design_system/design_system.dart';
 
 import 'create_channel_sheet.dart';
 
+/// How far below a touch header's middle its hugging label centres: the
+/// bottom inset plus half the label's line, off the 4dp grid for that reason.
+const double _labelCentreDrop = 6;
+
 class SectionLabel extends StatefulWidget {
   const SectionLabel(
     this.text, {
@@ -84,6 +88,7 @@ class _SectionLabelState extends State<SectionLabel> {
       revealed,
       (v) => setState(() => _trailingFocused = v),
     );
+    if (touch) return _touchHeader(label, trailing);
     return MouseRegion(
       onEnter: (_) => setState(() => _hovered = true),
       onExit: (_) => setState(() => _hovered = false),
@@ -103,6 +108,41 @@ class _SectionLabelState extends State<SectionLabel> {
                   trailing,
                 ],
               ),
+      ),
+    );
+  }
+
+  /// A full touch target tall, but with the text hugging its own rows, so the
+  /// gap above a header reads wider than the gap below it.
+  Widget _touchHeader(Widget label, Widget? trailing) {
+    final hugged = widget.onToggle == null
+        ? Align(
+            alignment: Alignment.bottomLeft,
+            child: Padding(
+              padding: const EdgeInsets.only(bottom: AppSpacing.s8),
+              child: label,
+            ),
+          )
+        : label;
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: AppSpacing.s8),
+      child: SizedBox(
+        height: AppSizes.rowTouch,
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Expanded(child: hugged),
+            if (trailing != null)
+              Align(
+                alignment: Alignment.bottomCenter,
+                // Centres the button on the label, which sits above the box's own middle.
+                child: Transform.translate(
+                  offset: const Offset(0, _labelCentreDrop),
+                  child: trailing,
+                ),
+              ),
+          ],
+        ),
       ),
     );
   }
@@ -197,22 +237,26 @@ class _FoldButton extends StatelessWidget {
       child: InkWell(
         onTap: onToggle,
         borderRadius: BorderRadius.circular(AppRadii.control),
-        child: Padding(
-          padding: EdgeInsets.symmetric(vertical: touch ? AppSpacing.s12 : 0),
-          child: Row(
-            children: [
-              AnimatedRotation(
-                turns: collapsed ? -0.25 : 0,
-                duration: AppMotion.reduced(context, AppMotion.fast),
-                child: Icon(
-                  AppIcons.chevronDown,
-                  size: AppSizes.icon16,
-                  color: tokens.textSecondary,
+        child: Align(
+          alignment: Alignment.bottomLeft,
+          heightFactor: touch ? null : 1,
+          child: Padding(
+            padding: EdgeInsets.only(bottom: touch ? AppSpacing.s8 : 0),
+            child: Row(
+              children: [
+                AnimatedRotation(
+                  turns: collapsed ? -0.25 : 0,
+                  duration: AppMotion.reduced(context, AppMotion.fast),
+                  child: Icon(
+                    AppIcons.chevronDown,
+                    size: AppSizes.icon16,
+                    color: tokens.textSecondary,
+                  ),
                 ),
-              ),
-              const SizedBox(width: AppSpacing.s4),
-              Expanded(child: child),
-            ],
+                const SizedBox(width: AppSpacing.s4),
+                Expanded(child: child),
+              ],
+            ),
           ),
         ),
       ),

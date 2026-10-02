@@ -27,6 +27,7 @@ import 'channel_rail_channel_rows.dart';
 import 'channel_rail_reorder.dart';
 import 'channel_rail_section_label.dart';
 import 'channel_rail_selection_marker.dart';
+import 'context_menu_region.dart' show ContextMenuRegionState;
 import 'dm_row.dart';
 import 'personal_space_row.dart';
 
@@ -148,6 +149,9 @@ class _ChannelCategorySectionsState
   /// one item renders as.
   bool _dragging = false;
 
+  /// One per channel, so a lifted-and-dropped row can open its own menu.
+  final _menuKeys = <String, GlobalKey<ContextMenuRegionState>>{};
+
   @override
   Widget build(BuildContext context) {
     final channels = widget.channels;
@@ -184,7 +188,7 @@ class _ChannelCategorySectionsState
     final overrides = ref.watch(channelNotificationOverridesProvider);
 
     // Breaking out of a collapsed category is an unread indicator like any other, so it reads the same rule the rows do.
-    Widget row(Channel channel, bool longPressDrags, int? dragHandleIndex) {
+    Widget row(Channel channel, bool longPressDrags) {
       final pinnedOpen =
           channel.id == selectedId ||
           unreadIndicatorFor(
@@ -206,7 +210,10 @@ class _ChannelCategorySectionsState
           child: ManagedChannelRow(
             canManage: canManage,
             reorderable: longPressDrags,
-            dragHandleIndex: dragHandleIndex,
+            menuKey: _menuKeys.putIfAbsent(
+              channel.id,
+              GlobalKey<ContextMenuRegionState>.new,
+            ),
             move: ChannelMoveActions(
               canMove: (delta) =>
                   groupsAfterStep(
@@ -286,6 +293,7 @@ class _ChannelCategorySectionsState
       headerBuilder: header,
       onDragStart: () => setState(() => _dragging = true),
       onDragEnd: () => setState(() => _dragging = false),
+      onLiftedInPlace: (channel) => _menuKeys[channel.id]?.currentState?.open(),
     );
   }
 }

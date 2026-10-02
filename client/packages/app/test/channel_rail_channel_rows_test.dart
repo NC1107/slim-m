@@ -321,7 +321,6 @@ void main() {
         ManagedChannelRow(
           canManage: true,
           reorderable: false,
-          dragHandleIndex: 0,
           channel: channel,
           row: (kebab) => AppListRow(label: channel.name, trailing: kebab),
         ),

@@ -72,9 +72,9 @@ void main() {
     for (final size in _sizesOf(tester, find.byType(AppListRow))) {
       expect(size.height, greaterThanOrEqualTo(AppSizes.rowTouch));
     }
-    // A manage button per channel plus the section's own add glyph: proof
-    // the loop above had rows to walk rather than passing vacuously.
-    expect(find.byType(AppIconButton), findsNWidgets(3));
+    // Only the section's add glyph: a phone row has no kebab. Proof the loops
+    // above had something to walk rather than passing vacuously.
+    expect(find.byType(AppIconButton), findsNWidgets(1));
     expect(find.byType(AppListRow), findsNWidgets(2));
   });
 
