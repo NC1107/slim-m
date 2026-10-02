@@ -1,5 +1,36 @@
 # Changelog
 
+## [0.91.0](https://github.com/Slim-m-org/slim-m/compare/client-v0.90.0...client-v0.91.0) (2026-10-01)
+
+
+### Features
+
+* /version reports claimed, and an unclaimed Space opens on create-account ([#1562](https://github.com/Slim-m-org/slim-m/issues/1562)) ([067d0cc](https://github.com/Slim-m-org/slim-m/commit/067d0cc593f0eb08fa46837ecfc76c4c3e0912d2))
+* an administrator can rename a member or bot, and a refused app launch stops spinning ([#1582](https://github.com/Slim-m-org/slim-m/issues/1582)) ([3512da2](https://github.com/Slim-m-org/slim-m/commit/3512da2acbdee23a75d4909f4aad8881c1121188))
+* **client:** a shorter message menu with quick reactions, a thread chip, inline edited, and a clearer edit mode ([#1577](https://github.com/Slim-m-org/slim-m/issues/1577)) ([5d423c0](https://github.com/Slim-m-org/slim-m/commit/5d423c0517ec7bc27fd9c9c6b4de808eaa721824))
+* **client:** Tab indents composer lists to three levels, and a compact channel switch no longer shows the old channel through ([#1575](https://github.com/Slim-m-org/slim-m/issues/1575)) ([90cb99e](https://github.com/Slim-m-org/slim-m/commit/90cb99e4b98aa7c87488899f3ae29f0c47d0c094))
+* search the emoji list, refuse standard shortcode names, report identical images, and turn typed :shortcodes: into emoji ([#1581](https://github.com/Slim-m-org/slim-m/issues/1581)) ([de9ed81](https://github.com/Slim-m-org/slim-m/commit/de9ed81e5f9e9264439e695d7bd7c49d0d1460c7))
+
+
+### Bug Fixes
+
+* backslash escapes, forward and empty-chat glyphs, long role chips, moderator gating, and a signed-out notice ([#1568](https://github.com/Slim-m-org/slim-m/issues/1568)) ([e58013e](https://github.com/Slim-m-org/slim-m/commit/e58013eb3e8cce135590c5aabceded33a577ee86))
+* **client:** dialogs and the time picker stay in the app window on Linux, and release notes live under About ([#1578](https://github.com/Slim-m-org/slim-m/issues/1578)) ([6d77153](https://github.com/Slim-m-org/slim-m/commit/6d7715342d669a7fb5062091a0b5c29d94930160))
+* **client:** input edges meet 3:1, a message row is one tab stop, and phone controls get 44px hit areas ([#1569](https://github.com/Slim-m-org/slim-m/issues/1569)) ([dab0313](https://github.com/Slim-m-org/slim-m/commit/dab0313507a6d6add1602c23e188a3b0fe97e8ad))
+* **client:** module scenes are bounded inline on every width, and Escape leaves full screen ([#1580](https://github.com/Slim-m-org/slim-m/issues/1580)) ([de33bef](https://github.com/Slim-m-org/slim-m/commit/de33bef51849bb04586b1b951a9d2a4ef7bd3cd3))
+* **client:** moving channels on a phone no longer lifts rows while scrolling, and can carry a row past the fold ([#1576](https://github.com/Slim-m-org/slim-m/issues/1576)) ([72ebd17](https://github.com/Slim-m-org/slim-m/commit/72ebd17b6cff984163b67d08ca082668ac22f5aa))
+* **client:** settings rows say what they do in a few words, and a gate keeps them that way ([#1585](https://github.com/Slim-m-org/slim-m/issues/1585)) ([6711775](https://github.com/Slim-m-org/slim-m/commit/671177563c8db7575437aa3822261b1f5f2a541a))
+* **client:** small voice and sign-out fixes, and one wording table for labels ([#1573](https://github.com/Slim-m-org/slim-m/issues/1573)) ([eb73322](https://github.com/Slim-m-org/slim-m/commit/eb73322ad71b628f4b76b760cdaa451ec81b7903))
+* **client:** the Dock says which version is on offer, shows every limit, and confirms an install ([#1563](https://github.com/Slim-m-org/slim-m/issues/1563)) ([bff802b](https://github.com/Slim-m-org/slim-m/commit/bff802b5ad89b264953d3477662af9c61e157e68))
+* **client:** the rail's sign-in notice works, a refused moderation action is visible, and a failed update is not reinstalled ([#1572](https://github.com/Slim-m-org/slim-m/issues/1572)) ([00b3482](https://github.com/Slim-m-org/slim-m/commit/00b3482ac402801cdd0575530d26da2172b18fd5))
+* **client:** the thread pane focuses its composer, reads as its own surface, and starts at the top ([#1579](https://github.com/Slim-m-org/slim-m/issues/1579)) ([9762da3](https://github.com/Slim-m-org/slim-m/commit/9762da3121ea742ba1b4743d3d9939608c97084b))
+* cross-device sync for unread and overrides, last seen, attachment names, mentions in code, hidden characters ([#1567](https://github.com/Slim-m-org/slim-m/issues/1567)) ([a323133](https://github.com/Slim-m-org/slim-m/commit/a323133f4b9f991654b54da04c3142637c5d0d2b))
+* self-update verification is structural, and a release run fails when an asset is missing ([#1570](https://github.com/Slim-m-org/slim-m/issues/1570)) ([16bdd7b](https://github.com/Slim-m-org/slim-m/commit/16bdd7b974e3fc681d13a88786eb107159e05490))
+* the call timer reads the call's age from the server, and five more call ui bugs ([#1566](https://github.com/Slim-m-org/slim-m/issues/1566)) ([44f3c8d](https://github.com/Slim-m-org/slim-m/commit/44f3c8d81f8d9c8df06ab6181efc5aa44a6000a1))
+* the message preview in a push is an account choice, on by default, so a reinstall or a new device no longer turns it off ([#1583](https://github.com/Slim-m-org/slim-m/issues/1583)) ([8ab0b75](https://github.com/Slim-m-org/slim-m/commit/8ab0b758fb010a50b7595018477068da1c31b238))
+* the update manifest lists the Linux tarball, and a platform with no artifact says so ([#1560](https://github.com/Slim-m-org/slim-m/issues/1560)) ([0a0e030](https://github.com/Slim-m-org/slim-m/commit/0a0e0306626f9ddb956a39cf0db943c156e71919))
+* two-factor and account deletion need the password, usernames ignore case, and a clear-totp command ([#1561](https://github.com/Slim-m-org/slim-m/issues/1561)) ([7263973](https://github.com/Slim-m-org/slim-m/commit/7263973d9e3a83f983003b3059ff41117006c90a))
+
 ## [0.90.0](https://github.com/Slim-m-org/slim-m/compare/client-v0.89.0...client-v0.90.0) (2026-10-01)
 
 
