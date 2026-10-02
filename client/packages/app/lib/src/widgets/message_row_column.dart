@@ -8,10 +8,12 @@
 library;
 
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:slimm_api/api.dart' as api;
 import 'package:slimm_data/data.dart';
 import 'package:slimm_design_system/design_system.dart';
 
+import '../providers/author_is_bot.dart';
 import 'app_surface_view.dart';
 import 'attachment_view.dart';
 import 'bot_ui_failure.dart';
@@ -31,7 +33,7 @@ import 'poll_view.dart';
 import 'reactions_row.dart';
 import 'reply_quote.dart';
 
-class MessageRowColumn extends StatelessWidget {
+class MessageRowColumn extends ConsumerWidget {
   const MessageRowColumn({
     super.key,
     required this.message,
@@ -53,6 +55,7 @@ class MessageRowColumn extends StatelessWidget {
     this.onViewEditHistory,
     this.onReplyTap,
     this.replyTo,
+    this.replyParentAdjacent = false,
     this.webhookUsername,
     this.reactions = const [],
     this.attachments = const [],
@@ -86,6 +89,9 @@ class MessageRowColumn extends StatelessWidget {
   final VoidCallback? onViewEditHistory;
   final VoidCallback? onReplyTap;
   final Message? replyTo;
+
+  /// True when the quoted parent is the row directly above this one.
+  final bool replyParentAdjacent;
   final String? webhookUsername;
   final List<api.ReactionSummary> reactions;
   final List<api.Attachment> attachments;
@@ -99,11 +105,19 @@ class MessageRowColumn extends StatelessWidget {
   final int? threadLastReplyAt;
   final int? threadUnreadCount;
 
+  /// The command a bot is answering is already the line above it.
+  static bool _isCommand(Message? parent) {
+    final text = parent?.content.trimLeft() ?? '';
+    return text.startsWith('!') || text.startsWith('/');
+  }
+
   bool get _unsent => message.pending || message.failed;
 
   @override
-  Widget build(BuildContext context) {
-    final edited = message.editedAt != null && !editing
+  Widget build(BuildContext context, WidgetRef ref) {
+    final isBot = ref.watch(authorIsBotProvider(message.authorId));
+    // A bot edits its own status as it goes, so the marker says nothing.
+    final edited = message.editedAt != null && !editing && !isBot
         ? EditedMarker(onTap: onViewEditHistory)
         : null;
     return Column(
@@ -124,7 +138,8 @@ class MessageRowColumn extends StatelessWidget {
             padding: EdgeInsets.only(bottom: AppSpacing.s4),
             child: AppBadge(variant: AppBadgeVariant.role, label: 'Editing'),
           ),
-        if (message.replyToId != null)
+        if (message.replyToId != null &&
+            !(isBot && replyParentAdjacent && _isCommand(replyTo)))
           ReplyQuote(resolved: replyTo, onTap: onReplyTap ?? () {}),
         if (editing)
           Padding(
