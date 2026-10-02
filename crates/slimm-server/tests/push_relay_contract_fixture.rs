@@ -23,11 +23,11 @@
 //! the server genuinely produced this run, not a literal retyped from
 //! scratch that could quietly stop matching what `envelope.rs`/`relay.rs`
 //! actually emit. This fixture only ever drives a message send, so `kind` is
-//! always `"message"` here even though `PushKind` also encodes `"call"` for
-//! a DM call ring (`push/call_ring.rs`) - every entry, real and synthetic
-//! alike, carries whichever real kind value this run produced; the relay
-//! must still reject an outright-unknown `kind` or `platform`, which is
-//! exactly the failure mode this contract exists to close off before it
+//! always `"message"` in it; the other kinds (`mention`, `call`, `call_end`,
+//! `security`) are captured by [`kinds`] into a sibling file, because the
+//! relay's contract test counts the entries here against its own case table.
+//! The relay must still reject an outright-unknown `kind` or `platform`, which
+//! is exactly the failure mode this contract exists to close off before it
 //! ships.
 //!
 //! Run standalone (`cargo test --all`), this test only asserts the two real
@@ -66,6 +66,9 @@ use tower::ServiceExt;
 
 mod support;
 
+#[path = "push_relay_contract_kinds/mod.rs"]
+mod kinds;
+
 /// The push tokens behind the fixture's two genuinely server-produced
 /// entries, one per platform this server can register a device for today. A
 /// token is otherwise opaque to the relay, so reusing it as each case's name
@@ -93,13 +96,27 @@ async fn new_store() -> (Store, support::TestDbGuard) {
 }
 
 fn app(store: Store, push: PushSender) -> Router {
+    app_with_voice(
+        store,
+        push,
+        slimm_server::voice::VoiceService::disabled(),
+        Hub::new(),
+    )
+}
+
+fn app_with_voice(
+    store: Store,
+    push: PushSender,
+    voice: slimm_server::voice::VoiceService,
+    hub: Hub,
+) -> Router {
     http::router(AppState {
         store,
         auth: Auth::new(2).expect("auth service"),
-        hub: Hub::new(),
+        hub,
         limiter: RateLimiter::new(),
         push,
-        voice: slimm_server::voice::VoiceService::disabled(),
+        voice,
         media: slimm_server::media::Media::for_tests(),
         gifs: slimm_server::http::gifs::GifSearch::disabled(),
         link_previews: slimm_server::http::link_preview::LinkPreviews::disabled(),
@@ -160,6 +177,7 @@ async fn register_push(
     platform: &str,
     push_token: &str,
     include_content: bool,
+    voip_push_token: Option<&str>,
 ) -> SecretKey {
     let secret = SecretKey::generate(&mut OsRng.unwrap_err());
     let public = secret.public_key();
@@ -172,6 +190,7 @@ async fn register_push(
             Some(json!({
                 "platform": platform,
                 "push_token": push_token,
+                "voip_push_token": voip_push_token,
                 "push_public_key": BASE64.encode(public.as_bytes()),
                 "include_content": include_content,
                 "include_content_chosen": true,
@@ -358,13 +377,14 @@ async fn push_relay_contract_fixture() {
     let bob_token = register_user(&store, "bob").await;
     let carol_token = register_user(&store, "carol").await;
     // One device of each shape; see this test's own module doc for why.
-    let bob_secret = register_push(&app, &bob_token, "ios", REAL_CASE_TOKEN_IOS, true).await;
+    let bob_secret = register_push(&app, &bob_token, "ios", REAL_CASE_TOKEN_IOS, true, None).await;
     let carol_secret = register_push(
         &app,
         &carol_token,
         "android",
         REAL_CASE_TOKEN_ANDROID,
         false,
+        None,
     )
     .await;
 

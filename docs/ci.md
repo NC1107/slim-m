@@ -478,6 +478,9 @@ Surfacing a break while it is cheap to fix is worth a slow check; blocking a mer
 The server and the relay agree on the push envelope's wire framing (field names, types, the platform and kind vocabulary, the payload size limit) but live in separate repos and languages, so nothing else here would notice one side changing it.
 This is the only job that checks out both and runs a server-produced request through the relay's real HTTP handler.
 See `crates/slimm-server/tests/push_relay_contract_fixture.rs` and slim-m-relay's `internal/api/push_relay_contract_test.go`.
+The fixture it hands the relay holds `message` entries only, because the relay's test counts them against its own case table.
+The same run also writes `push_relay_contract_kinds.generated.json` beside it, with one entry per other kind produced through the server's own path for it (`mention`, `call` on Android and on the iOS VoIP token, `call_end`, `security`), and asserts each entry's shape and sealed envelope in server CI.
+The relay ignores that file until its own test adopts it, so a wire-name drift in those kinds fails on this side first.
 The relay is checked out from this repository's own owner (`github.repository_owner`), so the two repos have to live under the same owner.
 
 ### No `token:` input on the relay checkout
