@@ -4,23 +4,21 @@
 library;
 
 import 'package:device_info_plus/device_info_plus.dart';
-import 'package:flutter/foundation.dart'
-    show TargetPlatform, defaultTargetPlatform, kIsWeb;
+import 'package:flutter/foundation.dart' show defaultTargetPlatform;
 
 import 'host_platform.dart';
 
-/// [deviceDisplayName], upgraded on a phone to the model the OS reports
+/// [deviceDisplayName], upgraded on a real phone build (never in a test host,
+/// where a platform channel would never answer) to the model the OS reports
 /// ("iPhone", "Pixel 8"). Never throws: a plugin that cannot answer leaves the
 /// fallback name.
 Future<String> resolveDeviceName() async {
-  if (kIsWeb) return deviceDisplayName;
+  if (!isIOSHost && !isAndroidHost) return deviceDisplayName;
   try {
     final plugin = DeviceInfoPlugin();
-    final model = switch (defaultTargetPlatform) {
-      TargetPlatform.iOS => (await plugin.iosInfo).model,
-      TargetPlatform.android => (await plugin.androidInfo).model,
-      _ => null,
-    };
+    final model = isIOSHost
+        ? (await plugin.iosInfo).model
+        : (await plugin.androidInfo).model;
     return composeDeviceName(
       defaultTargetPlatform,
       host: deviceHostName,

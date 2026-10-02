@@ -26,9 +26,13 @@ api.Device _device({
 
 void main() {
   group('devicePlatformLabel', () {
-    test('splits the platform from the hostname in parentheses', () {
-      expect(devicePlatformLabel('Linux (fedora)'), 'Linux · fedora');
-      expect(devicePlatformLabel('iOS (localhost)'), 'iOS · localhost');
+    test('reads an older parenthesised name the way new builds send it', () {
+      expect(devicePlatformLabel('Linux (fedora)'), 'Linux - fedora');
+      expect(devicePlatformLabel('Linux - fedora'), 'Linux - fedora');
+    });
+
+    test('drops the loopback host name an iPhone used to report', () {
+      expect(devicePlatformLabel('iOS (localhost)'), 'iOS');
     });
 
     test('passes a name with no parenthetical through unchanged', () {
