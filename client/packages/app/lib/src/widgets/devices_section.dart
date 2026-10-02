@@ -109,7 +109,7 @@ class _DevicesSectionState extends ConsumerState<DevicesSection> {
               child: _DeviceRow(key: ValueKey(device.id), device: device),
             ),
           AppButton(
-            label: 'Sign out',
+            label: 'Sign out unused',
             variant: AppButtonVariant.danger,
             full: true,
             disabled: _signingOutAll,

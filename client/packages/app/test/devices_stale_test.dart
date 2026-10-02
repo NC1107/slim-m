@@ -122,10 +122,12 @@ void main() {
     expect(find.textContaining('localhost'), findsNothing);
   });
 
-  testWidgets('one Sign out signs out only the stale devices', (tester) async {
+  testWidgets('one Sign out unused signs out only the stale devices', (
+    tester,
+  ) async {
     final removed = await _pump(tester, rows);
 
-    await tester.tap(find.widgetWithText(AppButton, 'Sign out'));
+    await tester.tap(find.widgetWithText(AppButton, 'Sign out unused'));
     await tester.pumpAndSettle();
     await tester.tap(find.widgetWithText(AppButton, 'Sign out').last);
     await tester.pumpAndSettle();
@@ -138,6 +140,6 @@ void main() {
   testWidgets('with nothing stale there is no group', (tester) async {
     await _pump(tester, rows.sublist(0, 2));
     expect(find.text('Not used recently'), findsNothing);
-    expect(find.widgetWithText(AppButton, 'Sign out'), findsNothing);
+    expect(find.widgetWithText(AppButton, 'Sign out unused'), findsNothing);
   });
 }
