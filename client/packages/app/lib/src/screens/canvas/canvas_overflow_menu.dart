@@ -58,7 +58,11 @@ class CanvasOverflowMenu extends StatefulWidget {
     required this.onToggleSelfBubbleHidden,
     required this.hiddenTiles,
     required this.onShowTile,
+    this.opensBelow = false,
   });
+
+  /// Opens under the button rather than over it, for a trigger in the header.
+  final bool opensBelow;
 
   final VoidCallback onPasteImage;
 
@@ -251,10 +255,14 @@ class _CanvasOverflowMenuState extends State<CanvasOverflowMenu> {
       child: CompositedTransformFollower(
         link: _link,
         showWhenUnlinked: false,
-        // Opens upward now: the trigger lives in the floating dock near the bottom of the pane, not a top bar.
-        targetAnchor: Alignment.topRight,
-        followerAnchor: Alignment.bottomRight,
-        offset: const Offset(0, -4),
+        // Upward by default: the trigger lives in the floating dock near the bottom of the pane.
+        targetAnchor: widget.opensBelow
+            ? Alignment.bottomRight
+            : Alignment.topRight,
+        followerAnchor: widget.opensBelow
+            ? Alignment.topRight
+            : Alignment.bottomRight,
+        offset: Offset(0, widget.opensBelow ? 4 : -4),
         child: TapRegion(
           onTapOutside: (_) => _controller.hide(),
           // The same keyboard route the message context menu already earned: Tab reaches every item once open, and Escape closes it.

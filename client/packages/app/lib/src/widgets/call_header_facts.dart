@@ -22,7 +22,12 @@ class CallHeaderLine extends ConsumerWidget {
     required this.channelId,
     this.mode,
     this.leading,
+    this.stacked = false,
   });
+
+  /// The facts under the title rather than beside it, where a row of
+  /// controls leaves the title too little width for both.
+  final bool stacked;
 
   final String channelId;
   final String? mode;
@@ -40,32 +45,57 @@ class CallHeaderLine extends ConsumerWidget {
       fontFamily: AppFonts.mono,
       fontFeatures: const [FontFeature.tabularFigures()],
     );
+    final titleText = Semantics(
+      container: true,
+      header: true,
+      child: Text(
+        title,
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+        style: AppText.body.copyWith(
+          color: tokens.textPrimary,
+          fontWeight: AppWeights.medium,
+        ),
+      ),
+    );
+    final live = inThisCall && voice.state == VoiceSessionState.connected;
+    final factsRow = Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Text('${voice.participants.length} in call', style: facts),
+        if (voice.connectedAt != null) ...[
+          Text(' · ', style: facts),
+          CallDuration(since: voice.connectedAt!, style: facts),
+        ],
+      ],
+    );
+    if (stacked) {
+      return Row(
+        children: [
+          ?leading,
+          Expanded(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                titleText,
+                if (live)
+                  FittedBox(
+                    fit: BoxFit.scaleDown,
+                    alignment: Alignment.centerLeft,
+                    child: factsRow,
+                  ),
+              ],
+            ),
+          ),
+        ],
+      );
+    }
     return Row(
       children: [
         ?leading,
-        Flexible(
-          child: Semantics(
-            container: true,
-            header: true,
-            child: Text(
-              title,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: AppText.body.copyWith(
-                color: tokens.textPrimary,
-                fontWeight: AppWeights.medium,
-              ),
-            ),
-          ),
-        ),
-        if (inThisCall && voice.state == VoiceSessionState.connected) ...[
-          const SizedBox(width: AppSpacing.s12),
-          Text('${voice.participants.length} in call', style: facts),
-          if (voice.connectedAt != null) ...[
-            Text(' · ', style: facts),
-            CallDuration(since: voice.connectedAt!, style: facts),
-          ],
-        ],
+        Flexible(child: titleText),
+        if (live) ...[const SizedBox(width: AppSpacing.s12), factsRow],
       ],
     );
   }

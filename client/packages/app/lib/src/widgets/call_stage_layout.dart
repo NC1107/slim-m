@@ -49,6 +49,9 @@ import 'watch_session_bar.dart';
 /// content reserves room rather than have the floating card cover it.
 const double _dockClearance = 76;
 
+/// The clearance a caller that does not measure its dock gets.
+const double defaultDockClearance = _dockClearance;
+
 /// Tall enough for [CallParticipantTile]'s own content (a camera tile runs
 /// to about 110) with room to centre it, short enough that the stage above
 /// still gets most of the height on a phone in portrait.
@@ -65,7 +68,12 @@ class CallStageLayout extends StatelessWidget {
     required this.onOpenProfile,
     required this.isDm,
     this.menuItemsBuilder,
+    this.dockClearance = _dockClearance,
   });
+
+  /// How much of the bottom edge the call's dock covers, measured by the
+  /// caller where the dock's height varies (a phone with bot controls).
+  final double dockClearance;
 
   final VoiceState voice;
   final VoiceController controller;
@@ -95,11 +103,11 @@ class CallStageLayout extends StatelessWidget {
   Widget build(BuildContext context) {
     final sharer = stageSharer(voice.participants);
     return Padding(
-      padding: const EdgeInsets.fromLTRB(
+      padding: EdgeInsets.fromLTRB(
         AppSpacing.s16,
         AppSpacing.s16,
         AppSpacing.s16,
-        AppSpacing.s16 + _dockClearance,
+        AppSpacing.s16 + dockClearance,
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
