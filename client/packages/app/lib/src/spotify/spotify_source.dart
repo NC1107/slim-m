@@ -21,8 +21,10 @@ class SpotifyNowPlayingSource implements NowPlayingSource {
     required SpotifyTokenStore store,
     Duration pollInterval = _defaultPollInterval,
     DateTime Function()? now,
+    Future<void> Function()? onRevoked,
   }) : _client = client,
        _store = store,
+       _onRevoked = onRevoked,
        _pollInterval = pollInterval,
        _now = now ?? DateTime.now;
 
@@ -30,6 +32,7 @@ class SpotifyNowPlayingSource implements NowPlayingSource {
   final SpotifyTokenStore _store;
   final Duration _pollInterval;
   final DateTime Function() _now;
+  final Future<void> Function()? _onRevoked;
   DateTime? _backoffUntil;
 
   @override
@@ -86,6 +89,7 @@ class SpotifyNowPlayingSource implements NowPlayingSource {
       return fresh;
     } on SpotifyAuthException {
       await _store.clear();
+      await _onRevoked?.call();
       return null;
     }
   }

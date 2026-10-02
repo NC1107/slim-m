@@ -27,8 +27,11 @@
 /// the link into the join dialog remains the Windows path.
 library;
 
+import 'dart:async';
+
 import 'package:app_links/app_links.dart';
 import 'package:flutter/foundation.dart';
+import 'package:flutter/widgets.dart' show WidgetsBinding;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'invite_link.dart';
@@ -36,6 +39,7 @@ import 'message_link.dart';
 import 'providers/providers.dart';
 import 'routing/router.dart';
 import 'routing/routes.dart';
+import 'spotify/spotify_callback.dart';
 import 'widgets/message_jump.dart';
 
 /// The invite a tapped link carried, waiting for the onboarding screen to
@@ -80,7 +84,14 @@ MessageLink? messageFromDeepLink(Uri uri, {required Uri? signedInTo}) {
 /// Listens for the app's whole lifetime; read once from bootstrap, next to
 /// the sync and push controllers.
 final deepLinkControllerProvider = Provider<void>((ref) {
+  final guard = SpotifyRouteGuard();
+  WidgetsBinding.instance.addObserver(guard);
+  ref.onDispose(() => WidgetsBinding.instance.removeObserver(guard));
   final sub = ref.read(deepLinkUrisProvider).listen((uri) {
+    if (isSpotifyCallback(uri)) {
+      unawaited(handleSpotifyCallback(ref, uri));
+      return;
+    }
     final signedIn = ref.read(sessionProvider).isSignedIn;
     final message = messageFromDeepLink(
       uri,
