@@ -17,6 +17,10 @@ import 'package:slimm_design_system/design_system.dart';
 
 import 'create_channel_sheet.dart';
 
+/// How far below a touch header's middle its hugging label centres: the
+/// bottom inset plus half the label's line, off the 4dp grid for that reason.
+const double _labelCentreDrop = 6;
+
 class SectionLabel extends StatefulWidget {
   const SectionLabel(
     this.text, {
@@ -129,7 +133,14 @@ class _SectionLabelState extends State<SectionLabel> {
           children: [
             Expanded(child: hugged),
             if (trailing != null)
-              Align(alignment: Alignment.bottomCenter, child: trailing),
+              Align(
+                alignment: Alignment.bottomCenter,
+                // Centres the button on the label, which sits above the box's own middle.
+                child: Transform.translate(
+                  offset: const Offset(0, _labelCentreDrop),
+                  child: trailing,
+                ),
+              ),
           ],
         ),
       ),
