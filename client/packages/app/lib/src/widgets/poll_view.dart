@@ -259,9 +259,16 @@ class _PollOptionRowState extends State<_PollOptionRow> {
                 children: [
                   // The track, always visible, so a zero-vote option still reads as a bar.
                   Positioned.fill(child: Container(color: tokens.borderSubtle)),
-                  FractionallySizedBox(
-                    widthFactor: fraction.clamp(0, 1),
-                    child: Container(color: _fillColor(tokens)),
+                  // Start-aligned: the stack's centre alignment would float a partial bar mid-track.
+                  Positioned.fill(
+                    child: Align(
+                      alignment: AlignmentDirectional.centerStart,
+                      child: FractionallySizedBox(
+                        widthFactor: fraction.clamp(0, 1),
+                        heightFactor: 1,
+                        child: Container(color: _fillColor(tokens)),
+                      ),
+                    ),
                   ),
                   Padding(
                     padding: const EdgeInsets.symmetric(
