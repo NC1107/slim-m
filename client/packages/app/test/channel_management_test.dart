@@ -15,6 +15,7 @@ import 'package:slimm_app/src/routing/routes.dart';
 import 'package:slimm_data/data.dart';
 import 'package:slimm_app/src/widgets/channel_rail.dart' show channelIdInPath;
 import 'package:slimm_app/src/widgets/channel_rail_sections.dart';
+import 'package:slimm_app/src/widgets/rail_insertion_line.dart';
 
 import 'channel_management_harness.dart';
 
@@ -218,10 +219,10 @@ void main() {
     /// dragging out is self-explanatory), so this is the only route left,
     /// and it has to work in exactly the state that used to defeat it: every
     /// channel filed, nothing uncategorised, the implicit "Channels" section
-    /// nowhere on screen until the drag itself reveals it (see
-    /// `channel_rail_sections.dart`'s `_ChannelCategorySectionsState`).
-    testWidgets('a manager can drag a channel out of its category onto the '
-        'implicit section a drag reveals', (tester) async {
+    /// nowhere on screen, and a pointer carry reaches it by dropping above the
+    /// first category header, so nothing shifts under the pointer.
+    testWidgets('a manager can carry a channel out of its category into the '
+        'undrawn implicit section above the first header', (tester) async {
       List<ChannelOrderGroup>? reported;
       await tester.pumpWidget(
         harness(
@@ -241,27 +242,24 @@ void main() {
         ),
       );
 
-      // Hidden while every channel sits in "dev" - the exact gap the drag has to close.
       expect(find.text('Channels'), findsNothing);
+      final header = tester.getRect(find.text('dev'));
 
       final gesture = await tester.startGesture(
         tester.getCenter(find.text('chat')),
+        kind: PointerDeviceKind.mouse,
       );
-      await tester.pump(kLongPressTimeout + kPressTimeout);
-      for (var i = 0; i < 4; i++) {
-        await gesture.moveBy(const Offset(0, -20));
-        await tester.pump(const Duration(milliseconds: 16));
-      }
+      await tester.pump(const Duration(milliseconds: 400));
+      await gesture.moveTo(Offset(header.center.dx, header.top - 4));
+      await tester.pump(const Duration(milliseconds: 16));
 
-      // Revealed for the length of the drag, with a real drop target rather than a zero-size placeholder.
-      expect(find.text('Channels'), findsOneWidget);
-      expect(tester.getSize(find.text('Channels')).height, greaterThan(0));
+      expect(find.text('Channels'), findsNothing, reason: 'nothing shifts');
+      expect(find.byType(RailInsertionLine), findsOneWidget);
 
       await tester.pumpAndSettle();
       await gesture.up();
       await tester.pumpAndSettle();
 
-      // Hides again once idle: the section holds something now, so this checks the same seam catches a still-empty one too.
       expect(reported, isNotNull);
       expect(reported!.firstWhere((g) => g.categoryId == null).channelIds, [
         'c1',

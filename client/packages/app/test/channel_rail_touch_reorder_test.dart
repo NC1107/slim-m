@@ -13,7 +13,6 @@ import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 import 'package:slimm_api/api.dart' as api;
 import 'package:slimm_app/src/providers/providers.dart';
-import 'package:slimm_app/src/widgets/channel_category_drag.dart';
 import 'package:slimm_app/src/widgets/rail_drag_lift.dart';
 import 'package:slimm_app/src/widgets/channel_move.dart';
 import 'package:slimm_app/src/widgets/channel_rail_reorder.dart'
@@ -229,6 +228,6 @@ void main() {
 
   testWidgets('a phone category header has no drag grip', (tester) async {
     await _pumpRail(tester);
-    expect(find.byType(CategoryDragGrip), findsNothing);
+    expect(find.byIcon(AppIcons.dragHandle), findsNothing);
   });
 }

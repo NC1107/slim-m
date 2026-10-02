@@ -14,7 +14,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:slimm_api/api.dart' show ChannelOrderGroup;
 import 'package:slimm_app/src/widgets/channel_rail_reorder.dart';
-import 'package:slimm_app/src/widgets/rail_drag_lift.dart';
 import 'package:slimm_data/data.dart';
 import 'package:slimm_design_system/design_system.dart';
 
@@ -69,93 +68,6 @@ void main() {
     expect(find.text('b'), findsOneWidget);
   });
 
-  testWidgets('a mouse drag starts moving without a held press', (
-    tester,
-  ) async {
-    // A delayed listener never began a drag that moved before its deadline.
-    List<ChannelOrderGroup>? reported;
-    await tester.pumpWidget(
-      _harness(
-        ReorderableChannelRows(
-          sections: [
-            (null, [_channel('a'), _channel('b'), _channel('c')]),
-          ],
-          canManage: true,
-          onReorder: (order) => reported = order,
-          rowBuilder: (channel, longPressDrags) =>
-              SizedBox(height: 48, child: Text(channel.id)),
-          headerBuilder: _header,
-        ),
-      ),
-    );
-
-    final gesture = await tester.startGesture(
-      tester.getCenter(find.text('a')),
-      kind: PointerDeviceKind.mouse,
-    );
-    // Straight into the move, the way a mouse drag is actually made.
-    for (var i = 0; i < 6; i++) {
-      await gesture.moveBy(const Offset(0, 20));
-      await tester.pump(const Duration(milliseconds: 16));
-    }
-    await tester.pumpAndSettle();
-    await gesture.up();
-    await tester.pumpAndSettle();
-
-    expect(reported, isNotNull, reason: 'the mouse drag never started');
-    expect(reported!.single.channelIds, isNot(['a', 'b', 'c']));
-  });
-
-  testWidgets('a mouse press takes hold of the row and the drag lifts it', (
-    tester,
-  ) async {
-    await tester.pumpWidget(
-      _harness(
-        ReorderableChannelRows(
-          sections: [
-            (null, [_channel('a'), _channel('b'), _channel('c')]),
-          ],
-          canManage: true,
-          onReorder: (_) {},
-          // A tappable row, as every real one is: a lone recognizer would win the arena on press.
-          rowBuilder: (channel, longPressDrags) => GestureDetector(
-            onTap: () {},
-            child: SizedBox(height: 48, child: Text(channel.id)),
-          ),
-          headerBuilder: _header,
-        ),
-      ),
-    );
-    double heldScale() => tester
-        .widget<AnimatedScale>(
-          find.ancestor(
-            of: find.text('a'),
-            matching: find.byType(AnimatedScale),
-          ),
-        )
-        .scale;
-    expect(heldScale(), 1);
-
-    final gesture = await tester.startGesture(
-      tester.getCenter(find.text('a')),
-      kind: PointerDeviceKind.mouse,
-    );
-    await tester.pump();
-    expect(heldScale(), AppMotion.pressScale, reason: 'pressed reads as held');
-
-    for (var i = 0; i < 6; i++) {
-      await gesture.moveBy(const Offset(0, 20));
-      await tester.pump(const Duration(milliseconds: 16));
-    }
-    expect(find.byType(RailDragLift), findsOneWidget, reason: 'carried copy');
-
-    await tester.pumpAndSettle();
-    await gesture.up();
-    await tester.pumpAndSettle();
-    expect(find.byType(RailDragLift), findsNothing, reason: 'set back down');
-    expect(heldScale(), 1);
-  });
-
   testWidgets('a mouse click on a row still reaches the row, not a drag', (
     tester,
   ) async {
@@ -181,7 +93,7 @@ void main() {
     await tester.tap(find.text('a'), kind: PointerDeviceKind.mouse);
     await tester.pumpAndSettle();
 
-    expect(tapped, 1, reason: 'the immediate drag listener must not eat taps');
+    expect(tapped, 1, reason: 'the hold recogniser must not eat taps');
     expect(reported, isNull);
   });
 
@@ -374,7 +286,7 @@ void main() {
       await tester.pumpWidget(
         _harness(
           ReorderableChannelRows(
-            sections: [(category, channels)],
+            sections: [(null, <Channel>[]), (category, channels)],
             canManage: true,
             onReorder: (order) => reported = order,
             rowBuilder: (channel, longPressDrags) {
@@ -386,13 +298,13 @@ void main() {
         ),
       );
 
-      // Drag 'a' to the top of the rail: the only category there is, so this pulls it out.
+      // Drag 'a' to the top of the rail, into the empty uncategorised section above the only category.
       final gesture = await tester.startGesture(
         tester.getCenter(find.text('a')),
       );
       await tester.pump(kLongPressTimeout + kPressTimeout);
       for (var i = 0; i < 10; i++) {
-        await gesture.moveBy(const Offset(0, -20));
+        await gesture.moveBy(const Offset(0, -30));
         await tester.pump(const Duration(milliseconds: 16));
       }
       await tester.pumpAndSettle();

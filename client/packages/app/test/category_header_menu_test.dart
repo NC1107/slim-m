@@ -19,7 +19,7 @@ import 'package:slimm_api/api.dart' as api;
 import 'package:slimm_app/src/providers/collapsed_categories_preference.dart';
 import 'package:slimm_app/src/providers/providers.dart';
 import 'package:slimm_app/src/widgets/category_header_menu.dart';
-import 'package:slimm_app/src/widgets/channel_category_drag.dart';
+import 'package:slimm_app/src/widgets/channel_rail_sections.dart';
 import 'package:slimm_data/data.dart';
 import 'package:slimm_design_system/design_system.dart';
 import 'package:slimm_platform/platform.dart';
@@ -105,8 +105,7 @@ Future<void> _pump(
   );
 }
 
-/// Both headers stacked as they render in the rail, so a drag from one's
-/// grip can land on the other.
+/// The real sections as the rail renders them, so a held header can be carried onto the other.
 Future<void> _pumpBoth(WidgetTester tester, ProviderContainer container) {
   return tester.pumpWidget(
     UncontrolledProviderScope(
@@ -114,16 +113,14 @@ Future<void> _pumpBoth(WidgetTester tester, ProviderContainer container) {
       child: MaterialApp(
         theme: buildTheme(Brightness.dark, AppTokens.dark),
         home: Scaffold(
-          body: Column(
-            children: [
-              for (final category in _categories)
-                CategoryHeaderMenu(
-                  category: category,
-                  categories: _categories,
-                  collapsed: const {},
-                  label: Text(category.name),
-                ),
-            ],
+          body: SingleChildScrollView(
+            child: ChannelCategorySections(
+              channels: const [],
+              categories: _categories,
+              selectedId: null,
+              canManage: true,
+              onReorder: (_) {},
+            ),
           ),
         ),
       ),
@@ -193,23 +190,27 @@ void main() {
   );
 
   testWidgets(
-    "dragging the first header's grip onto the second reorders exactly the "
-    'way "Move category down" does - the channels never move, only the '
-    'category list order',
+    'holding the first header and carrying it past the second reorders '
+    'exactly the way "Move category down" does - the channels never move, '
+    'only the category list order',
     (tester) async {
       final setup = _setup();
       addTearDown(setup.container.dispose);
       addTearDown(setup.db.close);
       await _pumpBoth(tester, setup.container);
 
-      final grip = find.byType(CategoryDragGrip).first;
-      final target = find.byType(CategoryHeaderMenu).last;
-
-      final gesture = await tester.startGesture(tester.getCenter(grip));
-      await tester.pump();
-      // Well into the target's bottom half - its center is an exact tie the side calculation resolves arbitrarily.
-      await gesture.moveTo(tester.getBottomLeft(target) + const Offset(10, -2));
-      await tester.pump();
+      final from = tester.getCenter(find.text('General'));
+      final gesture = await tester.startGesture(
+        from,
+        kind: PointerDeviceKind.mouse,
+      );
+      await tester.pump(const Duration(milliseconds: 400));
+      final end =
+          tester.getBottomLeft(find.text('Voice')) + const Offset(10, 30);
+      for (var i = 1; i <= 10; i++) {
+        await gesture.moveTo(Offset.lerp(from, end, i / 10)!);
+        await tester.pump(const Duration(milliseconds: 16));
+      }
       await gesture.up();
       await tester.pumpAndSettle();
 
