@@ -234,6 +234,47 @@ void main() {
     expect((body['subtitle'] as String).runes.length, 128);
   });
 
+  test(
+    'the player name and a Spotify cover go along, other art does not',
+    () async {
+      const id = 'ab67616d0000b273bc2dd68b840b1d4b7c9e5ad9';
+      final source = _FakeSource();
+      final h = _Harness(source: source);
+      addTearDown(h.dispose);
+      await h.start(enabled: true);
+
+      source.play(
+        const NowPlaying(
+          title: 'Song',
+          source: 'Spotify',
+          artUrl: 'https://i.scdn.co/image/$id',
+        ),
+      );
+      await h.settle();
+      expect(_body(h.calls.last), containsPair('source', 'Spotify'));
+      expect(
+        _body(h.calls.last),
+        containsPair('art_url', 'https://i.scdn.co/image/$id'),
+      );
+
+      source.play(
+        const NowPlaying(
+          title: 'Video',
+          source: 'Mozilla Firefox',
+          artUrl: 'https://i.ytimg.com/vi/x/hq.jpg',
+        ),
+      );
+      await h.settle();
+      final body = _body(h.calls.last);
+      expect(body['source'], 'Mozilla Firefox');
+      expect(body, isNot(contains('art_url')));
+      expect(
+        h.container.read(sharedFeedProvider)?.via,
+        "this device's media player",
+      );
+    },
+  );
+
   test('a reconnect that lost the activity sends it again', () async {
     final source = _FakeSource();
     final h = _Harness(source: source);

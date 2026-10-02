@@ -29,6 +29,12 @@ api.PresenceActivity activityFromNowPlaying(NowPlaying playing) {
     kind: api.ActivityKind.listening,
     title: capActivityText(playing.title),
     subtitle: artist == null ? null : capActivityText(artist),
+    source: playing.source == null
+        ? null
+        : String.fromCharCodes(
+            playing.source!.runes.take(api.PresenceActivity.maxSourceChars),
+          ),
+    artUrl: playing.artUrl,
   );
 }
 
@@ -51,6 +57,7 @@ class ActivityFeed {
     required this.enabled,
     required this.available,
     required this.open,
+    required this.via,
   });
 
   /// The switch's label and the sentence saying what turning it on reads.
@@ -59,6 +66,10 @@ class ActivityFeed {
 
   /// The persisted switch; off until the person turns it on.
   final StateNotifierProvider<ActivitySwitchController, bool> enabled;
+
+  /// Where the reading comes from, in a few words, so Settings can say which
+  /// of two sources that both name a track is the one being shared.
+  final String via;
 
   /// False where this device has no such source, so Settings omits the row.
   final ProviderListenable<bool> available;
@@ -72,6 +83,7 @@ final _listeningFeed = ActivityFeed(
   label: 'Show what I\'m listening to',
   description: 'Shows the track from any player on this computer.',
   enabled: shareListeningProvider,
+  via: 'this device\'s media player',
   available: nowPlayingSourceProvider.select((source) => source != null),
   open: (ref) => ref
       .read(nowPlayingSourceProvider)!
@@ -85,6 +97,7 @@ final _gameFeed = ActivityFeed(
   label: 'Show my current game',
   description: 'Only games on the list below are ever shown.',
   enabled: shareGameProvider,
+  via: 'the game list',
   available: gameSourceProvider.select((source) => source != null),
   open: (ref) => ref
       .read(gameSourceProvider)!
@@ -96,6 +109,7 @@ final _spotifyFeed = ActivityFeed(
   label: 'Show my Spotify track',
   description: 'Shows your track even when you play on another device.',
   enabled: shareSpotifyProvider,
+  via: 'your Spotify link',
   available: spotifyClientIdProvider.select((id) => id.isNotEmpty),
   open: (ref) => ref
       .read(spotifySourceProvider)
@@ -124,3 +138,6 @@ final availableActivityFeedsProvider = Provider<List<ActivityFeed>>((ref) {
 final sharedActivityProvider = StateProvider<api.PresenceActivity?>(
   (ref) => null,
 );
+
+/// The feed [sharedActivityProvider] came from, null when nothing is shared.
+final sharedFeedProvider = StateProvider<ActivityFeed?>((ref) => null);

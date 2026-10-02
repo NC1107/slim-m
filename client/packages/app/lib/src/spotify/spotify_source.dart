@@ -62,8 +62,13 @@ class SpotifyNowPlayingSource implements NowPlayingSource {
       playback = await _client.currentlyPlaying(tokens.accessToken);
     }
     switch (playback) {
-      case SpotifyPlaying(:final title, :final artist):
-        return NowPlaying(title: title, artist: artist);
+      case SpotifyPlaying(:final title, :final artist, :final artUrl):
+        return NowPlaying(
+          title: title,
+          artist: artist,
+          source: 'Spotify',
+          artUrl: artUrl,
+        );
       case SpotifyRateLimited(:final retryAfter):
         _backoffUntil = _now().add(retryAfter);
         throw const PollSkip();

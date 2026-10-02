@@ -71,7 +71,7 @@ void main() {
     expect(rig.requests, isEmpty);
     expect(
       await rig.source.watch().first,
-      const NowPlaying(title: 'Song', artist: 'A'),
+      const NowPlaying(title: 'Song', artist: 'A', source: 'Spotify'),
     );
   });
 
@@ -128,7 +128,9 @@ void main() {
     final afterLimit = rig.requests.length;
     await Future<void>.delayed(const Duration(milliseconds: 60));
     await sub.cancel();
-    expect(seen, [const NowPlaying(title: 'Song', artist: 'A')]);
+    expect(seen, [
+      const NowPlaying(title: 'Song', artist: 'A', source: 'Spotify'),
+    ]);
     expect(rig.requests.length, afterLimit);
   });
 
