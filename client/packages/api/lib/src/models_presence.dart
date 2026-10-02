@@ -67,6 +67,18 @@ enum ActivityKind {
       };
 }
 
+const _artPrefix = 'https://i.scdn.co/image/';
+const _artIdLength = 40;
+
+/// True only for a Spotify cover URL of the exact shape the server accepts
+/// (decision 0056). Checked again before drawing, so a server that widened
+/// the rule still could not make this client fetch another host.
+bool isAllowedArtUrl(String url) {
+  if (!url.startsWith(_artPrefix)) return false;
+  final id = url.substring(_artPrefix.length);
+  return id.length == _artIdLength && RegExp(r'^[0-9a-f]+$').hasMatch(id);
+}
+
 /// What a member is listening to or playing. Ephemeral: the server holds it
 /// only for as long as their socket is open and tells only those who may see
 /// their presence.
@@ -76,10 +88,15 @@ class PresenceActivity {
     required this.title,
     this.subtitle,
     this.startedAt,
-  });
+    this.source,
+    String? artUrl,
+  }) : _artUrl = artUrl;
 
   /// The most characters the server accepts in [title] or [subtitle].
   static const maxTextChars = 128;
+
+  /// The most characters the server accepts in [source].
+  static const maxSourceChars = 32;
 
   final ActivityKind kind;
   final String title;
@@ -87,6 +104,17 @@ class PresenceActivity {
 
   /// Epoch milliseconds the activity began, when the source knows.
   final int? startedAt;
+
+  /// Which player reported it ("Spotify", "Firefox"), when it said.
+  final String? source;
+
+  final String? _artUrl;
+
+  /// Spotify cover art; null for anything the server would refuse.
+  String? get artUrl {
+    final url = _artUrl;
+    return url != null && isAllowedArtUrl(url) ? url : null;
+  }
 
   /// Null when [json] is absent or unreadable.
   static PresenceActivity? tryFromJson(Object? json) {
@@ -96,11 +124,15 @@ class PresenceActivity {
     if (kind == null || title is! String || title.isEmpty) return null;
     final subtitle = json['subtitle'];
     final startedAt = json['started_at'];
+    final source = json['source'];
+    final artUrl = json['art_url'];
     return PresenceActivity(
       kind: kind,
       title: title,
       subtitle: subtitle is String && subtitle.isNotEmpty ? subtitle : null,
       startedAt: startedAt is int ? startedAt : null,
+      source: source is String && source.isNotEmpty ? source : null,
+      artUrl: artUrl is String ? artUrl : null,
     );
   }
 
@@ -109,6 +141,8 @@ class PresenceActivity {
         'title': title,
         if (subtitle != null) 'subtitle': subtitle,
         if (startedAt != null) 'started_at': startedAt,
+        if (source != null) 'source': source,
+        if (artUrl != null) 'art_url': artUrl,
       };
 
   @override
@@ -117,10 +151,13 @@ class PresenceActivity {
       other.kind == kind &&
       other.title == title &&
       other.subtitle == subtitle &&
-      other.startedAt == startedAt;
+      other.startedAt == startedAt &&
+      other.source == source &&
+      other.artUrl == artUrl;
 
   @override
-  int get hashCode => Object.hash(kind, title, subtitle, startedAt);
+  int get hashCode =>
+      Object.hash(kind, title, subtitle, startedAt, source, artUrl);
 }
 
 /// One user's presence, as told to the asking caller.
