@@ -9,11 +9,11 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:slimm_api/api.dart';
 import 'package:slimm_design_system/design_system.dart';
-import 'package:slimm_platform/platform.dart';
 
 import '../default_server.dart';
 import '../providers/providers.dart';
 import '../providers/push_controller.dart';
+import '../providers/sign_in_identity.dart';
 import '../routing/routes.dart';
 import '../server_address_reduction.dart';
 import '../server_scheme_policy.dart';
@@ -29,6 +29,7 @@ import 'sign_in_credential_fields.dart';
 import '../widgets/totp_sign_in_prompt.dart';
 import 'sign_in_error.dart';
 import 'sign_in_invite_notice.dart';
+import 'sign_in_invite_redeem.dart';
 import 'sign_in_session_ended_notice.dart';
 
 /// Sign in or create an account on a chosen server.
@@ -323,13 +324,10 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
 
     ref.read(chosenServerProvider.notifier).choose(reduced);
     final api = ref.read(apiProvider);
-    // Best-effort: a version this build cannot report is worth losing, not
-    // worth blocking sign-in over - the same tolerance deviceDisplayName
-    // gives a hostname it cannot read.
-    final clientVersion = await ref
-        .read(appInfoProvider.future)
-        .then<String?>((info) => info.version)
-        .catchError((_) => null);
+    final identity = await signInIdentity(
+      keyStore: ref.read(keyStoreProvider),
+      appInfo: ref.read(appInfoProvider.future),
+    );
 
     final invite = ref.read(pendingInviteProvider);
     try {
@@ -342,34 +340,34 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
               ? _username.text.trim()
               : _displayName.text.trim(),
           password: _password.text,
-          deviceName: deviceDisplayName,
+          deviceName: identity.deviceName,
           inviteCode: invite,
-          clientKind: deviceClientKind,
-          clientVersion: clientVersion,
+          clientKind: identity.clientKind,
+          clientVersion: identity.clientVersion,
+          installId: identity.installId,
         );
       } else {
         final outcome = await api.login(
           username: _username.text.trim(),
           password: _password.text,
-          deviceName: deviceDisplayName,
-          clientKind: deviceClientKind,
-          clientVersion: clientVersion,
+          deviceName: identity.deviceName,
+          clientKind: identity.clientKind,
+          clientVersion: identity.clientVersion,
+          installId: identity.installId,
         );
         // No session yet, so nothing below may run until one exists; abandoning the sheet leaves the screen as it was.
         if (outcome case SignInChallenged(:final challenge)) {
           if (!mounted) return;
-          final signedIn = await promptForTotpCode(context, ref, challenge);
+          final signedIn = await promptForTotpCode(
+            context,
+            ref,
+            challenge,
+            installId: identity.installId,
+          );
           if (!signedIn) return;
         }
         // An existing account can still spend a code, for the role it grants.
-        if (invite != null) {
-          try {
-            await api.redeemInvite(invite);
-          } on ApiException {
-            // The session is real either way; a spent code should not strand
-            // someone on the sign-in screen with no way forward.
-          }
-        }
+        if (invite != null) await redeemInviteQuietly(api, invite);
       }
       if (invite != null) {
         ref.read(pendingInviteProvider.notifier).state = null;

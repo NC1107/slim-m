@@ -41,31 +41,56 @@ bool get isDesktopHost => isLinuxHost || isMacOSHost || isWindowsHost;
 
 /// A short, human-recognisable name for this device, sent as `device_name`
 /// on sign-in and registration so the Devices list in settings can tell one
-/// session from another - the reason to revoke a session you don't recognise
-/// is gone the moment every row reads alike.
+/// session from another.
 ///
-/// Reads [defaultTargetPlatform] rather than [Platform]: it answers on web
-/// too, where `dart:io`'s stub would throw exactly as it does for
-/// [isIOSHost] above.
-/// The host name is folded in only where this build can read one without
-/// throwing, and that is the only thing added: no serial, build fingerprint,
-/// or user agent, nothing past what tells two rows apart.
-String get deviceDisplayName {
-  final platform = switch (defaultTargetPlatform) {
-    TargetPlatform.iOS => 'iOS',
-    TargetPlatform.android => 'Android',
-    TargetPlatform.macOS => 'Mac',
-    TargetPlatform.windows => 'Windows',
-    TargetPlatform.linux => 'Linux',
-    TargetPlatform.fuchsia => 'Fuchsia',
+/// This is the synchronous fallback: platform plus host name. A phone's real
+/// model needs an async platform call, which [resolveDeviceName] makes before
+/// falling back to this. Reads [defaultTargetPlatform] rather than [Platform]
+/// so it answers on web, where `dart:io`'s stub would throw.
+String get deviceDisplayName => composeDeviceName(
+      defaultTargetPlatform,
+      host: deviceHostName,
+    );
+
+/// Builds the name sent at sign-in. Desktop reads `Platform - host`; a
+/// phone reads its [model] and, without one, "iPhone" or "Android phone".
+///
+/// A host name that says nothing (empty, or the loopback name iOS reports
+/// when it hides the device name) is dropped: "iOS (localhost)" on every
+/// iPhone is what made the list read as the same device nine times.
+String composeDeviceName(
+  TargetPlatform platform, {
+  String? host,
+  String? model,
+}) {
+  final cleanHost = _usableLabel(host);
+  final cleanModel = _usableLabel(model);
+  return switch (platform) {
+    TargetPlatform.iOS => cleanModel ?? 'iPhone',
+    TargetPlatform.android => cleanModel ?? 'Android phone',
+    TargetPlatform.macOS => _withHost('Mac', cleanHost),
+    TargetPlatform.windows => _withHost('Windows', cleanHost),
+    TargetPlatform.linux => _withHost('Linux', cleanHost),
+    TargetPlatform.fuchsia => _withHost('Fuchsia', cleanHost),
   };
-  final host = kIsWeb ? null : _hostNameOrNull();
-  return host == null ? platform : '$platform ($host)';
 }
 
-/// `Platform.localHostname` is unsupported on some embedders; a name this
-/// build cannot read is worth losing, not worth crashing sign-in over.
-String? _hostNameOrNull() {
+String _withHost(String platform, String? host) =>
+    host == null ? platform : '$platform - $host';
+
+const _meaninglessHosts = {'localhost', 'localhost.localdomain', 'unknown'};
+
+String? _usableLabel(String? value) {
+  final trimmed = value?.trim();
+  if (trimmed == null || trimmed.isEmpty) return null;
+  return _meaninglessHosts.contains(trimmed.toLowerCase()) ? null : trimmed;
+}
+
+/// This machine's host name, or null on web and on embedders where
+/// `Platform.localHostname` is unsupported: a name this build cannot read is
+/// worth losing, not worth crashing sign-in over.
+String? get deviceHostName {
+  if (kIsWeb) return null;
   try {
     final name = Platform.localHostname.trim();
     return name.isEmpty ? null : name;

@@ -14,6 +14,7 @@ import 'package:slimm_design_system/design_system.dart';
 import '../providers/live_events.dart';
 import '../providers/providers.dart';
 import 'confirm_dialog.dart';
+import 'devices_stale.dart';
 import 'run_guarded.dart';
 import 'settings_section_header.dart';
 import 'settings_empty.dart';
@@ -80,10 +81,41 @@ class _DevicesSectionState extends ConsumerState<DevicesSection> {
     List<api.Device> list,
   ) {
     final others = list.where((d) => !d.isCurrent).toList();
+    final stale = staleDevices(list, DateTime.now());
+    final recent = list.where((d) => !stale.contains(d)).toList();
     return Column(
       children: [
-        for (final device in list)
+        for (final device in recent)
           _DeviceRow(key: ValueKey(device.id), device: device),
+        if (stale.isNotEmpty) ...[
+          Padding(
+            padding: const EdgeInsets.fromLTRB(
+              AppSpacing.s16,
+              AppSpacing.s16,
+              AppSpacing.s16,
+              AppSpacing.s4,
+            ),
+            child: Align(
+              alignment: Alignment.centerLeft,
+              child: Text(
+                'Not used recently',
+                style: AppText.caption.copyWith(color: tokens.textSecondary),
+              ),
+            ),
+          ),
+          for (final device in stale)
+            Opacity(
+              opacity: 0.6,
+              child: _DeviceRow(key: ValueKey(device.id), device: device),
+            ),
+          AppButton(
+            label: 'Remove',
+            variant: AppButtonVariant.danger,
+            full: true,
+            disabled: _signingOutAll,
+            onPressed: () => _confirmRemoveStale(context, stale),
+          ),
+        ],
         if (others.isNotEmpty) ...[
           AppButton(
             label: 'Sign out all other devices',
@@ -123,6 +155,25 @@ class _DevicesSectionState extends ConsumerState<DevicesSection> {
       confirmLabel: 'Sign out all',
     );
     if (!confirmed || !mounted) return;
+    await _signOutDevices(others);
+  }
+
+  Future<void> _confirmRemoveStale(
+    BuildContext context,
+    List<api.Device> stale,
+  ) async {
+    final confirmed = await confirmDangerousAction(
+      context,
+      title: 'Remove devices not used recently?',
+      message:
+          'They are signed out and have to sign in again to use this account.',
+      confirmLabel: 'Remove',
+    );
+    if (!confirmed || !mounted) return;
+    await _signOutDevices(stale);
+  }
+
+  Future<void> _signOutDevices(List<api.Device> others) async {
     setState(() {
       _signingOutAll = true;
       _bulkError = null;
@@ -147,13 +198,16 @@ class _DevicesSectionState extends ConsumerState<DevicesSection> {
 }
 
 /// The kind of thing a device is, guessed from the name it registered with
-/// ("iOS (localhost)", "Linux (fedora)", "desktop").
+/// ("iPhone", "Linux - fedora", "desktop").
 ///
 /// A guess, deliberately: the name is a free string the client picks at
 /// sign-in, and the server stores no platform of its own. Getting it wrong
 /// costs a slightly wrong glyph, and getting it right is what makes a list of
 /// sessions scannable for the one you do not recognise.
-IconData deviceIcon(String name) {
+IconData deviceIcon(String name, {String? clientKind}) {
+  if (clientKind == 'ios' || clientKind == 'android') {
+    return AppIcons.devicePhone;
+  }
   final lower = name.toLowerCase();
   const phones = ['ios', 'iphone', 'ipad', 'android', 'phone', 'mobile'];
   const laptops = ['macbook', 'laptop', 'linux', 'fedora', 'ubuntu', 'debian'];
@@ -175,15 +229,17 @@ String lastUsed(int? lastSeenAt) {
   return 'Last used ${delta ~/ (24 * 60 * 60 * 1000)}d ago';
 }
 
-/// Names a device by its platform rather than the raw string it registered
-/// with: "iOS (localhost)" reads as "iOS · localhost" - the hostname
-/// demoted to a detail beside the platform instead of buried inside one
-/// unbroken label. A name with no parenthetical (an older device, or a
-/// platform this build could not read a hostname for) passes through as-is.
+/// Names a device for the list: `Platform - host` as new builds send it,
+/// and the older "iOS (localhost)" shape tidied to the same form.
+///
+/// A host that says nothing (the loopback name iOS used to report on every
+/// iPhone) is dropped, so those rows read "iOS" rather than naming a host.
 String devicePlatformLabel(String name) {
   final match = RegExp(r'^(.+) \((.+)\)$').firstMatch(name);
   if (match == null) return name;
-  return '${match.group(1)} · ${match.group(2)}';
+  final host = match.group(2)!;
+  if (host.toLowerCase().startsWith('localhost')) return match.group(1)!;
+  return '${match.group(1)} - $host';
 }
 
 /// The mono detail line: client, version and last active, in that order.
@@ -262,7 +318,9 @@ class _DeviceRowState extends ConsumerState<_DeviceRow>
           onEnter: (_) => setState(() => _hovered = true),
           onExit: (_) => setState(() => _hovered = false),
           child: AppListRow(
-            leading: Icon(deviceIcon(device.name)),
+            leading: Icon(
+              deviceIcon(device.name, clientKind: device.clientKind),
+            ),
             label: devicePlatformLabel(device.name),
             subtitle: deviceDetailLine(device),
             meta: device.isCurrent
