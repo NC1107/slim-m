@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "INSERT INTO devices (id, user_id, name, created_at, last_seen_at, client_kind, client_version)\n             SELECT ?, ?, ?, ?, ?, ?, ? WHERE EXISTS (SELECT 1 FROM users WHERE id = ? AND deleted_at IS NULL)\n               AND NOT EXISTS (SELECT 1 FROM space_removals WHERE user_id = ?)\n             ON CONFLICT(id) DO UPDATE SET name = excluded.name, last_seen_at = excluded.last_seen_at,\n               client_kind = excluded.client_kind, client_version = excluded.client_version",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 9
+    },
+    "nullable": []
+  },
+  "hash": "f43cb2676c58222e3e3837c4afcdf49494ce8558b158749f5b4229681c4ad376"
+}

@@ -26,8 +26,9 @@ import 'totp_code_sheet.dart';
 Future<bool> promptForTotpCode(
   BuildContext context,
   WidgetRef ref,
-  api.TotpChallenge challenge,
-) async {
+  api.TotpChallenge challenge, {
+  String? installId,
+}) async {
   final done = await showTotpCodeSheet(
     context,
     title: 'Enter your code',
@@ -37,7 +38,11 @@ Future<bool> promptForTotpCode(
       try {
         await ref
             .read(apiProvider)
-            .verifyTotpChallenge(challenge: challenge.challenge, code: code);
+            .verifyTotpChallenge(
+              challenge: challenge.challenge,
+              code: code,
+              installId: installId,
+            );
         return null;
       } on api.ApiException catch (e) {
         return _failure(e);

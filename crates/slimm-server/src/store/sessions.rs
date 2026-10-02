@@ -23,6 +23,9 @@
 
 use sqlx::SqliteConnection;
 
+mod token_sweep;
+pub use token_sweep::SweptTokens;
+
 use super::invites::{record_redemption, spend_invite};
 use super::{JoinPolicy, Store, now_ms};
 use crate::auth::{generate_secret, hash_secret};
@@ -35,33 +38,6 @@ pub(super) const ACCESS_TTL_MS: i64 = 15 * 60 * 1000;
 pub(super) const REFRESH_TTL_MS: i64 = 30 * 24 * 60 * 60 * 1000;
 /// Connect tickets exist only to bridge a REST auth into a WebSocket upgrade.
 const WS_TICKET_TTL_MS: i64 = 30 * 1000;
-
-/// How long past its own expiry a refresh token is kept before being swept.
-///
-/// Not zero, and not tunable down casually: reuse detection works by finding
-/// the spent row and noticing `used_at` is set (see [`Store::rotate_refresh`]).
-/// Delete the row and a replayed token stops being distinguishable from one
-/// that never existed, so the family is denied softly instead of being revoked
-/// as leaked. Keeping a full extra `REFRESH_TTL_MS` past expiry means anything
-/// still worth detecting is still there: by then the token has been unusable
-/// for a month and the attacker has had nothing to gain from it for as long.
-pub(super) const REFRESH_SWEEP_GRACE_MS: i64 = REFRESH_TTL_MS;
-
-/// How long past expiry a spent or stale connect ticket is kept. Single use is
-/// enforced by `used_at` inside the 30-second window, so nothing after that
-/// window depends on the row existing; the hour is slack for clock skew.
-const TICKET_SWEEP_GRACE_MS: i64 = 60 * 60 * 1000;
-
-/// How long past expiry an access token row is kept. Authorization already
-/// checks `expires_at`, so an expired row grants nothing; the day is slack.
-const ACCESS_SWEEP_GRACE_MS: i64 = 24 * 60 * 60 * 1000;
-
-/// How many rows one sweep deletes per table.
-///
-/// Bounded so the sweep cannot take the write lock for an unbounded stretch on
-/// a deployment that has gone a long time without one. Whatever it does not
-/// reach this pass, it reaches on the next.
-const SWEEP_BATCH: i64 = 5_000;
 
 /// A freshly created account.
 #[derive(Debug, Clone)]
@@ -81,6 +57,9 @@ pub struct IssuedTokens {
     pub session_id: SessionId,
     pub user_id: UserId,
     pub device_id: DeviceId,
+    /// True when this sign-in replaced a session of an install the account
+    /// already had, so it is a re-login and not a new device.
+    pub known_install: bool,
 }
 
 /// Who a validated credential resolves to. Carries no secret.
@@ -139,81 +118,7 @@ impl From<sqlx::Error> for OpenError {
     }
 }
 
-/// What one sweep removed, so the caller can log something meaningful and a
-/// test can assert on it.
-#[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
-pub struct SweptTokens {
-    pub access_tokens: u64,
-    pub refresh_tokens: u64,
-    pub ws_tickets: u64,
-}
-
-impl SweptTokens {
-    pub fn total(self) -> u64 {
-        self.access_tokens + self.refresh_tokens + self.ws_tickets
-    }
-}
-
 impl Store {
-    /// Deletes token rows that are far enough past their expiry to be useless.
-    ///
-    /// Every sign-in writes an access token and a refresh token, every rotation
-    /// writes another refresh token, and every socket connect writes a ticket.
-    /// Nothing deleted any of them except the targeted revocation paths, so all
-    /// three tables grew for the life of a deployment and never shrank, taking
-    /// the indexes over them along for the ride.
-    ///
-    /// Each grace window is chosen so nothing that still means something is
-    /// removed; see the constants for why, particularly
-    /// [`REFRESH_SWEEP_GRACE_MS`], which reuse detection depends on.
-    ///
-    /// The three deletes are separate statements rather than one transaction:
-    /// the tables are independent, and holding the write lock across all three
-    /// buys nothing while making the pause longer.
-    pub async fn sweep_expired_tokens(&self) -> anyhow::Result<SweptTokens> {
-        let now = now_ms();
-        let access_cutoff = now - ACCESS_SWEEP_GRACE_MS;
-        let refresh_cutoff = now - REFRESH_SWEEP_GRACE_MS;
-        let ticket_cutoff = now - TICKET_SWEEP_GRACE_MS;
-
-        // Three statements, not one transaction; see the note on this function.
-        let access_tokens = sqlx::query!(
-            "DELETE FROM access_tokens WHERE rowid IN
-             (SELECT rowid FROM access_tokens WHERE expires_at < ? LIMIT ?)",
-            access_cutoff,
-            SWEEP_BATCH
-        )
-        .execute(&self.pool)
-        .await?
-        .rows_affected();
-
-        let refresh_tokens = sqlx::query!(
-            "DELETE FROM refresh_tokens WHERE rowid IN
-             (SELECT rowid FROM refresh_tokens WHERE expires_at < ? LIMIT ?)",
-            refresh_cutoff,
-            SWEEP_BATCH
-        )
-        .execute(&self.pool)
-        .await?
-        .rows_affected();
-
-        let ws_tickets = sqlx::query!(
-            "DELETE FROM ws_tickets WHERE rowid IN
-             (SELECT rowid FROM ws_tickets WHERE expires_at < ? LIMIT ?)",
-            ticket_cutoff,
-            SWEEP_BATCH
-        )
-        .execute(&self.pool)
-        .await?
-        .rows_affected();
-
-        Ok(SweptTokens {
-            access_tokens,
-            refresh_tokens,
-            ws_tickets,
-        })
-    }
-
     /// Registers an account through the front door: the deployment's join
     /// policy is applied here, atomically with the account insert.
     ///
@@ -349,7 +254,8 @@ impl Store {
         user_id: UserId,
         device_name: &str,
     ) -> Result<IssuedTokens, OpenError> {
-        self.open_session_as(user_id, device_name, None, None).await
+        self.open_session_as(user_id, device_name, None, None, None)
+            .await
     }
 
     /// Opens a session for a user: a new device, a session, a refresh token in a
@@ -360,14 +266,21 @@ impl Store {
     /// login that races an account deletion cannot mint a session for a
     /// tombstoned account: whichever of the two commits first wins, and a loser
     /// login gets [`OpenError::AccountGone`].
+    ///
+    /// With an `install_id` the device row is the install's own (see
+    /// [`install_device_id`]): signing in again reuses it and revokes the
+    /// sessions it already held, so one install is one row however often it
+    /// signs in. Without one, every sign-in is a fresh device as it always was.
     pub async fn open_session_as(
         &self,
         user_id: UserId,
         device_name: &str,
         client_kind: Option<&str>,
         client_version: Option<&str>,
+        install_id: Option<&str>,
     ) -> Result<IssuedTokens, OpenError> {
-        let device_id = DeviceId::generate();
+        let device_id =
+            install_id.map_or_else(DeviceId::generate, |i| install_device_id(user_id, i));
         let session_id = SessionId::generate();
         let family_id = FamilyId::generate();
 
@@ -381,10 +294,21 @@ impl Store {
         let refresh_expires_at = now + REFRESH_TTL_MS;
 
         let mut tx = self.begin_write().await?;
+        let known_install = install_id.is_some()
+            && sqlx::query_scalar!(
+                r#"SELECT 1 AS "one!: i64" FROM devices WHERE id = ? AND user_id = ?"#,
+                device_id,
+                user_id
+            )
+            .fetch_optional(&mut *tx)
+            .await?
+            .is_some();
         let created = sqlx::query!(
             "INSERT INTO devices (id, user_id, name, created_at, last_seen_at, client_kind, client_version)
              SELECT ?, ?, ?, ?, ?, ?, ? WHERE EXISTS (SELECT 1 FROM users WHERE id = ? AND deleted_at IS NULL)
-               AND NOT EXISTS (SELECT 1 FROM space_removals WHERE user_id = ?)",
+               AND NOT EXISTS (SELECT 1 FROM space_removals WHERE user_id = ?)
+             ON CONFLICT(id) DO UPDATE SET name = excluded.name, last_seen_at = excluded.last_seen_at,
+               client_kind = excluded.client_kind, client_version = excluded.client_version",
             device_id, user_id, device_name, now, now, client_kind, client_version, user_id, user_id
         )
         .execute(&mut *tx)
@@ -397,6 +321,20 @@ impl Store {
             } else {
                 OpenError::AccountGone
             });
+        }
+        if known_install {
+            let previous = sqlx::query_scalar!(
+                r#"SELECT id AS "id!: SessionId" FROM sessions
+                   WHERE device_id = ? AND revoked_at IS NULL"#,
+                device_id
+            )
+            .fetch_all(&mut *tx)
+            .await?;
+            for old in previous {
+                revoke_session_rows(&mut tx, old, now)
+                    .await
+                    .map_err(OpenError::Internal)?;
+            }
         }
         sqlx::query!(
             "INSERT INTO sessions (id, user_id, device_id, created_at) VALUES (?, ?, ?, ?)",
@@ -440,6 +378,7 @@ impl Store {
             session_id,
             user_id,
             device_id,
+            known_install,
         })
     }
 
@@ -561,6 +500,24 @@ impl Store {
         tx.commit().await?;
         Ok(())
     }
+}
+
+/// The device row an install owns on one account.
+///
+/// Derived, not stored, so no schema change is needed: a hash of the account
+/// and the client's `install_id`, shaped as a UUID. Scoping by account means
+/// the same install id on two accounts is two devices, and nobody can claim a
+/// device row that belongs to someone else by guessing its id.
+pub(crate) fn install_device_id(user_id: UserId, install_id: &str) -> DeviceId {
+    use sha2::{Digest, Sha256};
+    let digest = Sha256::new()
+        .chain_update(b"slimm-install-device-v1")
+        .chain_update(user_id.0.as_bytes())
+        .chain_update(install_id.as_bytes())
+        .finalize();
+    let mut bytes = [0u8; 16];
+    bytes.copy_from_slice(&digest[..16]);
+    DeviceId(uuid::Builder::from_custom_bytes(bytes).into_uuid())
 }
 
 /// Tears down a session's live credentials: access tokens and connect tickets

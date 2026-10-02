@@ -97,6 +97,10 @@ struct VerifyRequest {
     /// An authenticator code or one of the recovery codes; the server tries
     /// both rather than making the client say which it holds.
     code: String,
+    /// The install id the login request would have carried; the challenge
+    /// row does not store one.
+    #[serde(default)]
+    install_id: Option<String>,
 }
 
 // --- Handlers ---
@@ -217,9 +221,10 @@ async fn verify(
     State(state): State<AppState>,
     Json(body): Json<VerifyRequest>,
 ) -> Result<Json<super::auth::TokenResponse>, ApiError> {
+    let install_id = super::auth::parse_install_id(body.install_id.as_deref())?;
     let signed_in = state
         .store
-        .complete_totp_challenge(&body.challenge, body.code.trim())
+        .complete_totp_challenge(&body.challenge, body.code.trim(), install_id.as_deref())
         .await
         .map_err(challenge_error)?;
 

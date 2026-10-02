@@ -28,7 +28,7 @@ String _deviceJson(String id, String name, {bool isCurrent = false}) =>
       'id': id,
       'name': name,
       'created_at': 0,
-      'last_seen_at': 0,
+      'last_seen_at': DateTime.now().millisecondsSinceEpoch,
       'is_current': isCurrent,
     });
 

@@ -67,16 +67,22 @@ extension SlimmApiTotp on SlimmApi {
   /// Unauthenticated, since the caller has no session yet. [code] may be an
   /// authenticator code or a recovery code; the server tries both. The device
   /// fields come from the login request the challenge was minted for, so they
-  /// are not resent here.
+  /// are not resent here, except [installId], which the challenge does not
+  /// store.
   Future<TokenPair> verifyTotpChallenge({
     required String challenge,
     required String code,
+    String? installId,
   }) async {
     final json = await _send(
       'POST',
       '/auth/totp/verify',
       authenticated: false,
-      body: {'challenge': challenge, 'code': code},
+      body: {
+        'challenge': challenge,
+        'code': code,
+        if (installId != null) 'install_id': installId,
+      },
     );
     final tokens = TokenPair.fromJson(json as Map<String, dynamic>);
     session.set(tokens);
