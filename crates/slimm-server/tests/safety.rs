@@ -164,7 +164,13 @@ async fn devices_list_reports_client_kind_and_version_when_known() {
     let alice = store.create_account("alice", "Alice", &hash).await.unwrap();
 
     let desktop = store
-        .open_session_as(alice.id, "Linux (fedora)", Some("desktop"), Some("0.83.0"))
+        .open_session_as(
+            alice.id,
+            "Linux (fedora)",
+            Some("desktop"),
+            Some("0.83.0"),
+            None,
+        )
         .await
         .unwrap();
     let plain = store.open_session(alice.id, "an old client").await.unwrap();

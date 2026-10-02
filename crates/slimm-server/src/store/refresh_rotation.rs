@@ -169,6 +169,7 @@ impl Store {
             session_id: claimed.session_id,
             user_id: session.user_id,
             device_id: session.device_id,
+            known_install: false,
         }))
     }
 }

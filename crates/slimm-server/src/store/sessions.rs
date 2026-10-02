@@ -81,6 +81,9 @@ pub struct IssuedTokens {
     pub session_id: SessionId,
     pub user_id: UserId,
     pub device_id: DeviceId,
+    /// True when this sign-in replaced a session of an install the account
+    /// already had, so it is a re-login and not a new device.
+    pub known_install: bool,
 }
 
 /// Who a validated credential resolves to. Carries no secret.
@@ -349,7 +352,8 @@ impl Store {
         user_id: UserId,
         device_name: &str,
     ) -> Result<IssuedTokens, OpenError> {
-        self.open_session_as(user_id, device_name, None, None).await
+        self.open_session_as(user_id, device_name, None, None, None)
+            .await
     }
 
     /// Opens a session for a user: a new device, a session, a refresh token in a
@@ -360,14 +364,21 @@ impl Store {
     /// login that races an account deletion cannot mint a session for a
     /// tombstoned account: whichever of the two commits first wins, and a loser
     /// login gets [`OpenError::AccountGone`].
+    ///
+    /// With an `install_id` the device row is the install's own (see
+    /// [`install_device_id`]): signing in again reuses it and revokes the
+    /// sessions it already held, so one install is one row however often it
+    /// signs in. Without one, every sign-in is a fresh device as it always was.
     pub async fn open_session_as(
         &self,
         user_id: UserId,
         device_name: &str,
         client_kind: Option<&str>,
         client_version: Option<&str>,
+        install_id: Option<&str>,
     ) -> Result<IssuedTokens, OpenError> {
-        let device_id = DeviceId::generate();
+        let device_id =
+            install_id.map_or_else(DeviceId::generate, |i| install_device_id(user_id, i));
         let session_id = SessionId::generate();
         let family_id = FamilyId::generate();
 
@@ -381,10 +392,21 @@ impl Store {
         let refresh_expires_at = now + REFRESH_TTL_MS;
 
         let mut tx = self.begin_write().await?;
+        let known_install = install_id.is_some()
+            && sqlx::query_scalar!(
+                r#"SELECT 1 AS "one!: i64" FROM devices WHERE id = ? AND user_id = ?"#,
+                device_id,
+                user_id
+            )
+            .fetch_optional(&mut *tx)
+            .await?
+            .is_some();
         let created = sqlx::query!(
             "INSERT INTO devices (id, user_id, name, created_at, last_seen_at, client_kind, client_version)
              SELECT ?, ?, ?, ?, ?, ?, ? WHERE EXISTS (SELECT 1 FROM users WHERE id = ? AND deleted_at IS NULL)
-               AND NOT EXISTS (SELECT 1 FROM space_removals WHERE user_id = ?)",
+               AND NOT EXISTS (SELECT 1 FROM space_removals WHERE user_id = ?)
+             ON CONFLICT(id) DO UPDATE SET name = excluded.name, last_seen_at = excluded.last_seen_at,
+               client_kind = excluded.client_kind, client_version = excluded.client_version",
             device_id, user_id, device_name, now, now, client_kind, client_version, user_id, user_id
         )
         .execute(&mut *tx)
@@ -397,6 +419,20 @@ impl Store {
             } else {
                 OpenError::AccountGone
             });
+        }
+        if known_install {
+            let previous = sqlx::query_scalar!(
+                r#"SELECT id AS "id!: SessionId" FROM sessions
+                   WHERE device_id = ? AND revoked_at IS NULL"#,
+                device_id
+            )
+            .fetch_all(&mut *tx)
+            .await?;
+            for old in previous {
+                revoke_session_rows(&mut tx, old, now)
+                    .await
+                    .map_err(OpenError::Internal)?;
+            }
         }
         sqlx::query!(
             "INSERT INTO sessions (id, user_id, device_id, created_at) VALUES (?, ?, ?, ?)",
@@ -440,6 +476,7 @@ impl Store {
             session_id,
             user_id,
             device_id,
+            known_install,
         })
     }
 
@@ -561,6 +598,24 @@ impl Store {
         tx.commit().await?;
         Ok(())
     }
+}
+
+/// The device row an install owns on one account.
+///
+/// Derived, not stored, so no schema change is needed: a hash of the account
+/// and the client's `install_id`, shaped as a UUID. Scoping by account means
+/// the same install id on two accounts is two devices, and nobody can claim a
+/// device row that belongs to someone else by guessing its id.
+pub(crate) fn install_device_id(user_id: UserId, install_id: &str) -> DeviceId {
+    use sha2::{Digest, Sha256};
+    let digest = Sha256::new()
+        .chain_update(b"slimm-install-device-v1")
+        .chain_update(user_id.0.as_bytes())
+        .chain_update(install_id.as_bytes())
+        .finalize();
+    let mut bytes = [0u8; 16];
+    bytes.copy_from_slice(&digest[..16]);
+    DeviceId(uuid::Builder::from_custom_bytes(bytes).into_uuid())
 }
 
 /// Tears down a session's live credentials: access tokens and connect tickets
