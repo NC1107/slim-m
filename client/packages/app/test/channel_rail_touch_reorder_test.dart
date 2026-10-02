@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// Touch reordering of the channel rail at phone width: a finger that scrolls
-/// never lifts a row, a lifted row can be carried past the fold, and the
-/// handle is a full touch target. Drives the real `ChannelCategorySections`
+/// never lifts a row, a held press lifts it, and a lifted row can be carried
+/// past the fold. Drives the real `ChannelCategorySections`
 /// inside a scroll view the way `ChannelRail` builds it.
 library;
 
@@ -14,12 +14,10 @@ import 'package:http/testing.dart';
 import 'package:slimm_api/api.dart' as api;
 import 'package:slimm_app/src/providers/providers.dart';
 import 'package:slimm_app/src/widgets/channel_category_drag.dart';
-import 'package:slimm_app/src/widgets/channel_drag_grip.dart';
 import 'package:slimm_app/src/widgets/rail_drag_lift.dart';
 import 'package:slimm_app/src/widgets/channel_move.dart';
 import 'package:slimm_app/src/widgets/channel_rail_reorder.dart'
     show ChannelSection;
-import 'package:slimm_app/src/widgets/channel_rail_channel_rows.dart';
 import 'package:slimm_app/src/widgets/channel_rail_sections.dart';
 import 'package:slimm_data/data.dart';
 import 'package:slimm_design_system/design_system.dart';
@@ -106,22 +104,19 @@ Future<_Rail> _pumpRail(WidgetTester tester) async {
   return rail;
 }
 
-Finder _handle(String id) => find.descendant(
-  of: find.ancestor(
-    of: find.text(id),
-    matching: find.byType(ManagedChannelRow),
-  ),
-  matching: find.byType(ChannelDragGrip),
-);
+Finder _row(String id) => find.text(id);
+
+Future<void> _openMenu(WidgetTester tester, String id) async {
+  final gesture = await tester.startGesture(tester.getCenter(_row(id)));
+  await tester.pump(kLongPressTimeout + kPressTimeout);
+  await gesture.up();
+  await tester.pumpAndSettle();
+}
 
 void main() {
-  testWidgets('a finger scrolling from the right edge never lifts a row', (
-    tester,
-  ) async {
+  testWidgets('a finger scrolling from a row never lifts it', (tester) async {
     final rail = await _pumpRail(tester);
-    final start = tester.getCenter(find.byIcon(AppIcons.moreVertical).at(3));
-
-    final gesture = await tester.startGesture(start);
+    final gesture = await tester.startGesture(tester.getCenter(_row('a-03')));
     for (var i = 0; i < 12; i++) {
       await gesture.moveBy(const Offset(0, -24));
       await tester.pump(const Duration(milliseconds: 16));
@@ -131,57 +126,14 @@ void main() {
 
     expect(rail.reports, isEmpty, reason: 'a scroll must not reorder');
     expect(rail.controller.offset, greaterThan(100), reason: 'it scrolled');
-  });
-
-  testWidgets('a finger scrolling from the handle never lifts a row', (
-    tester,
-  ) async {
-    final rail = await _pumpRail(tester);
-    final start = tester.getCenter(_handle('a-02'));
-
-    final gesture = await tester.startGesture(start);
-    for (var i = 0; i < 12; i++) {
-      await gesture.moveBy(const Offset(0, -24));
-      await tester.pump(const Duration(milliseconds: 16));
-    }
-    await gesture.up();
-    await tester.pumpAndSettle();
-
-    expect(rail.reports, isEmpty, reason: 'a scroll must not reorder');
-    expect(rail.controller.offset, greaterThan(100), reason: 'it scrolled');
-  });
-
-  testWidgets('the handle is a full 44px touch target at phone width', (
-    tester,
-  ) async {
-    await _pumpRail(tester);
-    final listener = find.descendant(
-      of: _handle('a-02'),
-      matching: find.byType(ReorderableDelayedDragStartListener),
-    );
-    final rect = tester.getRect(listener);
-    expect(rect.width, greaterThanOrEqualTo(44));
-    expect(rect.height, greaterThanOrEqualTo(44));
-    final target = tester.renderObject(
-      find.descendant(of: listener, matching: find.byType(Listener)).first,
-    );
-    for (final point in [
-      rect.topLeft + const Offset(1, 1),
-      rect.bottomRight - const Offset(1, 1),
-      rect.center,
-    ]) {
-      final path = tester.hitTestOnBinding(point).path.map((e) => e.target);
-      expect(path, contains(target), reason: 'corner $point must hit the grip');
-    }
+    expect(find.byType(RailDragLift), findsNothing, reason: 'nothing lifted');
   });
 
   testWidgets(
     'a held drag at the bottom edge scrolls the rail and drops past the fold',
     (tester) async {
       final rail = await _pumpRail(tester);
-      final gesture = await tester.startGesture(
-        tester.getCenter(_handle('a-02')),
-      );
+      final gesture = await tester.startGesture(tester.getCenter(_row('a-02')));
       await tester.pump(kLongPressTimeout + kPressTimeout);
       await gesture.moveBy(const Offset(0, 8));
       await tester.pump();
@@ -215,8 +167,7 @@ void main() {
   ) async {
     final rail = await _pumpRail(tester);
 
-    await tester.tap(find.byIcon(AppIcons.moreVertical).at(1));
-    await tester.pumpAndSettle();
+    await _openMenu(tester, 'a-01');
     expect(find.text('Move up'), findsOneWidget);
     await tester.tap(find.text('Move down'));
     await tester.pumpAndSettle();
@@ -232,8 +183,7 @@ void main() {
     (tester) async {
       final rail = await _pumpRail(tester);
 
-      await tester.tap(find.byIcon(AppIcons.moreVertical).first);
-      await tester.pumpAndSettle();
+      await _openMenu(tester, 'a-00');
       await tester.tap(find.text('Move up'));
       await tester.pumpAndSettle();
 
@@ -277,24 +227,8 @@ void main() {
     });
   });
 
-  testWidgets(
-    'a finger scrolling from a category grip never lifts the category',
-    (tester) async {
-      final rail = await _pumpRail(tester);
-      final grip = find.byType(CategoryDragGrip).first;
-      expect(tester.getSize(grip).width, greaterThanOrEqualTo(44));
-      expect(tester.getSize(grip).height, greaterThanOrEqualTo(44));
-
-      final gesture = await tester.startGesture(tester.getCenter(grip));
-      for (var i = 0; i < 12; i++) {
-        await gesture.moveBy(const Offset(0, -24));
-        await tester.pump(const Duration(milliseconds: 16));
-      }
-      expect(find.byType(RailDragLift), findsNothing, reason: 'nothing lifted');
-      await gesture.up();
-      await tester.pumpAndSettle();
-
-      expect(rail.controller.offset, greaterThan(100), reason: 'it scrolled');
-    },
-  );
+  testWidgets('a phone category header has no drag grip', (tester) async {
+    await _pumpRail(tester);
+    expect(find.byType(CategoryDragGrip), findsNothing);
+  });
 }

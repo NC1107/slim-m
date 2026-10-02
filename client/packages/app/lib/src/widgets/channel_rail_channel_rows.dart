@@ -22,7 +22,6 @@ import '../providers/voice_controller.dart';
 import '../providers/voice_flags.dart';
 import '../providers/voice_roster.dart';
 import '../routing/routes.dart';
-import 'channel_drag_grip.dart';
 import 'channel_kind_icon.dart';
 import 'channel_move.dart';
 import 'channel_row_menu.dart';
@@ -41,7 +40,7 @@ class ManagedChannelRow extends StatefulWidget {
     super.key,
     required this.canManage,
     required this.reorderable,
-    this.dragHandleIndex,
+    this.menuKey,
     this.move,
     required this.channel,
     required this.row,
@@ -58,10 +57,9 @@ class ManagedChannelRow extends StatefulWidget {
   /// keyboard route are both unaffected either way.
   final bool reorderable;
 
-  /// Non-null when this row keeps its long-press menu and shows a
-  /// [ChannelDragGrip] beside the kebab instead - see
-  /// `channel_rail_reorder.dart` for which arrangement applies where.
-  final int? dragHandleIndex;
+  /// Lets the rail open this row's menu when a held press is released without
+  /// moving the row (`channel_rail_reorder.dart`).
+  final GlobalKey<ContextMenuRegionState>? menuKey;
 
   /// The non-gesture way to reorder, offered in the menu to a manager.
   final ChannelMoveActions? move;
@@ -83,7 +81,8 @@ class _ManagedChannelRowState extends State<ManagedChannelRow> {
   /// Reached by the kebab too (see [build]'s `onPressed`), so a tap there
   /// opens the exact same menu a right-click or long-press would rather than
   /// the separate "manage" sheet the kebab used to jump to directly.
-  final _menuKey = GlobalKey<ContextMenuRegionState>();
+  late final GlobalKey<ContextMenuRegionState> _menuKey =
+      widget.menuKey ?? GlobalKey<ContextMenuRegionState>();
 
   /// This row's own context, not the one `itemsBuilder` hands in: on a
   /// compact width the menu is a sheet pushed straight onto the root
@@ -109,17 +108,29 @@ class _ManagedChannelRowState extends State<ManagedChannelRow> {
       );
     }
     final enableLongPress = !widget.reorderable;
+    final touch = AppTouchTargets.of(context);
+    if (touch) {
+      // A phone row is icon, name and badge; options open from the held press.
+      return ContextMenuRegion(
+        key: _menuKey,
+        itemsBuilder: _menuItems,
+        ownsFocusNode: false,
+        enableLongPress: enableLongPress,
+        child: Semantics(
+          onLongPress: () => _menuKey.currentState?.open(),
+          child: widget.row(null),
+        ),
+      );
+    }
     // Mirrors _SectionLabel's own trailing inset so this glyph and the
     // section's add glyph share a right edge; both are AppIconButtonSize.sm.
-    final touch = AppTouchTargets.of(context);
-    final trailingPad = touch ? 0.0 : 4.0;
+    const trailingPad = 4.0;
 
     // A persistent kebab on every row adds a column of noise to the calmest
     // part of the shell, so a pointer reveals it on row hover (or when tab
     // reaches it, so a keyboard user never focuses something invisible). The
-    // slot keeps its width either way; nothing reflows. A finger has no
-    // hover, so touch keeps it always visible.
-    final shown = touch || _hovered || _kebabFocused;
+    // slot keeps its width either way; nothing reflows.
+    final shown = _hovered || _kebabFocused;
     final kebab = Padding(
       padding: EdgeInsets.only(right: trailingPad),
       child: SizedBox(
@@ -148,18 +159,6 @@ class _ManagedChannelRowState extends State<ManagedChannelRow> {
         ),
       ),
     );
-    final handled = widget.dragHandleIndex == null
-        ? kebab
-        : Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              ChannelDragGrip(
-                index: widget.dragHandleIndex!,
-                channelName: widget.channel.name,
-              ),
-              kebab,
-            ],
-          );
     // Inside the row's trailing slot, so no combined height to float against.
     return ContextMenuRegion(
       key: _menuKey,
@@ -169,7 +168,7 @@ class _ManagedChannelRowState extends State<ManagedChannelRow> {
       child: MouseRegion(
         onEnter: (_) => setState(() => _hovered = true),
         onExit: (_) => setState(() => _hovered = false),
-        child: widget.row(handled),
+        child: widget.row(kebab),
       ),
     );
   }

@@ -54,7 +54,7 @@ void main() {
           ],
           canManage: false,
           onReorder: (_) => fail('must not be reachable without canManage'),
-          rowBuilder: (channel, longPressDrags, dragHandleIndex) {
+          rowBuilder: (channel, longPressDrags) {
             expect(longPressDrags, isFalse);
             return Text(channel.id);
           },
@@ -82,7 +82,7 @@ void main() {
           ],
           canManage: true,
           onReorder: (order) => reported = order,
-          rowBuilder: (channel, longPressDrags, dragHandleIndex) =>
+          rowBuilder: (channel, longPressDrags) =>
               SizedBox(height: 48, child: Text(channel.id)),
           headerBuilder: _header,
         ),
@@ -118,11 +118,10 @@ void main() {
           canManage: true,
           onReorder: (_) {},
           // A tappable row, as every real one is: a lone recognizer would win the arena on press.
-          rowBuilder: (channel, longPressDrags, dragHandleIndex) =>
-              GestureDetector(
-                onTap: () {},
-                child: SizedBox(height: 48, child: Text(channel.id)),
-              ),
+          rowBuilder: (channel, longPressDrags) => GestureDetector(
+            onTap: () {},
+            child: SizedBox(height: 48, child: Text(channel.id)),
+          ),
           headerBuilder: _header,
         ),
       ),
@@ -170,11 +169,10 @@ void main() {
           ],
           canManage: true,
           onReorder: (order) => reported = order,
-          rowBuilder: (channel, longPressDrags, dragHandleIndex) =>
-              GestureDetector(
-                onTap: () => tapped++,
-                child: SizedBox(height: 48, child: Text(channel.id)),
-              ),
+          rowBuilder: (channel, longPressDrags) => GestureDetector(
+            onTap: () => tapped++,
+            child: SizedBox(height: 48, child: Text(channel.id)),
+          ),
           headerBuilder: _header,
         ),
       ),
@@ -199,7 +197,7 @@ void main() {
           ],
           canManage: true,
           onReorder: (order) => reported = order,
-          rowBuilder: (channel, longPressDrags, dragHandleIndex) {
+          rowBuilder: (channel, longPressDrags) {
             expect(longPressDrags, isTrue);
             return SizedBox(height: 48, child: Text(channel.id));
           },
@@ -249,7 +247,7 @@ void main() {
             ],
             canManage: true,
             onReorder: (order) => reported = order,
-            rowBuilder: (channel, longPressDrags, dragHandleIndex) {
+            rowBuilder: (channel, longPressDrags) {
               expect(longPressDrags, isTrue);
               return SizedBox(height: 48, child: Text(channel.id));
             },
@@ -285,14 +283,13 @@ void main() {
   );
 
   testWidgets(
-    'a phone leaves the held press to the context menu and drags from a handle',
+    'a phone lifts a row on a held press and a plain drag stays a scroll',
     (tester) async {
       tester.view.physicalSize = const Size(390, 844);
       tester.view.devicePixelRatio = 1;
       addTearDown(tester.view.resetPhysicalSize);
       addTearDown(tester.view.resetDevicePixelRatio);
 
-      final indices = <int?>[];
       List<ChannelOrderGroup>? reported;
       await tester.pumpWidget(
         _harness(
@@ -302,34 +299,19 @@ void main() {
             ],
             canManage: true,
             onReorder: (order) => reported = order,
-            rowBuilder: (channel, longPressDrags, dragHandleIndex) {
-              expect(
-                longPressDrags,
-                isFalse,
-                reason:
-                    'a phone has no right-click, so a held press has to stay '
-                    'the context menu route',
-              );
-              indices.add(dragHandleIndex);
-              return SizedBox(
-                height: 48,
-                child: ReorderableDragStartListener(
-                  index: dragHandleIndex!,
-                  child: Text(channel.id),
-                ),
-              );
+            rowBuilder: (channel, longPressDrags) {
+              expect(longPressDrags, isTrue, reason: 'a held press lifts');
+              return SizedBox(height: 48, child: Text(channel.id));
             },
             headerBuilder: _header,
           ),
         ),
       );
 
-      expect(indices, isNot(contains(null)));
-
       final gesture = await tester.startGesture(
         tester.getCenter(find.text('a')),
       );
-      await tester.pump(kPressTimeout);
+      await tester.pump(kLongPressTimeout + kPressTimeout);
       await gesture.moveBy(const Offset(0, 120));
       await tester.pumpAndSettle();
       await gesture.up();
@@ -338,7 +320,7 @@ void main() {
       expect(
         reported,
         isNotNull,
-        reason: 'dragging the handle still reorders on a phone',
+        reason: 'a lifted row still reorders on a phone',
       );
       expect(reported!.single.channelIds, isNot(['a', 'b', 'c']));
     },
@@ -395,7 +377,7 @@ void main() {
             sections: [(category, channels)],
             canManage: true,
             onReorder: (order) => reported = order,
-            rowBuilder: (channel, longPressDrags, dragHandleIndex) {
+            rowBuilder: (channel, longPressDrags) {
               expect(longPressDrags, isTrue);
               return SizedBox(height: 48, child: Text(channel.id));
             },

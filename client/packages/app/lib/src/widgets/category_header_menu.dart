@@ -101,12 +101,14 @@ class CategoryHeaderMenu extends ConsumerWidget {
     return CategoryDragTarget(
       category: category,
       ordered: categories,
-      child: Row(
-        children: [
-          CategoryDragGrip(category: category),
-          Expanded(child: menu),
-        ],
-      ),
+      child: AppTouchTargets.of(context)
+          ? menu
+          : Row(
+              children: [
+                CategoryDragGrip(category: category),
+                Expanded(child: menu),
+              ],
+            ),
     );
   }
 }

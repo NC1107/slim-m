@@ -17,12 +17,12 @@
 /// the scrollable the drag scrolls.
 ///
 /// At pointer widths the whole row is the handle and a drag starts on the
-/// first movement. Below `kCompactWidth` a finger has no second gesture and
-/// every drag on the row is a scroll, so the held press stays the context
-/// menu's and the row shows a [ChannelDragGrip]: a 44px target that lifts only
-/// after a held press (`docs/design/desktop-vs-mobile.md`, "drag to reorder").
-/// Move up and Move down in the row menu are the path without a gesture, and
-/// a screen reader gets Flutter's own move actions on every row.
+/// first movement. Below `kCompactWidth` every drag on a row is a scroll, so
+/// the row lifts only after a held press (`docs/design/desktop-vs-mobile.md`,
+/// "drag to reorder"); a held press released without moving the row opens its
+/// options sheet instead ([onLiftedInPlace]). Move up and Move down in that
+/// sheet are the path without a gesture, and a screen reader gets Flutter's
+/// own move actions on every row.
 ///
 /// The settle animation of a held drag does not honour `AppMotion` or the OS
 /// reduce-motion toggle: [SliverReorderableList] takes no animation style and
@@ -36,7 +36,6 @@ import 'package:slimm_api/api.dart' show ChannelOrderGroup;
 import 'package:slimm_data/data.dart';
 import 'package:slimm_design_system/design_system.dart';
 
-import 'channel_drag_grip.dart' show ChannelDragGrip;
 import 'rail_drag_lift.dart';
 
 /// One category's ordered channels, `null` for the implicit uncategorised
@@ -74,7 +73,7 @@ class ChannelRailItem extends RailItem {
 /// pointer once it has actually moved. Only channel rows carry a listener, so
 /// a header can never itself be picked up, however its slot may still shift
 /// as channels are dropped around it.
-class ReorderableChannelRows extends StatelessWidget {
+class ReorderableChannelRows extends StatefulWidget {
   const ReorderableChannelRows({
     super.key,
     required this.sections,
@@ -84,6 +83,7 @@ class ReorderableChannelRows extends StatelessWidget {
     required this.headerBuilder,
     this.onDragStart,
     this.onDragEnd,
+    this.onLiftedInPlace,
   });
 
   final List<ChannelSection> sections;
@@ -102,25 +102,29 @@ class ReorderableChannelRows extends StatelessWidget {
   final VoidCallback? onDragStart;
   final VoidCallback? onDragEnd;
 
+  /// A touch row was lifted and dropped back where it was, which opens that
+  /// row's options rather than leaving a held press with no result.
+  final ValueChanged<Channel>? onLiftedInPlace;
+
   /// Builds one channel's row, told whether *this render* actually wraps it
   /// in a drag listener - false in the plain-[Column] branch, true in the
   /// reorder-list one - so a caller can withhold a competing
   /// long-press gesture (a context menu, say) only where one would actually
   /// compete for the arena.
   /// [longPressDrags] says a held press on this row starts a move, so the
-  /// row must withhold its own long-press context menu. [dragHandleIndex] is
-  /// the opposite arrangement: non-null means the row keeps its long press
-  /// and shows a [ChannelDragGrip] at that index instead.
-  final Widget Function(
-    Channel channel,
-    bool longPressDrags,
-    int? dragHandleIndex,
-  )
-  rowBuilder;
+  /// row must withhold its own long-press context menu.
+  final Widget Function(Channel channel, bool longPressDrags) rowBuilder;
   final Widget Function(ChannelCategoryRow? category) headerBuilder;
 
+  @override
+  State<ReorderableChannelRows> createState() => _ReorderableChannelRowsState();
+}
+
+class _ReorderableChannelRowsState extends State<ReorderableChannelRows> {
+  int? _liftedFrom;
+
   List<RailItem> get _items => [
-    for (final (category, channels) in sections) ...[
+    for (final (category, channels) in widget.sections) ...[
       HeaderRailItem(category),
       for (final channel in channels) ChannelRailItem(channel),
     ],
@@ -131,18 +135,17 @@ class ReorderableChannelRows extends StatelessWidget {
     final items = _items;
     final channelCount = items.whereType<ChannelRailItem>().length;
     // See this file's own doc comment for why fewer than two also bails out.
-    if (!canManage || channelCount < 2) {
+    if (!widget.canManage || channelCount < 2) {
       return Column(
         // A Column centres by default and a header is only as wide as its word, so without the manager's add glyph every heading sat centred.
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           for (final item in items)
             switch (item) {
-              HeaderRailItem(:final category) => headerBuilder(category),
-              ChannelRailItem(:final channel) => rowBuilder(
+              HeaderRailItem(:final category) => widget.headerBuilder(category),
+              ChannelRailItem(:final channel) => widget.rowBuilder(
                 channel,
                 false,
-                null,
               ),
             },
         ],
@@ -162,13 +165,15 @@ class ReorderableChannelRows extends StatelessWidget {
           itemCount: items.length,
           proxyDecorator: (child, _, animation) =>
               RailDragLift(animation: animation, child: child),
-          onReorderStart: (_) {
+          onReorderStart: (index) {
+            _liftedFrom = index;
             AppHaptics.impact();
-            onDragStart?.call();
+            widget.onDragStart?.call();
           },
-          onReorderEnd: (_) {
+          onReorderEnd: (index) {
             AppHaptics.selection();
-            onDragEnd?.call();
+            widget.onDragEnd?.call();
+            _openIfDroppedInPlace(items, index);
           },
           onReorderItem: (oldIndex, newIndex) =>
               _reorder(items, oldIndex, newIndex),
@@ -185,30 +190,39 @@ class ReorderableChannelRows extends StatelessWidget {
         : list;
   }
 
+  void _openIfDroppedInPlace(List<RailItem> items, int droppedAt) {
+    final from = _liftedFrom;
+    _liftedFrom = null;
+    if (!AppTouchTargets.of(context) || from != droppedAt) return;
+    final item = items[droppedAt];
+    if (item is ChannelRailItem) widget.onLiftedInPlace?.call(item.channel);
+  }
+
   void _reorder(List<RailItem> items, int oldIndex, int newIndex) {
     final moved = items[oldIndex];
     if (moved is! ChannelRailItem) return;
     final rearranged = [...items]
       ..removeAt(oldIndex)
       ..insert(newIndex, moved);
-    onReorder(groupsFromRailItems(rearranged, sections));
+    widget.onReorder(groupsFromRailItems(rearranged, widget.sections));
   }
 
   Widget _item(List<RailItem> items, int i, bool touch) => switch (items[i]) {
     HeaderRailItem(:final category) => KeyedSubtree(
       key: ValueKey('header-${category?.id}'),
-      child: headerBuilder(category),
+      child: widget.headerBuilder(category),
     ),
     ChannelRailItem(:final channel) =>
       touch
-          ? KeyedSubtree(
+          ? ReorderableDelayedDragStartListener(
               key: ValueKey(channel.id),
-              child: rowBuilder(channel, false, i),
+              index: i,
+              child: RailGrabFeedback(child: widget.rowBuilder(channel, true)),
             )
           : ReorderableDragStartListener(
               key: ValueKey(channel.id),
               index: i,
-              child: RailGrabFeedback(child: rowBuilder(channel, true, null)),
+              child: RailGrabFeedback(child: widget.rowBuilder(channel, true)),
             ),
   };
 }
