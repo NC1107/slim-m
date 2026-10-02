@@ -162,6 +162,32 @@ pub(super) async fn presence_status(
     )))
 }
 
+/// Whether `viewer` may be told that `target`'s typing ended.
+///
+/// Unlike the start, the stop is published by a timer that can fire after the
+/// typer disconnected, when they read as offline to everyone; withholding it
+/// then strands the indicator on every other client. Only a typer who chose
+/// to appear offline stays withheld (their start was never announced), and a
+/// store error fails closed as it does for the start.
+pub(super) async fn may_hear_typing_stop(
+    store: &Store,
+    hub: &Hub,
+    viewer: UserId,
+    target: UserId,
+) -> bool {
+    if viewer == target {
+        return true;
+    }
+    let visibility = match hub.presence().visibility(target) {
+        Some(cached) => cached,
+        None => match store.presence_visibility(target).await {
+            Ok(Some(visibility)) => visibility,
+            _ => return false,
+        },
+    };
+    visibility != Visibility::Hidden
+}
+
 /// The frame telling a viewer `target`'s resolved status, and the activity
 /// that status permits them to see.
 pub(super) fn presence_frame(hub: &Hub, target: UserId, status: Status) -> ServerFrame {

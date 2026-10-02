@@ -374,7 +374,6 @@ pub(super) async fn authorize_unstamped(
 
     // Typing, a cursor and a stroke preview all leak presence and must fail closed on a blip.
     if let Event::TypingStarted { user_id, .. }
-    | Event::TypingStopped { user_id, .. }
     | Event::CanvasCursorMoved { user_id, .. }
     | Event::CanvasStrokePreview { user_id, .. } = event
     {
@@ -385,6 +384,13 @@ pub(super) async fn authorize_unstamped(
         if !confirmed_visible {
             return Authorization::Withhold;
         }
+    }
+
+    // A stop fires after the typer may have left, so offline must not withhold it; only a chosen Hidden does.
+    if let Event::TypingStopped { user_id, .. } = event
+        && !signals::may_hear_typing_stop(store, hub, ctx.user_id, user_id).await
+    {
+        return Authorization::Withhold;
     }
 
     // Gated on chosen VISIBILITY, not live connection; see decision 0032.
