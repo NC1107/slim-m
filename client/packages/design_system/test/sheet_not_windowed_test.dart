@@ -7,6 +7,8 @@ library;
 
 // ignore_for_file: invalid_use_of_internal_member, implementation_imports
 
+import 'package:flutter/foundation.dart'
+    show debugDefaultTargetPlatformOverride;
 import 'package:flutter/material.dart';
 import 'package:flutter/src/foundation/_features.dart' as features;
 import 'package:flutter_test/flutter_test.dart';
@@ -42,8 +44,12 @@ void main() {
   setUp(() {
     windowing = features.isWindowingEnabled;
     features.isWindowingEnabled = true;
+    debugDefaultTargetPlatformOverride = TargetPlatform.linux;
   });
-  tearDown(() => features.isWindowingEnabled = windowing);
+  tearDown(() {
+    features.isWindowingEnabled = windowing;
+    debugDefaultTargetPlatformOverride = null;
+  });
 
   testWidgets('showAppSheet at desktop width pushes an in-window DialogRoute',
       (tester) async {

@@ -8,6 +8,8 @@
 /// `client/packages/*/lib` may call `showDialog`; a gate enforces it.
 library;
 
+import 'package:flutter/foundation.dart'
+    show TargetPlatform, defaultTargetPlatform, kIsWeb;
 import 'package:flutter/material.dart';
 
 import '../../app_motion.dart';
@@ -20,6 +22,19 @@ Future<T?> showInWindowDialog<T>({
   AnimationStyle? animationStyle,
   RouteSettings? routeSettings,
 }) {
+  // Only the Linux build turns windowing on. Elsewhere Flutter's own helper
+  // stays reachable: dropping it from the macOS AOT build crashed the snapshot
+  // generator ("Class with illegal cid" in _window_macos.dart) in 0.91.0.
+  if (kIsWeb || defaultTargetPlatform != TargetPlatform.linux) {
+    return showDialog<T>(
+      context: context,
+      builder: builder,
+      barrierDismissible: barrierDismissible,
+      animationStyle: animationStyle,
+      routeSettings: routeSettings,
+      useRootNavigator: true,
+    );
+  }
   final navigator = Navigator.of(context, rootNavigator: true);
   final themes = InheritedTheme.capture(from: context, to: navigator.context);
   return navigator.push<T>(
