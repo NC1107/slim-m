@@ -11,6 +11,7 @@ on:
       - "crates/slimm-server/src/push/**"
       - "crates/slimm-server/src/http/push.rs"
       - "crates/slimm-server/tests/push_relay_contract_fixture.rs"
+      - "crates/slimm-server/tests/push_relay_contract_kinds/**"
       - ".github/workflows/push-relay-contract.yml"
   pull_request:
     paths:
@@ -18,6 +19,7 @@ on:
       - "crates/slimm-server/src/push/**"
       - "crates/slimm-server/src/http/push.rs"
       - "crates/slimm-server/tests/push_relay_contract_fixture.rs"
+      - "crates/slimm-server/tests/push_relay_contract_kinds/**"
       - ".github/workflows/push-relay-contract.yml"
   workflow_dispatch:
 
