@@ -78,6 +78,7 @@ class MessageRow extends StatelessWidget {
     this.threadLastReplyAt,
     this.threadUnreadCount,
     this.replyTo,
+    this.replyParentAdjacent = false,
     this.onReplyTap,
   });
 
@@ -198,6 +199,9 @@ class MessageRow extends StatelessWidget {
   /// when [message] is not a reply at all or its parent could not be
   /// resolved. See `reply_quote.dart` for what null does and does not mean.
   final Message? replyTo;
+
+  /// True when the quoted parent is the row directly above this one.
+  final bool replyParentAdjacent;
 
   /// Jumps to the parent named by [Message.replyToId]. Only ever called when
   /// that id is non-null, so it is safe to leave null when [message] is not
@@ -321,6 +325,7 @@ class MessageRow extends StatelessWidget {
                                   onViewEditHistory: onViewEditHistory,
                                   onReplyTap: onReplyTap,
                                   replyTo: replyTo,
+                                  replyParentAdjacent: replyParentAdjacent,
                                   webhookUsername: webhookUsername,
                                   reactions: reactions,
                                   attachments: attachments,

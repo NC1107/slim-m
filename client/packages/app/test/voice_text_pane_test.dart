@@ -165,6 +165,17 @@ Future<void> _unmount(WidgetTester tester) async {
   }
 }
 
+/// The compact call body under a stand-in for the app bar's chat action,
+/// which is what drives it on a phone.
+Widget _tabsWithAppBarAction() => const Column(
+  children: [
+    VoiceChatAction(),
+    Expanded(
+      child: VoiceCallWithChatTabs(channelId: 'v1', call: Text('CALL')),
+    ),
+  ],
+);
+
 Future<void> _settle(WidgetTester tester) async {
   for (var i = 0; i < 10; i++) {
     await tester.pump(const Duration(milliseconds: 20));
@@ -275,15 +286,13 @@ void main() {
 
   group('VoiceCallWithChatTabs', () {
     testWidgets(
-      'shows the call full-screen with a chat toggle, nothing registered',
+      'shows the call full-screen with the chat action beside it, nothing registered',
       (tester) async {
-        final harness = await _mount(
-          tester,
-          const VoiceCallWithChatTabs(channelId: 'v1', call: Text('CALL')),
-        );
+        final harness = await _mount(tester, _tabsWithAppBarAction());
 
         expect(find.text('CALL'), findsOneWidget);
-        expect(find.byIcon(AppIcons.hash), findsOneWidget);
+        expect(find.byIcon(AppIcons.chat), findsOneWidget);
+        expect(find.byIcon(AppIcons.hash), findsNothing);
         expect(find.byType(ChannelScreen), findsNothing);
         expect(
           harness.container.read(mountedChannelsProvider).openChannelIds,
@@ -298,12 +307,9 @@ void main() {
       'opening chat swaps the call out entirely, registers the channel, and '
       'a member can send; going back restores the call and unregisters it',
       (tester) async {
-        final harness = await _mount(
-          tester,
-          const VoiceCallWithChatTabs(channelId: 'v1', call: Text('CALL')),
-        );
+        final harness = await _mount(tester, _tabsWithAppBarAction());
 
-        await tester.tap(find.byIcon(AppIcons.hash));
+        await tester.tap(find.byIcon(AppIcons.chat));
         await _settle(tester);
 
         expect(
@@ -331,7 +337,7 @@ void main() {
         await _settle(tester);
         expect(harness.posted, contains('hello from the compact chat view'));
 
-        await tester.tap(find.byIcon(AppIcons.back));
+        await tester.tap(find.byIcon(AppIcons.chat));
         await _settle(tester);
 
         expect(find.text('CALL'), findsOneWidget);

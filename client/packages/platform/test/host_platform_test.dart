@@ -60,6 +60,44 @@ void main() {
     });
   });
 
+  group('composeDeviceName', () {
+    test('desktop reads "<Platform> - <host>" the same on every platform', () {
+      expect(
+        composeDeviceName(TargetPlatform.linux, host: 'fedora'),
+        'Linux - fedora',
+      );
+      expect(
+        composeDeviceName(TargetPlatform.macOS, host: 'studio'),
+        'Mac - studio',
+      );
+      expect(composeDeviceName(TargetPlatform.windows), 'Windows');
+    });
+
+    test('the loopback host name is never part of a name', () {
+      for (final host in ['localhost', 'Localhost', 'localhost.localdomain']) {
+        expect(
+          composeDeviceName(TargetPlatform.iOS, host: host),
+          isNot(contains('localhost')),
+        );
+        expect(
+          composeDeviceName(TargetPlatform.linux, host: host),
+          'Linux',
+        );
+      }
+    });
+
+    test('a phone is named by its model, else by what it is', () {
+      expect(composeDeviceName(TargetPlatform.iOS, model: 'iPad'), 'iPad');
+      expect(
+          composeDeviceName(TargetPlatform.iOS, host: 'localhost'), 'iPhone');
+      expect(
+        composeDeviceName(TargetPlatform.android, model: 'Pixel 8'),
+        'Pixel 8',
+      );
+      expect(composeDeviceName(TargetPlatform.android), 'Android phone');
+    });
+  });
+
   group('createPersistentKeyStore', () {
     test('desktop gets the owner-only file, never the keychain backend', () {
       if (!Platform.isLinux && !Platform.isMacOS && !Platform.isWindows) {

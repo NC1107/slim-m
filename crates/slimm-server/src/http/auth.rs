@@ -60,6 +60,10 @@ struct RegisterRequest {
     client_kind: Option<String>,
     #[serde(default)]
     client_version: Option<String>,
+    /// A random id the client generates once per install, so signing in again
+    /// replaces that install's session instead of adding a device.
+    #[serde(default)]
+    install_id: Option<String>,
 }
 
 #[derive(Deserialize)]
@@ -72,6 +76,10 @@ struct LoginRequest {
     client_kind: Option<String>,
     #[serde(default)]
     client_version: Option<String>,
+    /// A random id the client generates once per install, so signing in again
+    /// replaces that install's session instead of adding a device.
+    #[serde(default)]
+    install_id: Option<String>,
 }
 
 /// A session token alone never deletes an account: it needs the password, and a
@@ -144,6 +152,23 @@ fn parse_client_info(
     ))
 }
 
+/// Bounds `install_id` to what a client-minted UUID looks like, so it is
+/// safe to hash and never carries anything surprising into a log.
+pub(super) fn parse_install_id(value: Option<&str>) -> Result<Option<String>, ApiError> {
+    let Some(value) = value.map(str::trim).filter(|v| !v.is_empty()) else {
+        return Ok(None);
+    };
+    let ok = (8..=64).contains(&value.len())
+        && value
+            .bytes()
+            .all(|b| b.is_ascii_alphanumeric() || b == b'-' || b == b'_');
+    if ok {
+        Ok(Some(value.to_owned()))
+    } else {
+        Err(ApiError::BadRequest("install_id is not valid"))
+    }
+}
+
 pub(super) fn token_response(tokens: &IssuedTokens) -> TokenResponse {
     TokenResponse {
         user_id: tokens.user_id.to_string(),
@@ -177,6 +202,7 @@ async fn register(
     validate_label(&req.device_name, "device_name must be 1 to 64 characters")?;
     let (client_kind, client_version) =
         parse_client_info(req.client_kind.as_deref(), req.client_version.as_deref())?;
+    let install_id = parse_install_id(req.install_id.as_deref())?;
 
     let invite_code = req
         .invite_code
@@ -226,6 +252,7 @@ async fn register(
             &req.device_name,
             client_kind.as_deref(),
             client_version.as_deref(),
+            install_id.as_deref(),
         )
         .await?;
     Ok(Json(token_response(&tokens)))
@@ -246,6 +273,7 @@ async fn login(
     validate_label(&req.device_name, "device_name must be 1 to 64 characters")?;
     let (client_kind, client_version) =
         parse_client_info(req.client_kind.as_deref(), req.client_version.as_deref())?;
+    let install_id = parse_install_id(req.install_id.as_deref())?;
     // A credential that could never exist fails like a wrong one, so the error never teaches the policy.
     if validate_username(&req.username).is_err() || validate_password(&req.password).is_err() {
         state.auth.verify_decoy().await?;
@@ -299,6 +327,7 @@ async fn login(
             &req.device_name,
             client_kind.as_deref(),
             client_version.as_deref(),
+            install_id.as_deref(),
         )
         .await?;
     super::sign_in_alert::announce(&state, &tokens, &req.device_name, client_kind.as_deref()).await;

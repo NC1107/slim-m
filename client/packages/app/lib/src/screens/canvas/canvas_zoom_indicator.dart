@@ -21,10 +21,15 @@
 library;
 
 import 'package:flutter/widgets.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:slimm_design_system/design_system.dart';
 import 'package:slimm_voice_canvas/voice_canvas.dart';
 
-class CanvasZoomIndicator extends StatelessWidget {
+import '../../providers/dock_reservation.dart';
+
+/// At phone width the dock's cards reach into this corner, so the readout
+/// rides above them by the dock's measured height instead of sitting under it.
+class CanvasZoomIndicator extends ConsumerWidget {
   const CanvasZoomIndicator({
     super.key,
     required this.document,
@@ -35,41 +40,50 @@ class CanvasZoomIndicator extends StatelessWidget {
   final AppTokens tokens;
 
   @override
-  Widget build(BuildContext context) => Align(
+  Widget build(BuildContext context, WidgetRef ref) => Align(
     alignment: Alignment.bottomLeft,
-    child: SafeArea(
-      minimum: const EdgeInsets.all(AppSpacing.s12),
-      child: IgnorePointer(
-        child: ListenableBuilder(
-          listenable: document,
-          builder: (context, _) {
-            final percent = (document.camera.zoom * 100).round();
-            return Semantics(
-              container: true,
-              label: 'Zoom $percent percent',
-              child: Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: AppSpacing.s8,
-                  vertical: AppSpacing.s4,
-                ),
-                decoration: BoxDecoration(
-                  color: tokens.surfaceRaised,
-                  borderRadius: BorderRadius.circular(AppRadii.full),
-                  border: Border.all(color: tokens.borderSubtle),
-                ),
-                child: ExcludeSemantics(
-                  child: Text(
-                    '$percent%',
-                    style: AppText.caption.copyWith(
-                      color: tokens.textSecondary,
-                      fontWeight: AppWeights.medium,
-                    ),
+    child: Padding(
+      padding: EdgeInsets.only(
+        bottom: MediaQuery.sizeOf(context).width < kCompactWidth
+            ? ref.watch(bottomDockReservationProvider) + AppSpacing.s12
+            : 0,
+      ),
+      child: _readout(),
+    ),
+  );
+
+  Widget _readout() => SafeArea(
+    minimum: const EdgeInsets.all(AppSpacing.s12),
+    child: IgnorePointer(
+      child: ListenableBuilder(
+        listenable: document,
+        builder: (context, _) {
+          final percent = (document.camera.zoom * 100).round();
+          return Semantics(
+            container: true,
+            label: 'Zoom $percent percent',
+            child: Container(
+              padding: const EdgeInsets.symmetric(
+                horizontal: AppSpacing.s8,
+                vertical: AppSpacing.s4,
+              ),
+              decoration: BoxDecoration(
+                color: tokens.surfaceRaised,
+                borderRadius: BorderRadius.circular(AppRadii.full),
+                border: Border.all(color: tokens.borderSubtle),
+              ),
+              child: ExcludeSemantics(
+                child: Text(
+                  '$percent%',
+                  style: AppText.caption.copyWith(
+                    color: tokens.textSecondary,
+                    fontWeight: AppWeights.medium,
                   ),
                 ),
               ),
-            );
-          },
-        ),
+            ),
+          );
+        },
       ),
     ),
   );

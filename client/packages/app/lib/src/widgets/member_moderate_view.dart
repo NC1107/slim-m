@@ -23,10 +23,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:slimm_api/api.dart' as api;
 import 'package:slimm_design_system/design_system.dart';
 
-import '../permissions.dart';
 import '../providers/admin_providers.dart';
 import '../providers/member_presence.dart' show membersProvider;
 import '../providers/providers.dart';
+import 'member_moderate_roles.dart';
 import 'member_profile_sections.dart';
 import 'moderation_unavailable_caption.dart';
 import 'clear_totp_sheet.dart';
@@ -52,6 +52,7 @@ class MemberModerateView extends ConsumerStatefulWidget {
     required this.onRemove,
     required this.onEject,
     required this.onDone,
+    this.compact = false,
   });
 
   final api.UserProfile profile;
@@ -74,6 +75,9 @@ class MemberModerateView extends ConsumerStatefulWidget {
   final VoidCallback onRemove;
   final VoidCallback onEject;
   final VoidCallback onDone;
+
+  /// A phone sheet: roles collapse to one row and Time out comes first.
+  final bool compact;
 
   @override
   ConsumerState<MemberModerateView> createState() => _MemberModerateViewState();
@@ -105,102 +109,85 @@ class _MemberModerateViewState extends ConsumerState<MemberModerateView>
         .firstOrNull;
     final heldIds = live?.roleIds ?? widget.profile.roleIds;
 
+    final header = _header(tokens);
+    final rolesSection = widget.canManageRoles
+        ? MemberModerateRoles(
+            roles: roles,
+            heldIds: heldIds,
+            myPermissions: mine,
+            memberName: widget.profile.displayName,
+            compact: widget.compact,
+            onChanged: _toggleRole,
+          )
+        : null;
+    final timeOut = widget.canOfferTimeoutChips
+        ? Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const AppMenuLabel('TIME OUT'),
+              TimeoutDurationChips(onChosen: widget.onTimeOut),
+            ],
+          )
+        : null;
+    final sections = <Widget?>[
+      if (widget.compact) ...[
+        timeOut,
+        rolesSection,
+      ] else ...[
+        rolesSection,
+        null,
+      ],
+      if (widget.outranked) _outrankedCaption(),
+      if (widget.canRename)
+        Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const AppMenuLabel('NAME'),
+            RenameMemberMenuItem(
+              host: widget.host,
+              profile: live ?? widget.profile,
+              onDone: widget.onDone,
+            ),
+          ],
+        ),
+      if (!widget.compact) timeOut,
+      if (widget.canEject)
+        AppMenuItem(
+          label: 'Eject from call...',
+          leading: AppIcons.leaveCall,
+          tone: AppMenuItemTone.danger,
+          onTap: widget.onEject,
+        ),
+      if (widget.canIssueReset)
+        Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const AppMenuLabel('ACCOUNT'),
+            ResetCodeMenuItem(
+              host: widget.host,
+              subjectId: widget.profile.id,
+              subjectName: widget.profile.displayName,
+              onDone: widget.onDone,
+            ),
+            ClearTotpMenuItem(
+              host: widget.host,
+              subjectId: widget.profile.id,
+              subjectName: widget.profile.displayName,
+              onDone: widget.onDone,
+            ),
+          ],
+        ),
+    ].whereType<Widget>().toList();
+
     return Column(
       mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Padding(
-          padding: const EdgeInsets.fromLTRB(
-            AppSpacing.s8,
-            AppSpacing.s8,
-            AppSpacing.s12,
-            AppSpacing.s8,
-          ),
-          child: Row(
-            children: [
-              AppIconButton(
-                icon: AppIcons.back,
-                semanticLabel: 'Back to profile',
-                tooltip: 'Back',
-                size: AppIconButtonSize.sm,
-                onPressed: widget.onBack,
-              ),
-              const SizedBox(width: AppSpacing.s4),
-              Expanded(
-                child: Text(
-                  'Moderate ${widget.profile.displayName}',
-                  overflow: TextOverflow.ellipsis,
-                  style: AppText.body.copyWith(
-                    color: tokens.textPrimary,
-                    fontWeight: AppWeights.semi,
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
-        if (widget.canManageRoles) ...[
-          const AppMenuLabel('ROLES'),
-          for (final role in roles)
-            _RoleRow(
-              role: role,
-              held: role.isEveryone || heldIds.contains(role.id),
-              grantable:
-                  !role.isEveryone && mine.hasPermission(role.permissions),
-              memberName: widget.profile.displayName,
-              onChanged: (v) => _toggleRole(role, v),
-            ),
-          const AppMenuDivider(),
-        ],
-        if (widget.outranked) ...[
-          Padding(
-            padding: const EdgeInsets.symmetric(
-              horizontal: AppSpacing.s12,
-              vertical: AppSpacing.s8,
-            ),
-            child: ModerationUnavailableCaption(
-              'You cannot time out or remove ${widget.profile.displayName}: '
-              'they hold permissions you do not.',
-            ),
-          ),
-        ],
-        if (widget.canRename) ...[
-          const AppMenuLabel('NAME'),
-          RenameMemberMenuItem(
-            host: widget.host,
-            profile: live ?? widget.profile,
-            onDone: widget.onDone,
-          ),
-          const AppMenuDivider(),
-        ],
-        if (widget.canOfferTimeoutChips) ...[
-          const AppMenuLabel('TIME OUT'),
-          TimeoutDurationChips(onChosen: widget.onTimeOut),
-          const AppMenuDivider(),
-        ],
-        if (widget.canEject) ...[
-          AppMenuItem(
-            label: 'Eject from call...',
-            leading: AppIcons.leaveCall,
-            tone: AppMenuItemTone.danger,
-            onTap: widget.onEject,
-          ),
-          const AppMenuDivider(),
-        ],
-        if (widget.canIssueReset) ...[
-          const AppMenuLabel('ACCOUNT'),
-          ResetCodeMenuItem(
-            host: widget.host,
-            subjectId: widget.profile.id,
-            subjectName: widget.profile.displayName,
-            onDone: widget.onDone,
-          ),
-          ClearTotpMenuItem(
-            host: widget.host,
-            subjectId: widget.profile.id,
-            subjectName: widget.profile.displayName,
-            onDone: widget.onDone,
-          ),
+        header,
+        for (var i = 0; i < sections.length; i++) ...[
+          sections[i],
+          if (i < sections.length - 1 || (widget.compact && widget.canRemove))
+            const AppMenuDivider(),
         ],
         if (actionError != null)
           Padding(
@@ -228,53 +215,46 @@ class _MemberModerateViewState extends ConsumerState<MemberModerateView>
       ],
     );
   }
-}
 
-/// One role's checkbox row. `@everyone` arrives already locked (`grantable`
-/// false and `held` true), so it renders the same as any role the caller
-/// cannot toggle - the design's own "shown but locked".
-class _RoleRow extends StatelessWidget {
-  const _RoleRow({
-    required this.role,
-    required this.held,
-    required this.grantable,
-    required this.memberName,
-    required this.onChanged,
-  });
+  Widget _outrankedCaption() => Padding(
+    padding: const EdgeInsets.symmetric(
+      horizontal: AppSpacing.s12,
+      vertical: AppSpacing.s8,
+    ),
+    child: ModerationUnavailableCaption(
+      'You cannot time out or remove ${widget.profile.displayName}: '
+      'they hold permissions you do not.',
+    ),
+  );
 
-  final api.Role role;
-  final bool held;
-  final bool grantable;
-  final String memberName;
-  final ValueChanged<bool> onChanged;
-
-  @override
-  Widget build(BuildContext context) {
-    final tokens = Theme.of(context).extension<AppTokens>()!;
-    return AppListRow(
-      leading: Icon(AppIcons.shield, color: tokens.textSecondary),
-      label: role.name,
-      meta: role.isEveryone ? 'Always granted' : null,
-      subtitle: role.isEveryone || grantable
-          ? null
-          : 'Needs permissions you lack',
-      trailing: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          if (role.isManagedByBot) ...[
-            const AppBadge(variant: AppBadgeVariant.tag, label: 'Bot'),
-            const SizedBox(width: AppSpacing.s8),
-          ],
-          AppToggle(
-            value: held,
-            onChanged: (!role.isEveryone && grantable)
-                ? (v) => onChanged(v)
-                : null,
-            locked: role.isEveryone,
-            semanticLabel: '${role.name} for $memberName',
+  Widget _header(AppTokens tokens) => Padding(
+    padding: const EdgeInsets.fromLTRB(
+      AppSpacing.s8,
+      AppSpacing.s8,
+      AppSpacing.s12,
+      AppSpacing.s8,
+    ),
+    child: Row(
+      children: [
+        AppIconButton(
+          icon: AppIcons.back,
+          semanticLabel: 'Back to profile',
+          tooltip: 'Back',
+          size: AppIconButtonSize.sm,
+          onPressed: widget.onBack,
+        ),
+        const SizedBox(width: AppSpacing.s4),
+        Expanded(
+          child: Text(
+            'Moderate ${widget.profile.displayName}',
+            overflow: TextOverflow.ellipsis,
+            style: AppText.body.copyWith(
+              color: tokens.textPrimary,
+              fontWeight: AppWeights.semi,
+            ),
           ),
-        ],
-      ),
-    );
-  }
+        ),
+      ],
+    ),
+  );
 }

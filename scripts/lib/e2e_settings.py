@@ -92,9 +92,9 @@ def change_status(client, api):
 def upload_avatar(client, api, path):
     """Upload a picture and check the server serves it back."""
     _open_personal(client)
-    # The badge opens a source sheet first; see avatar_settings_section.dart.
+    # The avatar opens a photo menu first; see avatar_settings_section.dart.
     client.click(L.CHANGE_AVATAR, settle=2)
-    client.attach_file('Photo library', path)
+    client.attach_file('Choose photo', path)
     # A picked picture is cropped before it is uploaded, so the sheet has to be
     # answered; nothing reaches the server until it is.
     client.wait_for(L.CROP_TITLE)

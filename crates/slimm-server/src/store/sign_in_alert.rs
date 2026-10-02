@@ -8,9 +8,11 @@ impl Store {
     /// Whether the sign-in that just minted `device_id` should alert the
     /// account's other devices.
     ///
-    /// Every login mints a fresh device row, so "a device we have seen" cannot
-    /// mean the same row: it means an earlier row (live or long expired) with
-    /// the same name and client kind, the pair a client reports about itself.
+    /// A login that sends no install id mints a fresh device row, so "a device
+    /// we have seen" cannot mean the same row: it means an earlier row (live or
+    /// long expired) with the same name and client kind, the pair a client
+    /// reports about itself. A login that replaced its own install's session is
+    /// known outright and never gets here (see `http::sign_in_alert`).
     /// The first device of an account has no one to tell, so it needs another
     /// *live* device to alert. The liveness clause matches
     /// [`Store::list_devices`], so the alert never targets a device the owner

@@ -66,10 +66,10 @@ class MessageButtons extends ConsumerWidget {
         children: [
           for (final row in rows)
             Padding(
-              padding: const EdgeInsets.only(top: AppSpacing.s8),
+              padding: const EdgeInsets.only(top: AppSpacing.s4),
               child: Wrap(
-                spacing: AppSpacing.s8,
-                runSpacing: AppSpacing.s8,
+                spacing: AppSpacing.s4,
+                runSpacing: AppSpacing.s4,
                 children: [
                   for (final button in row.buttons)
                     _ButtonView(

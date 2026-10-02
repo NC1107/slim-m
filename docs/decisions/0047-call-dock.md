@@ -45,6 +45,15 @@ The eraser staying on screen was chosen over the row count, and `canvas_call_doc
 
 Why: it already works, and the only thing wrong with it is the order that point 2 fixes everywhere.
 
+Amended 2026-10-02, from the owner's phone ("dock ui on mobile a mess in canvas", "same for non canvas view"): the three-row stack above is replaced below `kCompactWidth` of the window.
+In the canvas the tools get a one-row card and the call controls a second, separate one-row card, hugging their content and sharing a width, 124dp together at 390 against 176dp before.
+Undo, the overflow menu and close moved into the canvas header, which has the room the bottom edge never had, and the overflow opens under its button there.
+The eraser stays on screen without scrolling at 360, 390 and 430, held by `canvas_call_dock_tool_reach_test.dart`.
+Outside the canvas a bot's call controls are one row at phone width: its name and a Bot badge as a small label, then one icon chip per control, the same chip the call row uses and labelled by tooltip and semantics.
+The stage reserves the dock's measured height instead of a constant, so participant tiles are no longer hidden under a taller dock.
+Between 600 and 800 the stacked layout above is unchanged, and so is everything at desktop width.
+The channel's text chat on a phone is an app bar action beside members, not a floating button over the call (desktop-vs-mobile.md rule 2).
+
 ### 2. Leave is always last, after a divider
 
 Today: `CallControls` already ends with leave, but in the combined dock the call row comes first and the tools after it, so leave is fourth of twelve.

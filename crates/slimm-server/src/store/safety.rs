@@ -40,9 +40,10 @@ impl Store {
 
     /// The account's *live* devices, newest first, flagging the caller's own.
     ///
-    /// Every sign-in mints a fresh device row (`Store::open_session`) and
-    /// nothing ever deletes one except an explicit `Store::remove_device`, so
-    /// without a filter here the list would only ever grow: a device signed
+    /// A sign-in without an install id mints a fresh device row
+    /// (`Store::open_session_as`) and nothing ever deletes one except an
+    /// explicit `Store::remove_device`, so without a filter here the list
+    /// would only ever grow: a device signed
     /// out of a month ago would sit beside the one in active use, both
     /// offering the same "sign out" action for a session that, for one of
     /// them, no longer exists to sign out of.

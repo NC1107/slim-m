@@ -11,10 +11,16 @@
 /// Its own file so the shell can show it without a screens-to-widgets import
 /// running backwards.
 ///
+/// The whole strip is one button back to the call (`docs/design/desktop-vs-mobile.md`
+/// rule 6, a status banner that is also a way back); mute, deafen and leave are
+/// the only controls that act on their own.
+///
 /// The design's "Open canvas" button is deliberately absent: the Voice Canvas
 /// is Phase 6 and there is nothing to open, and a button that does nothing is
 /// worse than a missing one. Everything else here acts.
 library;
+
+import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -27,6 +33,7 @@ import '../providers/voice_controller.dart';
 import '../routing/routes.dart';
 import '../screens/dm_call_pane.dart';
 import 'call_participant_tiles.dart';
+import 'call_strip_press_area.dart';
 import 'user_avatar.dart';
 
 /// Whether a call is live and worth surfacing, regardless of which channel is
@@ -56,10 +63,103 @@ class VoiceStripIndicator extends ConsumerWidget {
               : BorderSide.none,
         ),
       ),
-      padding: const EdgeInsets.symmetric(
-        horizontal: AppSpacing.s12,
-        vertical: AppSpacing.s8,
+      constraints: const BoxConstraints(minHeight: AppSizes.rowTouch),
+      child: Stack(
+        children: [
+          if (voice.channelId case final channelId?)
+            Positioned.fill(
+              child: _ReturnToCall(
+                voice: voice,
+                onPressed: () {
+                  // See RailCallSummary's identical line for why.
+                  ref.read(dmCallOpenProvider.notifier).state = channelId;
+                  context.go(Routes.channel(channelId));
+                },
+              ),
+            ),
+          Padding(
+            padding: const EdgeInsets.symmetric(
+              horizontal: AppSpacing.s12,
+              vertical: AppSpacing.s8,
+            ),
+            child: Row(
+              children: [
+                Expanded(
+                  child: IgnorePointer(child: _Summary(voice: voice)),
+                ),
+                _Controls(voice: voice, controller: controller),
+              ],
+            ),
+          ),
+        ],
       ),
+    );
+  }
+}
+
+/// The press surface, named for a screen reader as one button that carries the
+/// channel and the clock the visible text shows.
+class _ReturnToCall extends ConsumerStatefulWidget {
+  const _ReturnToCall({required this.voice, required this.onPressed});
+
+  final VoiceState voice;
+  final VoidCallback onPressed;
+
+  @override
+  ConsumerState<_ReturnToCall> createState() => _ReturnToCallState();
+}
+
+class _ReturnToCallState extends ConsumerState<_ReturnToCall> {
+  Timer? _tick;
+
+  @override
+  void initState() {
+    super.initState();
+    _tick = Timer.periodic(const Duration(seconds: 1), (_) {
+      if (mounted && widget.voice.connectedAt != null) setState(() {});
+    });
+  }
+
+  @override
+  void dispose() {
+    _tick?.cancel();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final id = widget.voice.channelId;
+    final name =
+        (id == null
+            ? null
+            : ref.watch(channelByIdProvider(id)).valueOrNull?.name) ??
+        'In a call';
+    final since = widget.voice.connectedAt;
+    final clock = since == null
+        ? null
+        : formatCallClock(
+            DateTime.now().difference(since).isNegative
+                ? Duration.zero
+                : DateTime.now().difference(since),
+          );
+    return CallStripPressArea(
+      semanticLabel: ['Return to call', name, ?clock].join(', '),
+      onPressed: widget.onPressed,
+    );
+  }
+}
+
+/// Avatars, channel name, clock and what the call is; drawn over the press
+/// surface and left out of semantics, which the button's own label covers.
+class _Summary extends StatelessWidget {
+  const _Summary({required this.voice});
+
+  final VoiceState voice;
+
+  @override
+  Widget build(BuildContext context) {
+    final tokens = Theme.of(context).extension<AppTokens>()!;
+    return ExcludeSemantics(
       child: Row(
         children: [
           for (final p in voice.participants.take(2))
@@ -109,7 +209,6 @@ class VoiceStripIndicator extends ConsumerWidget {
               ],
             ),
           ),
-          _Controls(voice: voice, controller: controller),
         ],
       ),
     );
@@ -150,21 +249,19 @@ class CallChannelName extends ConsumerWidget {
   }
 }
 
-/// Mic, deafen and leave, plus a way back to the call itself.
+/// Mic, deafen and leave.
 ///
 /// Screen share is deliberately not here: the picker it opens needs room the
 /// strip does not have, and the call screen one tap away has the button
 /// already.
-class _Controls extends ConsumerWidget {
+class _Controls extends StatelessWidget {
   const _Controls({required this.voice, required this.controller});
 
   final VoiceState voice;
   final VoiceController controller;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final channelId = voice.channelId;
-
+  Widget build(BuildContext context) {
     return Row(
       mainAxisAlignment: MainAxisAlignment.end,
       children: [
@@ -180,18 +277,6 @@ class _Controls extends ConsumerWidget {
           tooltip: voice.deafened ? 'Undeafen' : 'Deafen',
           onPressed: controller.toggleDeafen,
         ),
-        // Absent with no known channel rather than routing to nothing.
-        if (channelId != null)
-          AppIconButton(
-            icon: AppIcons.back,
-            semanticLabel: 'Back to the call',
-            tooltip: 'Back to the call',
-            onPressed: () {
-              // See RailCallSummary's identical line for why.
-              ref.read(dmCallOpenProvider.notifier).state = channelId;
-              context.go(Routes.channel(channelId));
-            },
-          ),
         AppIconButton(
           icon: AppIcons.leaveCall,
           semanticLabel: 'Leave call',

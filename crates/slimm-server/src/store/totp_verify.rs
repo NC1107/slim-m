@@ -153,6 +153,7 @@ impl Store {
         &self,
         challenge: &str,
         code: &str,
+        install_id: Option<&str>,
     ) -> Result<TotpSignIn, ChallengeError> {
         let hash = hash_secret(challenge);
         let now = now_ms();
@@ -226,6 +227,7 @@ impl Store {
                 &pending.device_name,
                 pending.client_kind.as_deref(),
                 pending.client_version.as_deref(),
+                install_id,
             )
             .await
             .map_err(ChallengeError::Open)?;
