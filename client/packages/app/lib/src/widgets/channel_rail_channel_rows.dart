@@ -26,7 +26,6 @@ import 'channel_kind_icon.dart';
 import 'channel_move.dart';
 import 'channel_row_menu.dart';
 import 'context_menu_region.dart';
-import 'join_muted_badge.dart';
 import 'user_avatar.dart';
 import 'voice_channel_tap.dart';
 
@@ -185,7 +184,9 @@ class _ManagedChannelRowState extends State<ManagedChannelRow> {
 ///
 /// The mute glyph the text row draws has no slot to take here - the
 /// participant count already holds it - so a muted voice channel reads as
-/// muted from [AppListRow.muted]'s own dimming alone.
+/// muted from [AppListRow.muted]'s own dimming alone. A channel that joins
+/// muted carries no glyph on its row: that is a default the channel's
+/// settings own, and a member meets it on the join screen.
 class VoiceChannelRow extends ConsumerWidget {
   const VoiceChannelRow({
     super.key,
@@ -252,23 +253,14 @@ class VoiceChannelRow extends ConsumerWidget {
             restricted: channel.restricted ?? false,
             color: iconColor,
           ),
-          trailing: participants.isEmpty && !channel.joinMuted
+          trailing: participants.isEmpty
               ? null
-              : Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    if (channel.joinMuted) const JoinMutedBadge(size: 14),
-                    if (channel.joinMuted && participants.isNotEmpty)
-                      const SizedBox(width: AppSpacing.s4),
-                    if (participants.isNotEmpty)
-                      Text(
-                        '${participants.length}',
-                        style: AppText.micro.copyWith(
-                          color: tokens.textSecondary,
-                          fontFeatures: const [FontFeature.tabularFigures()],
-                        ),
-                      ),
-                  ],
+              : Text(
+                  '${participants.length}',
+                  style: AppText.micro.copyWith(
+                    color: tokens.textSecondary,
+                    fontFeatures: const [FontFeature.tabularFigures()],
+                  ),
                 ),
           trailingExtra: trailingExtra,
           onTap: () {

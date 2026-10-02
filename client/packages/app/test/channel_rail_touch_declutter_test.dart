@@ -16,6 +16,7 @@ import 'package:slimm_api/api.dart' as api;
 import 'package:slimm_app/src/providers/providers.dart';
 import 'package:slimm_app/src/widgets/channel_rail_channel_rows.dart';
 import 'package:slimm_app/src/widgets/channel_rail_sections.dart';
+import 'package:slimm_app/src/widgets/rail_drag_lift.dart';
 import 'package:slimm_data/data.dart';
 import 'package:slimm_design_system/design_system.dart';
 
@@ -199,12 +200,12 @@ void main() {
     handle.dispose();
   });
 
-  testWidgets('a desktop row keeps its hover kebab and category grip', (
+  testWidgets('a desktop row keeps its hover kebab and shows no grip', (
     tester,
   ) async {
     await _pumpRail(tester, 1280);
     expect(find.byIcon(AppIcons.moreVertical), findsNWidgets(6));
-    expect(find.byIcon(AppIcons.dragHandle), findsNWidgets(2));
+    expect(find.byIcon(AppIcons.dragHandle), findsNothing);
     double opacity() => tester
         .widget<AnimatedOpacity>(
           find
@@ -221,5 +222,25 @@ void main() {
     await mouse.moveTo(tester.getCenter(find.text('a-1')));
     await tester.pumpAndSettle();
     expect(opacity(), 1);
+    expect(find.byIcon(AppIcons.dragHandle), findsNothing, reason: 'on hover');
+  });
+
+  testWidgets('a desktop hold released in place opens no menu and no sheet', (
+    tester,
+  ) async {
+    final reports = await _pumpRail(tester, 1280);
+    final at = tester.getCenter(find.text('a-1'));
+    final gesture = await tester.startGesture(
+      at,
+      kind: PointerDeviceKind.mouse,
+    );
+    await tester.pump(const Duration(milliseconds: 400));
+    expect(find.byType(RailDragLift), findsOneWidget);
+    await gesture.up();
+    await tester.pumpAndSettle();
+
+    expect(find.byType(AppMenuItem), findsNothing);
+    expect(find.byType(RailDragLift), findsNothing);
+    expect(reports, isEmpty);
   });
 }

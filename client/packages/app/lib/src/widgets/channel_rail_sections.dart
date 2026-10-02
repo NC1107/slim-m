@@ -15,6 +15,8 @@ import 'package:slimm_data/data.dart';
 import 'package:slimm_design_system/design_system.dart';
 
 import '../providers/channel_notification_overrides_controller.dart';
+import '../providers/channel_order_controller.dart'
+    show categoryOrderControllerProvider;
 import '../providers/collapsed_categories_preference.dart';
 import '../providers/member_presence.dart' show presenceSeedProvider;
 import '../providers/unread_indicator_rules.dart';
@@ -188,7 +190,7 @@ class _ChannelCategorySectionsState
     final overrides = ref.watch(channelNotificationOverridesProvider);
 
     // Breaking out of a collapsed category is an unread indicator like any other, so it reads the same rule the rows do.
-    Widget row(Channel channel, bool longPressDrags) {
+    Widget row(Channel channel, bool longPressDrags, {bool carried = false}) {
       final pinnedOpen =
           channel.id == selectedId ||
           unreadIndicatorFor(
@@ -210,10 +212,12 @@ class _ChannelCategorySectionsState
           child: ManagedChannelRow(
             canManage: canManage,
             reorderable: longPressDrags,
-            menuKey: _menuKeys.putIfAbsent(
-              channel.id,
-              GlobalKey<ContextMenuRegionState>.new,
-            ),
+            menuKey: carried
+                ? null
+                : _menuKeys.putIfAbsent(
+                    channel.id,
+                    GlobalKey<ContextMenuRegionState>.new,
+                  ),
             move: ChannelMoveActions(
               canMove: (delta) =>
                   groupsAfterStep(
@@ -290,7 +294,12 @@ class _ChannelCategorySectionsState
       canManage: canManage,
       onReorder: onReorder,
       rowBuilder: row,
+      carriedRowBuilder: (channel) => row(channel, true, carried: true),
       headerBuilder: header,
+      collapsed: collapsed,
+      onReorderCategories: (ids) => unawaited(
+        ref.read(categoryOrderControllerProvider.notifier).reorder(ids),
+      ),
       onDragStart: () => setState(() => _dragging = true),
       onDragEnd: () => setState(() => _dragging = false),
       onLiftedInPlace: (channel) => _menuKeys[channel.id]?.currentState?.open(),

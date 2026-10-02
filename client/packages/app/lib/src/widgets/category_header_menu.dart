@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
-/// A category header's own context menu (rename, move, collapse, delete)
-/// plus its drag grip and drop target - split out of
-/// `channel_rail_sections.dart` for the review budget. The null,
+/// A category header's own context menu (rename, move, collapse, delete),
+/// split out of `channel_rail_sections.dart` for the review budget. The null,
 /// id-less implicit "Channels" section never reaches this: it has nothing
 /// here to manage.
 library;
@@ -14,7 +13,6 @@ import 'package:slimm_data/data.dart';
 import 'package:slimm_design_system/design_system.dart';
 
 import '../providers/collapsed_categories_preference.dart';
-import 'channel_category_drag.dart';
 import 'context_menu_region.dart';
 import 'manage_category_sheet.dart';
 
@@ -42,6 +40,8 @@ class CategoryHeaderMenu extends ConsumerWidget {
     final isCollapsed = collapsed.contains(category.id);
     // Both verbs directly: deleting used to be a menu, a sheet, a danger zone and a confirmation.
     final menu = ContextMenuRegion(
+      // A held press lifts the header on a pointer; touch opens this menu from it instead.
+      enableLongPress: AppTouchTargets.of(context),
       itemsBuilder: (context, close) => [
         AppMenuItem(
           label: 'Rename category...',
@@ -97,18 +97,6 @@ class CategoryHeaderMenu extends ConsumerWidget {
       ],
       child: label,
     );
-    // The grip is the drag source; the whole row is the drop target, so a drag can land anywhere over a header.
-    return CategoryDragTarget(
-      category: category,
-      ordered: categories,
-      child: AppTouchTargets.of(context)
-          ? menu
-          : Row(
-              children: [
-                CategoryDragGrip(category: category),
-                Expanded(child: menu),
-              ],
-            ),
-    );
+    return menu;
   }
 }

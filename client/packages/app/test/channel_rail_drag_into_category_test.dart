@@ -65,7 +65,7 @@ Future<List<ChannelOrderGroup>?> _drag(
     from,
     kind: PointerDeviceKind.mouse,
   );
-  await tester.pump(const Duration(milliseconds: 50));
+  await tester.pump(const Duration(milliseconds: 400));
   const steps = 20;
   for (var i = 1; i <= steps; i++) {
     await gesture.moveTo(Offset.lerp(from, to, i / steps)!);
