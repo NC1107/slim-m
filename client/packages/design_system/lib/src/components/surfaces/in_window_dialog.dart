@@ -15,6 +15,10 @@ import 'package:flutter/material.dart';
 import '../../app_motion.dart';
 
 /// Pushes [builder] as an in-window Material dialog on the root navigator.
+///
+/// Only the Linux build turns windowing on, so other platforms keep calling
+/// Flutter's `showDialog`: with no call to it the macOS AOT build crashed the
+/// snapshot generator ("Class with illegal cid", `_window_macos.dart`) in 0.91.0.
 Future<T?> showInWindowDialog<T>({
   required BuildContext context,
   required WidgetBuilder builder,
@@ -22,9 +26,7 @@ Future<T?> showInWindowDialog<T>({
   AnimationStyle? animationStyle,
   RouteSettings? routeSettings,
 }) {
-  // Only the Linux build turns windowing on. Elsewhere Flutter's own helper
-  // stays reachable: dropping it from the macOS AOT build crashed the snapshot
-  // generator ("Class with illegal cid" in _window_macos.dart) in 0.91.0.
+  // Linux only: elsewhere showDialog stays reachable (see this function's doc).
   if (kIsWeb || defaultTargetPlatform != TargetPlatform.linux) {
     return showDialog<T>(
       context: context,
