@@ -7,32 +7,24 @@
 /// and is looking straight at, since the only way to start a reply is
 /// tapping "Reply" on a row already on screen.
 ///
-/// An inset, rounded chip rather than a full-bleed bar: it reads as one
-/// recessed quote above the composer, on the design's rounded surfaces,
-/// instead of a heavy sharp-cornered strip the width of the pane. A
-/// text-less parent with a single image attachment swaps the leading reply
-/// arrow for a small decoded thumbnail, so a reply to a photo shows the
-/// photo rather than a blank line beside its name.
+/// One flat row, no card border: its height is the close control's hit target
+/// (44dp on touch, 30dp on a pointer; `docs/design/desktop-vs-mobile.md`
+/// law 2) and nothing more. A text-less parent swaps the leading reply arrow
+/// for a thumbnail or kind glyph, so a reply to a photo shows the photo.
 library;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:slimm_api/api.dart' as api;
 import 'package:slimm_data/data.dart';
 import 'package:slimm_design_system/design_system.dart';
 
 import '../message_preview.dart';
-import '../providers/attachment_bytes.dart';
-import '../providers/media_preferences.dart';
 import '../providers/message_extras.dart';
 import '../providers/user_profiles.dart';
-import 'attachment_view.dart' show isInlineImage;
 import 'author_label.dart';
-import 'image_decode.dart';
+import 'reply_target_summary.dart';
 
-/// The square a reply's own attachment thumbnail draws into - small enough
-/// that the banner stays one compact row rather than growing to fit a
-/// preview-sized image.
+/// Small enough that the banner stays one row at the close control's height.
 const double _thumbnailEdge = AppSpacing.s24;
 
 class ReplyBanner extends ConsumerWidget {
@@ -60,34 +52,30 @@ class ReplyBanner extends ConsumerWidget {
     );
     // A text-less parent is named by what it carried, not left blank.
     final text = plainPreview(message.content);
-    final snippet = text.isNotEmpty ? text : _attachmentSummary(attachments);
-    // Only a single-attachment, text-less parent gets a thumbnail: several attachments already read as a count.
-    final soleAttachment = text.isEmpty && attachments.length == 1
-        ? attachments.single
-        : null;
+    final snippet = text.isNotEmpty ? text : attachmentKindLabel(attachments);
+    final showThumb = text.isEmpty && attachments.length == 1;
     return Padding(
       padding: const EdgeInsets.fromLTRB(
         AppSpacing.s8,
-        AppSpacing.s8,
-        AppSpacing.s8,
         AppSpacing.s4,
+        AppSpacing.s8,
+        0,
       ),
       child: DecoratedBox(
         decoration: BoxDecoration(
           color: tokens.surfaceSunken,
           borderRadius: BorderRadius.circular(AppRadii.control),
-          border: Border.all(color: tokens.borderSubtle),
         ),
         child: Padding(
-          padding: const EdgeInsets.symmetric(
-            horizontal: AppSpacing.s12,
-            vertical: AppSpacing.s8,
-          ),
+          padding: const EdgeInsets.only(left: AppSpacing.s12),
           child: Row(
             children: [
-              soleAttachment == null
-                  ? Icon(AppIcons.reply, size: 14, color: tokens.textSecondary)
-                  : _ReplyAttachmentThumbnail(attachment: soleAttachment),
+              showThumb
+                  ? ReplyAttachmentThumb(
+                      attachments: attachments,
+                      edge: _thumbnailEdge,
+                    )
+                  : Icon(AppIcons.reply, size: 14, color: tokens.textSecondary),
               const SizedBox(width: AppSpacing.s8),
               Expanded(
                 child: Text.rich(
@@ -123,68 +111,6 @@ class ReplyBanner extends ConsumerWidget {
             ],
           ),
         ),
-      ),
-    );
-  }
-}
-
-/// What a text-less parent carried, so its reply chip names something rather
-/// than trailing off after the author: one image reads as "Photo", one file as
-/// its own name, several as a plain count.
-String _attachmentSummary(List<api.Attachment> attachments) {
-  if (attachments.isEmpty) return '';
-  if (attachments.length > 1) return '${attachments.length} attachments';
-  final only = attachments.first;
-  return only.contentType.startsWith('image/') ? 'Photo' : only.filename;
-}
-
-/// The reply banner's leading glyph when its sole parent attachment is an
-/// image: a real decoded thumbnail rather than the generic reply arrow, so a
-/// reply to a photo reads as a photo at a glance instead of a blank line
-/// beside its filename.
-///
-/// Stays a file glyph, never a fetch, for anything the transcript itself
-/// would not decode inline (see [isInlineImage]) and for a reader who has
-/// turned off auto-download - a staged reply is not the place to spend their
-/// data budget on an image they have not asked to open.
-class _ReplyAttachmentThumbnail extends ConsumerWidget {
-  const _ReplyAttachmentThumbnail({required this.attachment});
-
-  final api.Attachment attachment;
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final tokens = Theme.of(context).extension<AppTokens>()!;
-    Widget frame(Widget child) => ClipRRect(
-      borderRadius: BorderRadius.circular(AppRadii.control),
-      child: SizedBox(
-        width: _thumbnailEdge,
-        height: _thumbnailEdge,
-        child: ColoredBox(color: tokens.surfaceRaised, child: child),
-      ),
-    );
-    Widget glyph(IconData icon) =>
-        Center(child: Icon(icon, size: 12, color: tokens.textSecondary));
-
-    if (!isInlineImage(attachment.contentType)) {
-      return frame(glyph(AppIcons.attachFile));
-    }
-    final autoDownload = ref.watch(mediaAutoDownloadControllerProvider);
-    if (autoDownload == MediaAutoDownload.manual) {
-      return frame(glyph(AppIcons.image));
-    }
-    final bytesAsync = ref.watch(attachmentBytesProvider(attachment.id));
-    return frame(
-      bytesAsync.when(
-        data: (bytes) => Image.memory(
-          bytes,
-          fit: BoxFit.cover,
-          cacheWidth: decodeEdge(context, _thumbnailEdge),
-          cacheHeight: decodeEdge(context, _thumbnailEdge),
-          errorBuilder: (_, _, _) => glyph(AppIcons.image),
-        ),
-        loading: () => const SizedBox.shrink(),
-        error: (_, _) => glyph(AppIcons.image),
       ),
     );
   }
