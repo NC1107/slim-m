@@ -5,8 +5,8 @@ One record per decision, numbered in the order they were written.
 The status column is the start of each record's own `Status:` line; the record has the full text, including what is and is not built.
 This index is written by hand from the records, so add a row when you add a record, using the next free number.
 
-The numbers run 0001 to 0050 with no gaps.
-No number is used twice.
+`scripts/lib/test_decision_index.py` fails on a record with no row, a number used twice, a row that links a missing file or the wrong number, and a first heading that does not start with the record's own number as `# NNNN - `.
+Take the next free number from `origin/main` at the moment you open the PR, since two branches can claim the same one.
 
 | Record | Title | Status |
 | --- | --- | --- |

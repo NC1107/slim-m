@@ -19,6 +19,12 @@ Pull request titles follow [Conventional Commits](https://www.conventionalcommit
 The repository squash-merges, using the PR title as the commit message, and release-please turns those titles into versions and changelogs.
 Server and client are versioned independently; a change to `schema/` bumps both.
 
+## Writing docs
+
+In a long Markdown file, put each full sentence on its own line, so a diff shows which sentence changed.
+Apply it to what you write or substantially edit; do not reflow a file you are only touching in passing.
+Keep docs short, link a decision record rather than repeating it, and use a plain `-` instead of an em dash.
+
 ## Definition of done
 
 Run the gates last, on the branch, after `git add`: several of them read only tracked files and report success on an untracked one.
@@ -32,7 +38,7 @@ Every change:
 - [ ] A new Rust or Dart source file starts with the SPDX header on its first line.
 - [ ] No file passes 500 lines (`scripts/check-file-budget.sh`, which warns at 300), and plain `//` or `#` comments are one line (`scripts/check-comment-cap.sh`).
 - [ ] A function takes at most seven positional parameters.
-- [ ] A product or architecture decision has a record in `docs/decisions/` under the next free number, with a row in its README.
+- [ ] A product or architecture decision has a record in `docs/decisions/` under the next free number, with a row in its README and a first heading that starts `# NNNN - ` (`scripts/lib/test_decision_index.py` checks both, and a number used twice).
 - [ ] A new workflow has a row in the `docs/ci.md` table that names every trigger it has (`scripts/check-ci-docs.py`, `scripts/lib/test_ci_docs_triggers.py`).
 - [ ] The `scripts/lib` unit tests pass: `(cd scripts/lib && python3 -m unittest discover -p 'test_*.py')`.
 

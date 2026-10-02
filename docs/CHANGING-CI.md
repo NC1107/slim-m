@@ -1,7 +1,7 @@
 <!-- SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0 -->
 # Changing CI safely
 
-Five incidents showed that a workflow change can pass every check and still break a release or a deploy.
+Six incidents showed that a workflow change can pass every check and still break a release or a deploy.
 Each section says what happened, why nothing caught it, the rule, and the gate that exists now, if one does.
 [ci.md](ci.md) stays the reference for what each workflow does, and this page is only about how to change them.
 
@@ -67,6 +67,9 @@ Gate: `scripts/lib/test_windows_builds_do_not_run_under_bash.py` refuses `flutte
 It closes that one door only.
 `release-asset-watchdog.yml` runs `scripts/check-release-assets.py` hourly, which compares every release of the last three days with the asset set its kind always carries and opens an issue labelled `release-incomplete` when one is short.
 It gives a release 90 minutes to finish attaching before it counts.
+A release that is known to be short and has been superseded goes in `scripts/release-asset-exempt.txt`, one line per tag: the tag, then why.
+Exempt a tag only when a later release replaces it, since an exemption silences the issue for good and the file is meant to stay short.
+`client-v0.91.0` is there because its macOS build crashed and `client-v0.91.1` replaced it.
 
 ## 4. A merge storm cancels `main-builds`
 
@@ -104,6 +107,16 @@ What the owner does in GitHub (the repository does not change settings itself):
 3. Open a throwaway PR, wait for `hygiene`, press "Merge when ready", and watch the queue entry run `hygiene` (and `client-ci` and `server-ci` if it touched their paths) on the `gh-readonly-queue/main/...` branch.
 4. If a path-gated PR sits at "Expected" forever, remove the ruleset's required check and tell whoever is changing CI; that is the failure the rule above is about.
 5. Release PRs go through the queue like any other PR; confirm the next one merges.
+
+## 6. Landing a stack of pull requests
+
+Every pull request runs the full client or server suite, and a merge to `main` can deploy.
+Merging a stack one by one therefore costs one full run and one `main-builds` per pull request, and a later one can break on an earlier one that was never tested beside it ([section 5](#5-two-green-pull-requests-can-break-main)).
+Instead, branch from `origin/main`, merge each pull request's branch into it in order, and fix any conflict once.
+Run the gates on that integration branch, then open it as one pull request and let CI run once.
+Merge that, close the originals, and read `git diff --stat origin/main` first, since a stale base would revert work.
+The cost of a run is in [ci.md](ci.md#where-a-pull-requests-time-goes-measured-2026-10-02): a client pull request is about 150 runner-minutes, most of it the eight app shards and the dart2js job.
+The `libmpv` apt step was the tail there, and the shards now install `libmpv2` with retries and a step timeout.
 
 ## After any workflow change
 

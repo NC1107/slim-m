@@ -1,4 +1,4 @@
-# 0013: One container system for settings and administration
+# 0013 - One container system for settings and administration
 
 Date: 2026-08-10
 Status: accepted

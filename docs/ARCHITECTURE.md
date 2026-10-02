@@ -46,6 +46,12 @@ Everything is in the library crate under `crates/slimm-server/src/`, and `main.r
 
 A new feature usually means a matching pair in `http/` and `store/`, a route in `http.rs`, and an entry in `schema/openapi.yaml`.
 
+Two server rules that are easy to miss:
+
+- Whether a push carries the message text is an account setting that falls back to `DEFAULT_PUSH_PREVIEW` in `src/notifications.rs`, resolved at send time ([0054](decisions/0054-push-preview-default-on.md)).
+- A migration that adds a uniqueness rule must repair the rows that already break it, because deployments have real data and a migration that fails stops the server.
+  Migration 0095 (case-insensitive usernames) renames the losers and records each in `username_collision_renames`, which [OPERATING.md](OPERATING.md#usernames) explains for operators.
+
 ## The hub
 
 `hub.rs` is two broadcast channels, one durable and one ephemeral, not a router per scope.
@@ -111,9 +117,13 @@ A Dart pub workspace under `client/packages/`, layered bottom-up:
 
 Wire types and the drift tables are hand-written on both sides; `schema/openapi.yaml` is the contract, not a generator input.
 
-Two client limits that are deliberate rather than bugs:
+Three client limits that are deliberate rather than bugs:
 
 - Android sweeps its share temp folders only on the next share, so the chooser can still read them; iOS and desktop delete in a `finally`. Exported images can therefore sit in the cache until the next share.
+- Flutter's `showDialog` stays reachable off Linux, in `in_window_dialog.dart`, on purpose.
+  Only Linux turns windowing on, so other platforms call `showDialog` and Linux uses the in-window route.
+  When nothing reached `showDialog`, the macOS AOT snapshot generator crashed (`Class with illegal cid` in Flutter's `_window_macos.dart`) and 0.91.0 shipped without a macOS build.
+  `no_bare_show_dialog_test.dart` and `sheet_not_windowed_test.dart` pin it.
 - A message deep link resolves by walking at most 10 pages (about 500 messages) of channel history, so an older link lands on the "unreachable" notice.
 
 ## The contract

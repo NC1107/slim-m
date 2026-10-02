@@ -220,6 +220,52 @@ const List<WhatsNewEntry> whatsNewEntries = [
     ],
   ),
   WhatsNewEntry(
+    version: '0.87.0',
+    headline: 'Select a range of messages, and gifs that hold still',
+    points: [
+      WhatsNewPoint(
+        'Shift-click a message to select everything between it and the last '
+        'one you picked. The title-bar menu on desktop now offers Restart, '
+        'and Update when a newer build is known.',
+      ),
+      WhatsNewPoint(
+        'Gifs hold on their first frame until you hover them, and pause '
+        'while the window is not focused. A notification for a voice '
+        "channel's chat opens the chat rather than the call.",
+      ),
+    ],
+  ),
+  WhatsNewEntry(
+    version: '0.88.0',
+    headline:
+        'Pre-muted rooms, a member list by role, and a warning for new devices',
+    points: [
+      WhatsNewPoint(
+        'A voice channel can be set so people join muted. The member list '
+        'is grouped by role, with bots and offline members below, and from '
+        "someone's card you can remove them from one channel without "
+        'touching the rest.',
+      ),
+      WhatsNewPoint(
+        'A full-screen image can be shared or saved, the sidebar narrows to '
+        'a compact rail instead of an icon strip, and an open web tab shows '
+        'a reload pill when a newer version is out. What you have read '
+        'follows you between your devices.',
+      ),
+      WhatsNewPoint(
+        'When a device you have not used before signs in to your account, '
+        'your other devices are told. A code block that hides '
+        'text-direction characters is refused, since it can make code read '
+        'differently from what it does.',
+        warn: true,
+      ),
+      WhatsNewPoint(
+        'Joining the official space no longer asks for a server address or '
+        'a fingerprint.',
+      ),
+    ],
+  ),
+  WhatsNewEntry(
     version: '0.89.0',
     headline:
         'A second factor, calls that follow you, and updates that '
@@ -258,7 +304,9 @@ const List<WhatsNewEntry> whatsNewEntries = [
         'Hovering a message shows its actions rather than hiding them behind '
         'a menu, a channel set to mentions only now stays quiet in the '
         'sidebar until you are actually mentioned, and the desktop app keeps '
-        'its local copy of your messages encrypted on disk.',
+        'its local copy of your messages encrypted on disk. A category in '
+        'the sidebar folds when you press its header, and a role can be '
+        'set to list its members apart from everyone else.',
       ),
       WhatsNewPoint(
         'The desktop app checks for a new build, makes sure it is genuinely '
