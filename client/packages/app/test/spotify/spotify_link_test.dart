@@ -17,7 +17,6 @@ import 'package:slimm_app/src/providers/presence_controller.dart';
 import 'package:slimm_app/src/spotify/spotify_client.dart';
 import 'package:slimm_app/src/spotify/spotify_link.dart';
 import 'package:slimm_app/src/spotify/spotify_link_status.dart';
-import 'package:slimm_app/src/spotify/spotify_token_store.dart';
 
 import 'spotify_rig.dart';
 
