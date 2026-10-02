@@ -207,6 +207,9 @@ void main() {
       await tester.pumpWidget(_harness(container));
       await tester.pumpAndSettle();
 
+      expect(find.text('Remove photo'), findsNothing);
+      await tester.tap(find.bySemanticsLabel(_cameraLabel));
+      await tester.pumpAndSettle();
       expect(find.text('Remove photo'), findsOneWidget);
 
       await tester.tap(find.text('Remove photo'));
@@ -260,11 +263,11 @@ void main() {
       await tester.pumpWidget(_harness(container));
       await tester.pumpAndSettle();
 
+      await tester.tap(find.bySemanticsLabel(_cameraLabel));
+      await tester.pumpAndSettle();
       await tester.tap(find.text('Remove photo'));
       await tester.pumpAndSettle();
 
-      // Still offering removal: the failed request changed nothing.
-      expect(find.text('Remove photo'), findsOneWidget);
       expect(find.byType(SnackBar), findsNothing);
       expect(find.byType(AppErrorState), findsOneWidget);
     },
@@ -327,7 +330,7 @@ void main() {
 
     await tester.tap(find.bySemanticsLabel(_cameraLabel));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('Photo library'));
+    await tester.tap(find.text('Choose photo'));
     await tester.pumpAndSettle();
 
     expect(find.byType(SnackBar), findsNothing);
