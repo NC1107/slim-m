@@ -109,7 +109,7 @@ class _DevicesSectionState extends ConsumerState<DevicesSection> {
               child: _DeviceRow(key: ValueKey(device.id), device: device),
             ),
           AppButton(
-            label: 'Remove',
+            label: 'Sign out',
             variant: AppButtonVariant.danger,
             full: true,
             disabled: _signingOutAll,
@@ -164,10 +164,10 @@ class _DevicesSectionState extends ConsumerState<DevicesSection> {
   ) async {
     final confirmed = await confirmDangerousAction(
       context,
-      title: 'Remove devices not used recently?',
+      title: 'Sign out devices not used recently?',
       message:
           'They are signed out and have to sign in again to use this account.',
-      confirmLabel: 'Remove',
+      confirmLabel: 'Sign out',
     );
     if (!confirmed || !mounted) return;
     await _signOutDevices(stale);
