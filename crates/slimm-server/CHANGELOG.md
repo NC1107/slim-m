@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.81.0](https://github.com/Slim-m-org/slim-m/compare/server-v0.80.0...server-v0.81.0) (2026-10-02)
+
+
+### Bug Fixes
+
+* **server:** a typer who leaves mid-typing no longer leaves the indicator stuck ([#1599](https://github.com/Slim-m-org/slim-m/issues/1599)) ([6cde8b6](https://github.com/Slim-m-org/slim-m/commit/6cde8b6d280f0991ebc25efb3bf0bedd86db3460))
+* seven phone ui fixes from the backlog, one device row per install, and a tidier call screen ([#1611](https://github.com/Slim-m-org/slim-m/issues/1611)) ([99c8f6b](https://github.com/Slim-m-org/slim-m/commit/99c8f6b481905f2c058eb3c5f86466e2c49cc862))
+* the totp contract script waits until mid step so a step edge cannot refuse its codes ([#1603](https://github.com/Slim-m-org/slim-m/issues/1603)) ([b51670c](https://github.com/Slim-m-org/slim-m/commit/b51670c1736388fa60b6798f0da5c1577b4815ef))
+
 ## [0.80.0](https://github.com/Slim-m-org/slim-m/compare/server-v0.79.0...server-v0.80.0) (2026-10-02)
 
 
