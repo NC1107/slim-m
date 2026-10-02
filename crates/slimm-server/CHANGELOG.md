@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.80.0](https://github.com/Slim-m-org/slim-m/compare/server-v0.79.0...server-v0.80.0) (2026-10-02)
+
+
+### Bug Fixes
+
+* linking Spotify reports what happened, and the listening box shows cover art and its source ([#1593](https://github.com/Slim-m-org/slim-m/issues/1593)) ([c8f3f3c](https://github.com/Slim-m-org/slim-m/commit/c8f3f3c770c81027524e1ade919519a21ceaade9))
+
 ## [0.79.0](https://github.com/Slim-m-org/slim-m/compare/server-v0.78.0...server-v0.79.0) (2026-10-01)
 
 
