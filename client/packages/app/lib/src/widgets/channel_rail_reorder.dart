@@ -4,9 +4,11 @@
 /// category - the property backlog item #34 asked for. See
 /// docs/decisions/0006-channel-categories.md.
 ///
-/// A plain [Column] when nobody may reorder, or when fewer than two channels
-/// exist (a lone header in a reorder list hit-tests a tap to the wrong render
-/// object, and there is nothing to reorder anyway). Otherwise every
+/// A plain [Column] when nobody may reorder, when no channel exists (a lone
+/// header in a reorder list hit-tests a tap to the wrong render object), or
+/// when one channel has only its own section to sit in. A lone channel with a
+/// second section still reorders: it is the only way to file it there.
+/// Otherwise every
 /// category's header and channel rows are one flat item list, which is what
 /// lets a drag cross a section boundary at all.
 ///
@@ -134,8 +136,9 @@ class _ReorderableChannelRowsState extends State<ReorderableChannelRows> {
   Widget build(BuildContext context) {
     final items = _items;
     final channelCount = items.whereType<ChannelRailItem>().length;
-    // See this file's own doc comment for why fewer than two also bails out.
-    if (!widget.canManage || channelCount < 2) {
+    final nowhereToMove =
+        channelCount == 0 || (channelCount == 1 && widget.sections.length < 2);
+    if (!widget.canManage || nowhereToMove) {
       return Column(
         // A Column centres by default and a header is only as wide as its word, so without the manager's add glyph every heading sat centred.
         crossAxisAlignment: CrossAxisAlignment.stretch,
