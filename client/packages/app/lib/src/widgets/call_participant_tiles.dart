@@ -299,6 +299,14 @@ class _StateBadge extends StatelessWidget {
   }
 }
 
+/// The running clock a call shows: `mm:ss`, or `h:mm:ss` past the hour.
+String formatCallClock(Duration d) {
+  final parts = decomposeDuration(d);
+  final m = parts.minutes.toString().padLeft(2, '0');
+  final s = parts.seconds.toString().padLeft(2, '0');
+  return parts.hours > 0 ? '${parts.hours}:$m:$s' : '$m:$s';
+}
+
 /// `12:34`-style elapsed time since [since], ticking once a second.
 ///
 /// A text update, not motion, so it does not route through reduce-motion;
@@ -332,19 +340,12 @@ class _CallDurationState extends State<CallDuration> {
     super.dispose();
   }
 
-  static String _format(Duration d) {
-    final parts = decomposeDuration(d);
-    final m = parts.minutes.toString().padLeft(2, '0');
-    final s = parts.seconds.toString().padLeft(2, '0');
-    return parts.hours > 0 ? '${parts.hours}:$m:$s' : '$m:$s';
-  }
-
   @override
   Widget build(BuildContext context) {
     final tokens = Theme.of(context).extension<AppTokens>()!;
     final elapsed = DateTime.now().difference(widget.since);
     return Text(
-      _format(elapsed.isNegative ? Duration.zero : elapsed),
+      formatCallClock(elapsed.isNegative ? Duration.zero : elapsed),
       style:
           widget.style ??
           AppText.caption.copyWith(
