@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
-/// A join_muted voice channel is marked on the rail's row and on the rejoin
-/// screen, and an ordinary one carries no marker on either.
+/// A join_muted voice channel says so on the screen a member joins from and
+/// not on the rail's row, where it would only restate the channel's default.
 library;
 
 import 'package:flutter/material.dart';
@@ -106,23 +106,14 @@ Future<void> _pumpRejoin(WidgetTester tester, Channel channel) async {
 }
 
 void main() {
-  testWidgets('the rail marks a join_muted voice channel with a labelled '
-      'mic-off badge', (tester) async {
-    final semantics = tester.ensureSemantics();
-    await _pumpRail(tester, _voice(joinMuted: true));
-
-    expect(find.byIcon(AppIcons.micOff), findsOneWidget);
-    expect(find.bySemanticsLabel(RegExp('Joins muted')), findsWidgets);
-    semantics.dispose();
-  });
-
-  testWidgets('the rail shows no badge on an ordinary voice channel', (
+  testWidgets('the rail row of a join_muted channel carries no mic-off glyph', (
     tester,
   ) async {
-    await _pumpRail(tester, _voice(joinMuted: false));
+    await _pumpRail(tester, _voice(joinMuted: true));
 
     expect(find.text('stage'), findsOneWidget);
     expect(find.byIcon(AppIcons.micOff), findsNothing);
+    expect(find.bySemanticsLabel(RegExp('Joins muted')), findsNothing);
   });
 
   testWidgets('the rejoin screen says a join_muted channel joins with the mic '

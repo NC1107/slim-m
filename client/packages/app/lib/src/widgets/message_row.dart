@@ -116,9 +116,9 @@ class MessageRow extends StatelessWidget {
   final VoidCallback? onEditFailed;
 
   /// Called with the token the add-reaction picker chose (a codepoint, or a
-  /// `:shortcode:` for one of the deployment's own), from the hover-revealed
-  /// button in [ReactionsRow] or from the long-press menu's own sheet, which
-  /// is the only one of the two a finger can reach.
+  /// `:shortcode:` for one of the deployment's own), from the hover toolbar's
+  /// button or from the long-press menu's own sheet, which is the only one of
+  /// the two a finger can reach.
   final ValueChanged<String> onPickReaction;
 
   /// Toggles the caller's own reaction for an existing chip: on if
@@ -316,7 +316,6 @@ class MessageRow extends StatelessWidget {
                                   customEmoji: customEmoji,
                                   onRetry: onRetry,
                                   onDiscard: onDiscard,
-                                  onPickReaction: onPickReaction,
                                   onReactionTap: onReactionTap,
                                   onVote: onVote,
                                   onSubmitEdit: onSubmitEdit,

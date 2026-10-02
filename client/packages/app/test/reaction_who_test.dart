@@ -93,7 +93,6 @@ class _Fixture {
     messageId: 'm1',
     reactions: _reactions,
     onReactionTap: (r) => tapped.add(r.emoji),
-    onPickReaction: (_) {},
   );
 
   Widget _messageRow() => MessageRow(

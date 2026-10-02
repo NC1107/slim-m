@@ -38,7 +38,6 @@ Widget _row(
           api.ReactionSummary(emoji: emoji, count: 1, reacted: false),
         ],
         onReactionTap: onTap ?? (_) {},
-        onPickReaction: (_) {},
         customEmoji: custom,
       ),
     ),

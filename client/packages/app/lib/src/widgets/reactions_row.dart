@@ -10,10 +10,7 @@ import 'package:flutter/material.dart';
 import 'package:slimm_api/api.dart' as api;
 import 'package:slimm_design_system/design_system.dart';
 
-import '../routing/breakpoints.dart';
-import 'add_reaction_chip.dart';
 import 'custom_emoji_image.dart';
-import 'emoji_picker.dart';
 import 'reaction_chip_who.dart';
 import 'standard_emoji.dart';
 
@@ -42,8 +39,10 @@ const double _reactionChipSpacing =
     AppSpacing.s4 - (focusRingGap + focusRingWidth);
 
 /// One chip per distinct emoji already on the message (real counts, and
-/// [api.ReactionSummary.reacted] driving the active state), plus the
-/// add-reaction glyph, which opens [EmojiPickerButton]'s floating picker.
+/// [api.ReactionSummary.reacted] driving the active state). There is no
+/// add-reaction control at rest: [MessageRow]'s hover toolbar carries it on a
+/// pointer and the long-press menu's quick row on touch (desktop-vs-mobile
+/// rule 3), and tapping a chip toggles the viewer's own reaction of it.
 /// Tapping an existing chip calls [onReactionTap] with that summary; the
 /// caller decides whether that means adding or removing based on whether it
 /// was already active.
@@ -60,13 +59,9 @@ class ReactionsRow extends StatefulWidget {
     super.key,
     required this.reactions,
     required this.onReactionTap,
-    required this.onPickReaction,
     this.messageId,
     this.customEmoji = const {},
   });
-
-  /// The dashed chip that trails the reactions, for a test to find.
-  static const addChipKey = Key('reactions_add_chip');
 
   /// The message these chips sit under. With it, holding a chip (or
   /// right-clicking it) lists who left that reaction; without it the chips are
@@ -75,9 +70,6 @@ class ReactionsRow extends StatefulWidget {
 
   final List<api.ReactionSummary> reactions;
   final ValueChanged<api.ReactionSummary> onReactionTap;
-
-  /// Called with the emoji character the picker chose.
-  final ValueChanged<String> onPickReaction;
 
   /// The deployment's custom emoji, lower-cased name to id. Empty while the
   /// set is loading or unfetchable, which leaves a shortcode reaction as the
@@ -173,27 +165,6 @@ class _ReactionsRowState extends State<ReactionsRow> {
     );
   }
 
-  /// The picker opens as a sheet below the compact width and anchored under
-  /// the chip above it: nothing floats under a thumb.
-  Widget _addChip(BuildContext context) {
-    if (LayoutClass.of(context) == LayoutClass.compact) {
-      return KeyedSubtree(
-        key: ReactionsRow.addChipKey,
-        child: AddReactionChip(
-          onTap: () =>
-              showEmojiPickerSheet(context, onSelect: widget.onPickReaction),
-        ),
-      );
-    }
-    return KeyedSubtree(
-      key: ReactionsRow.addChipKey,
-      child: EmojiPickerButton(
-        onSelect: widget.onPickReaction,
-        triggerBuilder: (context, toggle) => AddReactionChip(onTap: toggle),
-      ),
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
     final live = {for (final r in widget.reactions) r.emoji: r};
@@ -227,7 +198,6 @@ class _ReactionsRowState extends State<ReactionsRow> {
                   },
                   child: _chip(reaction, exiting: true),
                 ),
-            if (live.isNotEmpty) _addChip(context),
           ],
         ),
       ),

@@ -126,7 +126,8 @@ static gboolean my_application_local_command_line(GApplication* application,
   g_application_activate(application);
   *exit_status = 0;
 
-  return TRUE;
+  // FALSE lets GApplication deliver the arguments to the primary instance's "command-line" signal, which the gtk plugin relays to app_links.
+  return FALSE;
 }
 
 // Implements GApplication::startup.
@@ -172,8 +173,9 @@ MyApplication* my_application_new() {
   // the application to be recognized beyond its binary name.
   g_set_prgname(APPLICATION_ID);
 
-  // No NON_UNIQUE flag: a second launch now re-enters activate() above.
+  // No NON_UNIQUE flag: a second launch re-enters activate() above, and HANDLES_COMMAND_LINE carries its slimm:// argument to the first.
   return MY_APPLICATION(g_object_new(my_application_get_type(),
                                      "application-id", APPLICATION_ID, "flags",
-                                     G_APPLICATION_DEFAULT_FLAGS, nullptr));
+                                     G_APPLICATION_HANDLES_COMMAND_LINE,
+                                     nullptr));
 }

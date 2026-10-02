@@ -46,7 +46,6 @@ class MessageRowColumn extends ConsumerWidget {
     required this.customEmoji,
     required this.onRetry,
     required this.onDiscard,
-    required this.onPickReaction,
     required this.onReactionTap,
     required this.onVote,
     required this.onSubmitEdit,
@@ -80,7 +79,6 @@ class MessageRowColumn extends ConsumerWidget {
   final Map<String, String> customEmoji;
   final VoidCallback onRetry;
   final VoidCallback onDiscard;
-  final ValueChanged<String> onPickReaction;
   final ValueChanged<api.ReactionSummary> onReactionTap;
   final ValueChanged<int> onVote;
   final ValueChanged<String> onSubmitEdit;
@@ -236,7 +234,6 @@ class MessageRowColumn extends ConsumerWidget {
             messageId: message.id,
             reactions: reactions,
             onReactionTap: onReactionTap,
-            onPickReaction: onPickReaction,
             customEmoji: customEmoji,
           ),
         if ((threadReplyCount ?? 0) > 0)

@@ -30,7 +30,6 @@ Widget _inSelectionArea() => MaterialApp(
               ),
             ],
             onReactionTap: (_) {},
-            onPickReaction: (_) {},
           ),
         ],
       ),
