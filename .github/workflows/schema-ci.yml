@@ -8,6 +8,7 @@ name: schema-ci
 # gate (`verify-release-checks.yml`) can always find its check-run on the
 # commit a release actually verifies. See that job's own doc comment.
 on:
+  merge_group:
   push:
     branches: [main]
   pull_request:
