@@ -128,6 +128,13 @@ Every other account in the group was renamed to its own name plus `_` and the la
 `username_collision_renames` records the old and new name of each, so you can tell those members what to sign in with.
 Display names were not touched.
 
+## Push previews
+
+Whether a notification shows the message text is one choice per account, not per device.
+An account that never chose gets `DEFAULT_PUSH_PREVIEW` (`src/notifications.rs`), which is on.
+To flip the default for everyone who has not chosen, change that constant and nothing else; the account value is resolved when a push is sealed.
+Decision [0054](decisions/0054-push-preview-default-on.md) has the old-client caveat.
+
 ## Modules and module sources
 
 Modules are WebAssembly programs the server runs in-process, installed from the Dock in Space settings under Addons.

@@ -111,6 +111,7 @@ A run by hand without `defer` fails when a required archive is missing.
 gh workflow run update-manifest.yml --ref main -f tag=client-v<version> -f require=windows-x64,macos,linux-x64
 ```
 
+A release known to be short and already superseded is listed in `scripts/release-asset-exempt.txt` so the watchdog stops reporting it ([CHANGING-CI.md](CHANGING-CI.md)).
 The release-asset watchdog also reports a release whose `manifest.json` omits a platform whose archive is attached (client 0.88.0 omits `linux-x64`); the same command, from a ref with this change, re-signs it.
 
 It needs the `UPDATE_SIGNING_KEY` secret.
