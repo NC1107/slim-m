@@ -44,6 +44,15 @@ enum ClipboardImagePlugin {
       result(UIPasteboard.general.hasImages)
     case "readImage":
       result(UIPasteboard.general.image?.pngData())
+    case "writeImage":
+      guard let data = (call.arguments as? FlutterStandardTypedData)?.data,
+        let image = UIImage(data: data)
+      else {
+        result(FlutterError(code: "write_failed", message: "The image could not be copied.", details: nil))
+        return
+      }
+      UIPasteboard.general.image = image
+      result(nil)
     case "editMenuPasteSwizzleInstalled":
       result(editMenuPasteSwizzleInstalled)
     default:

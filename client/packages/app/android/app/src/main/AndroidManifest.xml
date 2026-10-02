@@ -64,6 +64,16 @@
                 <data android:scheme="slimm" android:host="spotify-callback"/>
             </intent-filter>
         </activity>
+        <!-- Serves the image ClipboardImageChannel copies; nothing else is reachable through it. -->
+        <provider
+            android:name="androidx.core.content.FileProvider"
+            android:authorities="${applicationId}.clipboard_images"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data
+                android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/clipboard_image_paths"/>
+        </provider>
         <!-- Don't delete the meta-data below.
              This is used by the Flutter tool to generate GeneratedPluginRegistrant.java -->
         <meta-data

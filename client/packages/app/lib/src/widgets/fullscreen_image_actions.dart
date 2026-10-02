@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
-/// The viewer header's Share and Save controls for the image on screen.
+/// The viewer header's Share, Copy and Save controls for the image on screen.
 ///
 /// Share exists only where [ImageExporter.canShare]; Save always exists and
 /// is the photo library on a phone, a Save as dialog on a desktop and a
@@ -15,7 +15,7 @@ import 'package:slimm_api/api.dart' as api;
 import 'package:slimm_design_system/design_system.dart';
 
 import '../api_failure.dart';
-import '../providers/toasts.dart';
+import 'image_actions.dart';
 import 'image_export.dart';
 
 class ImageExportActions extends ConsumerStatefulWidget {
@@ -52,9 +52,6 @@ class _ImageExportActionsState extends ConsumerState<ImageExportActions> {
       failure = await action(ref.read(imageExporterProvider), bytes);
     } on api.ApiException catch (e) {
       failure = describeApiFailure('$verb $name', e);
-    } on PhotoLibraryDenied {
-      failure =
-          'Could not save $name: allow photo access for slim-m in Settings.';
     } catch (_) {
       failure = 'Could not $verb $name.';
     }
@@ -73,18 +70,24 @@ class _ImageExportActionsState extends ConsumerState<ImageExportActions> {
     return null;
   });
 
-  Future<void> _save() => _run('save', (exporter, bytes) async {
-    final saved = await exporter.save(bytes, filename: widget.image.filename);
-    if (saved) {
-      ref
-          .read(toastsProvider.notifier)
-          .show(
-            exporter.savesToLibrary ? 'Saved to photos.' : 'Saved.',
-            severity: AppToastSeverity.success,
-          );
-    }
-    return null;
-  });
+  Future<void> _save() => _runShared(saveImageToDevice);
+
+  Future<void> _copy() => _runShared(copyImageToClipboard);
+
+  Future<void> _runShared(
+    Future<String?> Function(
+      WidgetRef ref,
+      api.Attachment image,
+      Future<Uint8List> Function() loadBytes,
+    )
+    action,
+  ) async {
+    setState(() => _busy = true);
+    final failure = await action(ref, widget.image, widget.loadBytes);
+    if (!mounted) return;
+    setState(() => _busy = false);
+    if (failure != null) widget.onFailure(failure);
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -103,6 +106,14 @@ class _ImageExportActionsState extends ConsumerState<ImageExportActions> {
               onPressed: _busy ? null : () => _share(_originOf(context)),
             ),
           ),
+        AppIconButton(
+          icon: AppIcons.copy,
+          semanticLabel: 'Copy image',
+          tooltip: 'Copy image',
+          size: AppIconButtonSize.touch,
+          touch: true,
+          onPressed: _busy ? null : _copy,
+        ),
         AppIconButton(
           icon: AppIcons.download,
           semanticLabel: exporter.savesToLibrary

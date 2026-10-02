@@ -23,6 +23,8 @@ import 'attachment_chip.dart';
 import 'attachment_format.dart';
 import 'attachment_reveal.dart';
 import 'attachment_video_player.dart';
+import 'image_actions_menu.dart';
+import 'run_guarded.dart';
 import 'fullscreen_image_viewer.dart';
 import 'image_decode.dart';
 import 'message_row_parts.dart' show AttachmentPlaceholder;
@@ -102,7 +104,8 @@ class AttachmentView extends ConsumerStatefulWidget {
 /// same image with one shared tag would throw the moment a flight starts.
 /// An identity object held by this element is unique per mounted view and
 /// stable across rebuilds, which is exactly what a hero tag needs.
-class _AttachmentViewState extends ConsumerState<AttachmentView> {
+class _AttachmentViewState extends ConsumerState<AttachmentView>
+    with GuardedActionState<AttachmentView> {
   final Object _heroTag = Object();
 
   /// Set once the reader taps a gated preview, opening both gates at once: a
@@ -209,7 +212,7 @@ class _AttachmentViewState extends ConsumerState<AttachmentView> {
             ),
           );
         }
-        return _tappable(
+        final image = _tappable(
           label: 'Open ${attachment.filename} fullscreen',
           onTap: () {
             final images = widget.siblings.isEmpty
@@ -279,6 +282,23 @@ class _AttachmentViewState extends ConsumerState<AttachmentView> {
               ),
             ],
           ),
+        );
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ImageActionsMenuRegion(
+              image: attachment,
+              loadBytes: () =>
+                  ref.read(attachmentBytesProvider(attachment.id).future),
+              onFailure: setActionError,
+              child: image,
+            ),
+            if (actionError != null) ...[
+              const SizedBox(height: AppSpacing.s4),
+              AppErrorState(message: actionError!, onDismiss: clearActionError),
+            ],
+          ],
         );
       },
     );

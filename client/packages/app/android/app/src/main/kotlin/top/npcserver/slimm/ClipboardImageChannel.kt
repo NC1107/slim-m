@@ -1,11 +1,14 @@
 // SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 package top.npcserver.slimm
 
+import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
+import androidx.core.content.FileProvider
 import io.flutter.plugin.common.BinaryMessenger
 import io.flutter.plugin.common.MethodCall
 import io.flutter.plugin.common.MethodChannel
+import java.io.File
 
 /**
  * The app half of the composer's mobile paste bridge; the Dart half is
@@ -32,6 +35,7 @@ class ClipboardImageChannel(private val context: Context) : MethodChannel.Method
     when (call.method) {
       "hasImage" -> result.success(hasImage())
       "readImage" -> readImage(result)
+      "writeImage" -> writeImage(call.arguments as? ByteArray, result)
       else -> result.notImplemented()
     }
   }
@@ -60,6 +64,28 @@ class ClipboardImageChannel(private val context: Context) : MethodChannel.Method
       )
     } catch (e: Exception) {
       result.error("read_failed", "The clipboard image could not be read.", null)
+    }
+  }
+
+  /**
+   * The clipboard holds a `content://` URI, not bytes, so the PNG is written
+   * to the app cache and served through [FileProvider]. One file is kept: the
+   * previous copy is replaced rather than left to accumulate.
+   */
+  private fun writeImage(bytes: ByteArray?, result: MethodChannel.Result) {
+    if (bytes == null) {
+      result.error("write_failed", "The image could not be copied.", null)
+      return
+    }
+    try {
+      val dir = File(context.cacheDir, "clipboard_images").apply { mkdirs() }
+      dir.listFiles()?.forEach { it.delete() }
+      val file = File(dir, "copied-image.png").apply { writeBytes(bytes) }
+      val uri = FileProvider.getUriForFile(context, "${context.packageName}.clipboard_images", file)
+      clipboardManager().setPrimaryClip(ClipData.newUri(context.contentResolver, "image", uri))
+      result.success(null)
+    } catch (e: Exception) {
+      result.error("write_failed", "The image could not be copied.", null)
     }
   }
 }
