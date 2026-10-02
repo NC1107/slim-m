@@ -71,7 +71,19 @@ def unlisted_platforms(version, names, manifest_platforms):
     ]
 
 
-def judge(tag, names, published_at, now, grace, manifest_platforms=None):
+EXEMPT_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "release-asset-exempt.txt")
+
+
+def exempt_tags(path=EXEMPT_FILE):
+    """Tags this check skips: one per line, the reason after the tag, # for notes."""
+    try:
+        lines = open(path, encoding="utf-8").read().splitlines()
+    except FileNotFoundError:
+        return set()
+    return {ln.split()[0] for ln in lines if ln.strip() and not ln.lstrip().startswith("#")}
+
+
+def judge(tag, names, published_at, now, grace, manifest_platforms=None, exempt=None):
     """Returns (status, missing): status is ok, pending, incomplete or ignored.
 
     manifest_platforms is the platform set the release's manifest.json lists,
@@ -79,7 +91,7 @@ def judge(tag, names, published_at, now, grace, manifest_platforms=None):
     manifest omits a platform whose asset is attached.
     """
     prefix = next((p for p in REQUIRED if tag.startswith(p)), None)
-    if prefix is None:
+    if prefix is None or tag in (exempt_tags() if exempt is None else exempt):
         return "ignored", []
     version = re.escape(tag[len(prefix):])
     missing = [

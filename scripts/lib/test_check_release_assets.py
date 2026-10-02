@@ -117,5 +117,26 @@ class CheckReleaseAssetsTest(unittest.TestCase):
         self.assertIn("scripts/check-release-assets.py", workflow)
 
 
+
+class ExemptTags(unittest.TestCase):
+    def test_an_exempt_incomplete_release_is_ignored(self):
+        status, missing = mod.judge("client-v0.91.0", ["SHA256SUMS"], OLD, NOW, GRACE, exempt={"client-v0.91.0"})
+        self.assertEqual((status, missing), ("ignored", []))
+
+    def test_other_tags_are_still_judged(self):
+        status, _ = mod.judge("client-v0.91.2", ["SHA256SUMS"], OLD, NOW, GRACE, exempt={"client-v0.91.0"})
+        self.assertEqual(status, "incomplete")
+
+    def test_the_file_parser_reads_tags_and_skips_notes(self):
+        import tempfile
+        with tempfile.NamedTemporaryFile("w", suffix=".txt", delete=False) as f:
+            f.write("# note\nclient-v1.0.0 because\n\n  # indented note\nserver-v2.0.0\n")
+        self.assertEqual(mod.exempt_tags(f.name), {"client-v1.0.0", "server-v2.0.0"})
+        self.assertEqual(mod.exempt_tags(f.name + ".missing"), set())
+
+    def test_the_repo_file_exempts_only_the_known_incident(self):
+        self.assertEqual(mod.exempt_tags(), {"client-v0.91.0"})
+
+
 if __name__ == "__main__":
     unittest.main()
