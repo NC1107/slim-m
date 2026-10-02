@@ -64,7 +64,9 @@ class DesktopChrome extends StatelessWidget {
                         onRequestClose: DesktopWindowShell.requestClose,
                       ),
                     const FirstRunTrayNoticeBanner(),
-                    const UpdateAvailableBanner(),
+                    // The frameless title bar carries the compact update chip instead.
+                    if (!DesktopWindowShell.frameless)
+                      const UpdateAvailableBanner(),
                     const SelfUpdateFailureBanner(),
                     Expanded(child: child),
                   ],

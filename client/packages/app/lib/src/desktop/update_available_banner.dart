@@ -5,6 +5,10 @@
 /// [FirstRunTrayNoticeBanner], the same "say it once, quietly, and let the
 /// user dismiss it" shape that banner already uses instead of a `SnackBar`.
 ///
+/// Only where there is no title bar to carry the compact `UpdateChip`: a phone,
+/// or a desktop window with native chrome. One line, dismissible (rule 6 of
+/// `docs/design/desktop-vs-mobile.md`: unrequested status is a banner).
+///
 /// On a build that passes back through a splash, this says only that a
 /// restart gets it and not how: `startup_updates` already knows the
 /// format-specific mechanism (dnf, the release page, ...) and re-derives it
@@ -54,9 +58,10 @@ class UpdateAvailableBanner extends ConsumerWidget {
           Expanded(
             child: Text(
               restartApplies
-                  ? 'Version ${update.version} is available. Restart slim-m '
-                        'to update.'
+                  ? 'Version ${update.version} is available. Restart slim-m to update.'
                   : 'Version ${update.version} is available.',
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
             ),
           ),
           if (!restartApplies)
