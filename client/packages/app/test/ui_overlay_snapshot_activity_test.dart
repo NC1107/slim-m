@@ -8,6 +8,7 @@
 library;
 
 import 'dart:convert';
+import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -18,6 +19,7 @@ import 'package:slimm_api/api.dart' as api;
 import 'package:slimm_app/src/providers/member_presence.dart';
 import 'package:slimm_app/src/providers/providers.dart';
 import 'package:slimm_app/src/providers/sync_controller.dart';
+import 'package:slimm_app/src/widgets/activity_card.dart';
 import 'package:slimm_app/src/widgets/member_pane.dart';
 import 'package:slimm_design_system/design_system.dart';
 import 'package:slimm_platform/platform.dart';
@@ -31,6 +33,34 @@ const _tokens = api.TokenPair(
   refreshToken: 'refresh',
   accessExpiresAt: 0,
 );
+
+const _art = 'https://i.scdn.co/image/ab67616d0000b273bc2dd68b840b1d4b7c9e5ad9';
+
+/// A cover drawn in code, so the picture shows real art without a network.
+Future<MemoryImage> _cover(WidgetTester tester) async {
+  final bytes = await tester.runAsync(() async {
+    final recorder = ui.PictureRecorder();
+    final canvas = Canvas(recorder);
+    const side = 96.0;
+    canvas.drawRect(
+      const Rect.fromLTWH(0, 0, side, side),
+      Paint()
+        ..shader = const LinearGradient(
+          colors: [Color(0xFF1DB954), Color(0xFF191414)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ).createShader(const Rect.fromLTWH(0, 0, side, side)),
+    );
+    canvas.drawCircle(
+      const Offset(48, 48),
+      20,
+      Paint()..color = const Color(0xFFFFFFFF),
+    );
+    final image = await recorder.endRecording().toImage(96, 96);
+    return (await image.toByteData(format: ui.ImageByteFormat.png))!;
+  });
+  return MemoryImage(bytes!.buffer.asUint8List());
+}
 
 /// Keeps the real controller's socket and retry timer out of the test.
 class _StubSyncController extends SyncController {
@@ -71,6 +101,8 @@ api.SlimmApi _fakeApi(api.SessionStore session) => api.SlimmApi(
             'type': 'listening',
             'title': 'Weightless',
             'subtitle': 'Marconi Union',
+            'source': 'Spotify',
+            'art_url': _art,
           },
         },
         {
@@ -82,6 +114,7 @@ api.SlimmApi _fakeApi(api.SessionStore session) => api.SlimmApi(
                 'A very long track title that cannot possibly fit on one line '
                 'of a narrow member pane',
             'subtitle': 'An artist with an equally long name',
+            'source': 'Mozilla Firefox',
           },
         },
         {'user_id': '3', 'status': 'online'},
@@ -110,8 +143,10 @@ Future<void> _pump(
     _profile('2', 'Kess', statusText: 'a typed status'),
     _profile('3', 'Marco', statusText: 'Out until 3'),
   ];
+  final cover = await _cover(tester);
   final container = ProviderContainer(
     overrides: [
+      activityArtImageProvider.overrideWithValue((_) => cover),
       keyStoreProvider.overrideWithValue(InMemoryKeyStore()),
       sessionProvider.overrideWithValue(api.SessionStore(tokens: _tokens)),
       syncControllerProvider.overrideWith(_StubSyncController.new),
@@ -157,6 +192,9 @@ Future<void> _pump(
     ),
   );
   await tester.pumpAndSettle();
+  await tester.runAsync(
+    () => precacheImage(cover, tester.element(find.byType(Scaffold))),
+  );
   if (drawer) scaffoldKey.currentState!.openEndDrawer();
   await tester.pumpAndSettle();
 }
@@ -194,7 +232,7 @@ void main() {
         await _finish(tester, 'activity-row-$suffix');
       });
 
-      testWidgets('$suffix: the profile card carries the same line', (
+      testWidgets('$suffix: the profile card shows cover, source and track', (
         tester,
       ) async {
         await _pump(
@@ -205,11 +243,30 @@ void main() {
         );
         await tester.tap(find.text('Priya'));
         await tester.pumpAndSettle();
-        expect(
-          find.text('Listening to Weightless - Marconi Union'),
-          findsNWidgets(2),
-        );
+        expect(find.text('Listening on Spotify'), findsOne);
+        expect(find.text('Weightless'), findsOne);
+        expect(find.text('Marconi Union'), findsOne);
+        final cover = tester.getSize(find.byKey(const Key('activity-cover')));
+        expect(cover, const Size(AppSpacing.s48, AppSpacing.s48));
+        expect(find.byType(Image), findsOne);
         await _finish(tester, 'activity-card-$suffix');
+      });
+
+      testWidgets('$suffix: a browser video says so and has no cover', (
+        tester,
+      ) async {
+        await _pump(
+          tester,
+          window: window,
+          drawer: drawer,
+          brightness: brightness,
+        );
+        await tester.tap(find.text('Kess'));
+        await tester.pumpAndSettle();
+        expect(find.text('Listening on Mozilla Firefox'), findsOne);
+        expect(find.byType(Image), findsNothing);
+        expect(find.byIcon(AppIcons.listening), findsWidgets);
+        await _finish(tester, 'activity-card-browser-$suffix');
       });
     }
   }
