@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.91.1](https://github.com/Slim-m-org/slim-m/compare/client-v0.91.0...client-v0.91.1) (2026-10-02)
+
+
+### Bug Fixes
+
+* **client:** keep flutter's showDialog reachable off linux so the macos build compiles again ([#1589](https://github.com/Slim-m-org/slim-m/issues/1589)) ([4e37f6c](https://github.com/Slim-m-org/slim-m/commit/4e37f6c940958ec3655d8e3065e370e041b34db4))
+
 ## [0.91.0](https://github.com/Slim-m-org/slim-m/compare/client-v0.90.0...client-v0.91.0) (2026-10-01)
 
 
