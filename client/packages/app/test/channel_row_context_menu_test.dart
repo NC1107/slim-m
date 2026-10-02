@@ -143,17 +143,6 @@ Future<void> _openMenu(WidgetTester tester) => tester.tapAt(
   kind: PointerDeviceKind.mouse,
 );
 
-/// A phone width so `AppTouchTargets.of` reports touch mode and the kebab
-/// renders unconditionally, the same way `channel_rail_channel_rows_test.dart`'s
-/// own long-press test does - a pointer-width test would instead need a real
-/// hover to reveal it first.
-void _usePhoneWidth(WidgetTester tester) {
-  tester.view.physicalSize = const Size(390, 844);
-  tester.view.devicePixelRatio = 1;
-  addTearDown(tester.view.resetPhysicalSize);
-  addTearDown(tester.view.resetDevicePixelRatio);
-}
-
 void main() {
   testWidgets(
     'a manager sees both Open channel and Channel settings on a right-click',
@@ -304,7 +293,6 @@ void main() {
     'the kebab opens the same menu a right-click does, not the settings '
     'route directly',
     (tester) async {
-      _usePhoneWidth(tester);
       final channel = _channel('c1', 'general');
       await tester.pumpWidget(_harness(_router(channel, canManage: true)));
       await tester.pump();
@@ -330,7 +318,6 @@ void main() {
     'the kebab menu shows Channel settings from MANAGE_CHANNELS alone, even '
     'without MANAGE_ROLES',
     (tester) async {
-      _usePhoneWidth(tester);
       final channel = _channel('c1', 'general');
       await tester.pumpWidget(
         _harness(
@@ -351,7 +338,6 @@ void main() {
     'Channel settings from the kebab menu navigates the same route the '
     'right-click menu does',
     (tester) async {
-      _usePhoneWidth(tester);
       final channel = _channel('c1', 'general');
       await tester.pumpWidget(_harness(_router(channel, canManage: true)));
       await tester.pump();
@@ -369,7 +355,6 @@ void main() {
     "Mute channel from the kebab menu runs the same action the right-click "
     "menu's own item does",
     (tester) async {
-      _usePhoneWidth(tester);
       final channel = _channel('c1', 'general');
       const tokens = api.TokenPair(
         userId: 'u-me',
