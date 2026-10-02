@@ -25,6 +25,7 @@ use super::{signup, text};
 const STEP_MS: i64 = 30 * 1000;
 
 pub(crate) async fn totp_calls(c: &mut Contract, root: &str, invite: &str) {
+    wait_for_mid_step().await;
     let signed_up = c
         .call(
             "register",
@@ -133,6 +134,15 @@ pub(crate) async fn totp_calls(c: &mut Contract, root: &str, invite: &str) {
         root,
     )
     .await;
+}
+
+/// Sleeps until the clock is well inside a step, so codes made for one step are not read by the server in the next.
+async fn wait_for_mid_step() {
+    let into_step = now_ms().rem_euclid(STEP_MS);
+    if !(5_000..=15_000).contains(&into_step) {
+        let wait = (STEP_MS - into_step + 5_000).rem_euclid(STEP_MS);
+        tokio::time::sleep(std::time::Duration::from_millis(wait as u64)).await;
+    }
 }
 
 fn code(secret: &str, offset_ms: i64) -> String {
