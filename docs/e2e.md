@@ -102,9 +102,10 @@ prints it every time so it cannot quietly grow.
 | `lib/e2e_run.py` | the running order, and the coverage report at the end |
 | `lib/e2e_client.py` | one browser, over the Chrome DevTools Protocol |
 | `lib/e2e_js.py` | the browser-side half: reading and driving the semantics tree |
+| `lib/e2e_input.py` | real pointer and key input: right-click, hold, Tab, Shift+Enter |
 | `lib/e2e_labels.py` | every accessible name the app is driven by, in one place |
 | `lib/e2e_api.py` | the server's own answer, for checking against |
-| `lib/e2e_messaging.py`, `e2e_settings.py`, `e2e_admin.py`, `e2e_voice.py`, `e2e_voice_rejoin.py`, `e2e_markdown.py`, `e2e_reconcile.py`, `e2e_replies.py`, `e2e_threads.py`, `e2e_dm_call.py`, `e2e_canvas.py`, `e2e_canvas_shapes.py`, `e2e_media_slots.py` | the scenarios |
+| `lib/e2e_messaging.py`, `e2e_settings.py`, `e2e_admin.py`, `e2e_voice.py`, `e2e_voice_rejoin.py`, `e2e_markdown.py`, `e2e_reconcile.py`, `e2e_replies.py`, `e2e_threads.py`, `e2e_message_menu.py`, `e2e_composer.py`, `e2e_members.py`, `e2e_accounts.py`, `e2e_dm_call.py`, `e2e_canvas.py`, `e2e_canvas_shapes.py`, `e2e_media_slots.py` | the scenarios |
 | `lib/e2e_sweep.py` | the API-level routes the scenarios do not reach |
 | `lib/e2e_seed.py`, `e2e_fixtures.py` | the accounts and the two PNGs a run uploads |
 
@@ -140,9 +141,10 @@ Four things cost real time to learn, and each fails silently rather than loudly:
   find; `createElement` is wrapped to catch it, and it is handed a real `File`
   through a `DataTransfer`.
 - **Pointer events do not reach the canvas while the tree is on**, because the
-  semantics elements sit over it. `gestures(True)` lifts them for the one
-  affordance that has no label - the react button, which only exists while the
-  pointer is over a message.
+  semantics elements sit over it. `gestures(True)` lifts them for the
+  affordances that have no label - the react button, which only exists while
+  the pointer is over a message, and the message menu, a held reaction chip and
+  Tab in the composer, which `e2e_input.py` drives with genuine browser events.
 
 ### Driving the Voice Canvas specifically
 
@@ -255,27 +257,17 @@ an honest gap declined for the same reason the stroke preview above is.
 
 ## What it drives at the API, on purpose
 
-Reporting and blocking live behind a context menu that opens on right-click or
-long-press.
-With the accessibility tree on, a synthetic pointer event cannot open it, so
-this harness cannot reach it.
-A screen reader can: `GestureDetector` publishes a long-press semantic action,
-which VoiceOver and TalkBack surface, and a test guards that.
-A keyboard-only user cannot, because the rows take no focus and no key opens
-the menu.
-So those two are driven at the API, and `scripts/lib/e2e_admin.py` says so in
-its docstring rather than implying the UI path was exercised.
-The underlying gap is recorded in `CLAUDE.md`; closing it would make the menu
-reachable for keyboard users and for this harness in the same change.
-
-Reply and "Reply in thread" sit behind the identical menu, so sending a reply
-and opening a thread are the same substitution, made in `e2e_replies.py` and
-`e2e_threads.py` for the same reason; each says so in its own docstring.
-Everything downstream of the send or the open - the rendered quote, its tap
-target, a deleted parent's honest placeholder, the channel list's exclusion of
-a thread, and the parent message's own reply-count affordance - is an ordinary
-`Semantics` node with no menu behind it, so all of that is driven and checked
-through the real UI.
+Reporting and blocking live behind the message context menu, and are still
+driven at the API: `scripts/lib/e2e_admin.py` says so in its docstring rather
+than implying the UI path was exercised.
+That menu used to be unreachable here, since a click dispatched at a semantics
+element does not open it.
+A genuine right-click sent with the semantics layer lifted does (see
+`e2e_input.py`), which is how `e2e_message_menu.py` drives its quick reactions
+and More page and how `e2e_threads.py` opens a thread with "Reply in thread".
+Sending a reply is still a substitution, made in `e2e_replies.py`.
+The menu is also reachable from a keyboard (the context-menu key), and a screen
+reader reaches it through the long-press action a test guards.
 
 Permissions are checked at the API deliberately rather than reluctantly.
 Hiding a button is not access control; refusing the request is, and each body
@@ -329,8 +321,8 @@ There was no way to finish or abandon a crop, and so no way to set an avatar at
 all. Fixed, with a test that asserts both buttons sit inside the window at
 three sizes.
 
-The context menu is unreachable without a pointer, described above. Recorded,
-not fixed.
+The message context menu looked unreachable without a pointer. It has since
+gained a keyboard route, and a real right-click reaches it here.
 
 Driving the Voice Canvas for the first time found two more, neither of which
 any widget test had caught, because neither needed a widget test to be wrong -

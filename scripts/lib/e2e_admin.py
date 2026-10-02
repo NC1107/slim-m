@@ -1,13 +1,12 @@
 # SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 """Roles, reporting, blocking: the parts that decide what people may do.
 
-Two of these are driven at the API rather than through the screen, and the
-reason is worth stating rather than hiding. Reporting and blocking live behind
-a context menu that opens on right-click or long-press only, and a synthetic
-pointer event cannot open it while the accessibility tree is on. That is not
-just a limit of this harness: a menu with no keyboard or assistive-technology
-affordance cannot be reached by anyone who does not use a mouse, so every
-action inside it (report, block, edit, delete, pin) is unreachable for them.
+Two of these are driven at the API rather than through the screen. Reporting
+and blocking live behind the message context menu. A click dispatched at a
+semantics element does not open it, which is why they began as API calls; a
+genuine right-click does (see e2e_input.py and e2e_message_menu.py), so they
+could move to the UI. They stay at the API because what matters here is that
+the server files the report and refuses the unauthorised caller.
 
 Permissions are deliberately checked at the API too. Hiding a button is not
 access control; refusing the request is, and that is the half worth testing.

@@ -3,9 +3,9 @@
 looks like once its parent is gone.
 
 'Reply' itself lives behind the same long-press/right-click context menu as
-report and block (see e2e_admin.py's own module doc for why a synthetic
-pointer event cannot open it), so the reply is sent through the API here,
-the same substitution that module already makes. Everything downstream - the
+report and block, which e2e_input.py can open with a real right-click; the
+reply is still sent through the API here, the substitution that module
+already makes. Everything downstream - the
 rendered quote, its tap target, and what a deleted parent looks like - is an
 ordinary `Semantics` node with no menu behind it, so all of that is driven
 and checked through the real UI.
