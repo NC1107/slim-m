@@ -421,6 +421,7 @@ class _MemberProfileBodyState extends ConsumerState<MemberProfileBody>
             canIssueReset: canIssueReset,
             canRemove: canRemove,
             canEject: canEject,
+            compact: widget.compact,
             onBack: () => setState(() => _moderating = false),
             onTimeOut: _timeOut,
             onEject: () {
@@ -472,12 +473,13 @@ class _MemberProfileBodyState extends ConsumerState<MemberProfileBody>
     ];
 
     if (widget.compact) {
-      return Padding(
-        padding: const EdgeInsets.fromLTRB(
+      // One scroll view for the whole sheet; the inset keeps a field above the keyboard.
+      return SingleChildScrollView(
+        padding: EdgeInsets.fromLTRB(
           AppSpacing.s8,
           0,
           AppSpacing.s8,
-          AppSpacing.s8,
+          AppSpacing.s8 + MediaQuery.viewInsetsOf(context).bottom,
         ),
         child: Column(mainAxisSize: MainAxisSize.min, children: rows),
       );
