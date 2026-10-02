@@ -2,7 +2,7 @@
 /// [AttachmentVideoPlayer] constructs a real `media_kit` [Player] the moment
 /// it mounts (see the widget's own field initializer), so every test here
 /// needs [MediaKit.ensureInitialized] and a real libmpv on the machine
-/// running it - `client-ci.yml`'s test job installs `libmpv-dev` for exactly
+/// running it - `client-ci.yml`'s test job installs the runtime `libmpv2` for exactly
 /// this. What is tested never needs that player to actually open anything:
 /// a caller with no access token fails inside `AttachmentVideoSource.open`
 /// itself, before `Player.open` is ever reached, so this is deterministic
