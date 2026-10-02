@@ -10,16 +10,16 @@ Each section below is named for its workflow file.
 
 | Workflow | Runs on | What it gates |
 | --- | --- | --- |
-| `server-ci` | changes under `crates/` or `.sqlx/`, `schema/openapi.yaml`, the Cargo files, `rust-toolchain.toml`, `docker/server.Dockerfile`, or its own workflow file | fmt, clippy, sqlx cache check, tests, release build, binary size budget |
-| `client-ci` | changes under `client/`, or to `schema/openapi.yaml`, `scripts/desktop-shell-smoke.sh`, `scripts/chrome-tests.sh` or its own workflow file; `update-golden-references` also by hand (workflow_dispatch) | dart analyze and format in one job, every package's tests plus the web build in another, the pure-logic tests listed in `client/chrome-tests.txt` compiled to JavaScript and run in Chrome in a third, so a typo reports in about a minute rather than fourteen; `update-golden-references` regenerates design_system's golden PNGs for a human to commit |
+| `server-ci` | changes under `crates/` or `.sqlx/`, `schema/openapi.yaml`, the Cargo files, `rust-toolchain.toml`, `docker/server.Dockerfile`, or its own workflow file, and every merge queue entry (`merge_group`, which ignores path filters) | fmt, clippy, sqlx cache check, tests, release build, binary size budget |
+| `client-ci` | changes under `client/`, or to `schema/openapi.yaml`, `scripts/desktop-shell-smoke.sh`, `scripts/chrome-tests.sh` or its own workflow file; `update-golden-references` also by hand (workflow_dispatch), and every merge queue entry (`merge_group`, which ignores path filters) | dart analyze and format in one job, every package's tests plus the web build in another, the pure-logic tests listed in `client/chrome-tests.txt` compiled to JavaScript and run in Chrome in a third, so a typo reports in about a minute rather than fourteen; `update-golden-references` regenerates design_system's golden PNGs for a human to commit |
 | `client-macos-ci` | a nightly schedule, and by hand | that the Dart and Swift compile against the macOS SDK. Compile-only, unsigned, and not a required check |
 | `client-windows-ci` | pushes to `main` that touch `client/` or `packaging/windows/`, a nightly schedule, and by hand; not pull requests | that the native plugin graph links against the Windows SDK, and the Windows launcher's Go tests. Compile-only, and not a required check |
 | `client-ios-ci` | changes under `client/packages/app/ios/`, `rtc/`, `platform/`, `data/`, the pubspec files, on pull requests and pushes to `main` | every `Runner` source file is registered in `project.pbxproj` (ubuntu, always), the iOS CallKit XCTest and extension-embeds-no-frameworks checks on macOS, and an unsigned Release-configuration device build when a native-relevant path changed |
-| `schema-ci` | changes under `schema/`, `redocly.yaml` on pull requests; every push to `main` unconditionally | redocly lint, the additive-only oasdiff gate against a PR's base on pull requests, and the same gate against the immediate parent commit on every push to `main` (required for a release; see below) |
+| `schema-ci` | changes under `schema/`, `redocly.yaml` on pull requests; every push to `main` unconditionally, and every merge queue entry (`merge_group`, which ignores path filters) | redocly lint, the additive-only oasdiff gate against a PR's base on pull requests, and the same gate against the immediate parent commit on every push to `main` (required for a release; see below) |
 | `audio-ci` | changes under `assets/audio/` | the seven notification sounds rebuild to the bytes that are committed, and the family is level with itself |
-| `hygiene` | every pull request, and every push to `main` | iOS purpose strings, the iOS broadcast extension is wired up, orientation is locked on phones only, no emoji in UI source, SPDX headers on Rust source, the file-size budget, the comment cap, and the `scripts/lib` unit tests, which include the two structural gates on `required_checks` |
+| `hygiene` | every pull request, and every push to `main`, and every merge queue entry (`merge_group`, which ignores path filters) | iOS purpose strings, the iOS broadcast extension is wired up, orientation is locked on phones only, no emoji in UI source, SPDX headers on Rust source, the file-size budget, the comment cap, and the `scripts/lib` unit tests, which include the two structural gates on `required_checks` |
 | `advisory-watchdog` | a daily schedule, and by hand | nothing. It opens a deduplicated GitHub issue for a security advisory against a dependency and closes it once the tree is clean; the trigger `licenses` deliberately does not carry |
-| `licenses` | changes to any dependency manifest or lockfile or to `deny.toml`; every push to `main` | every Rust crate's and every pub package's license is in the one allowlist |
+| `licenses` | changes to any dependency manifest or lockfile or to `deny.toml`; every push to `main`, and every merge queue entry (`merge_group`, which ignores path filters) | every Rust crate's and every pub package's license is in the one allowlist |
 | `perf` | changes under `crates/`, `perf/`, the Cargo files; plus published releases | benches compile on PRs, benches run on a release |
 | `compose-smoke` | changes to the self-host stack, a weekly schedule, and by hand | `docker compose up` on a fresh box produces a working deployment |
 | `e2e` | every push to `main`; a nightly schedule; by hand; and pull requests only when they touch voice, calls, the canvas, the rtc/api packages, server auth/ws/hub/voice, migrations, the image, the schema or the harness (a superseded PR run is cancelled) | the whole product through two real headless browsers; advisory, not required |
@@ -113,8 +113,33 @@ The `test-chrome` job (`logic tests under dart2js (chrome)`) runs `scripts/chrom
 dart2js evaluates integer shifts and 64-bit maths differently from the VM, so a bug can exist only in the web build: web ids once minted a wrong timestamp and the canvas grid key collided (#1540), both found only by running the suite under Chrome by hand.
 The list holds 220 files (api, app, design_system, platform, rtc, voice_canvas), chosen by running every candidate that imports no `dart:io`, `dart:ffi`, drift or platform channel and keeping the ones that pass.
 A file is opt-in: run `flutter test --platform chrome <file>` first and add it only if it passes.
-Locally the whole list takes about nine minutes; the job has no `needs`, so it runs beside the test shards and does not lengthen the PR's critical path, at the cost of one extra runner of roughly ten minutes per run.
+Locally the whole list takes about nine minutes, but a CI runner took 20.6 minutes at the median (p90 21.1, max 21.8 over 38 runs), so the job runs as two legs (`logic tests under dart2js (chrome 1)` and `(chrome 2)`) and `CHROME_SHARD` hands each `flutter test --total-shards=2` its half of every package's files; each leg is about half of that plus setup.
+The job has no `needs`, so it runs beside the test shards.
 It is not in `verify-client-ci`'s `required_checks`.
+
+### Where a pull request's time goes, measured 2026-10-02
+
+Over the last 400 runs (2026-10-01 15:33 to 2026-10-02 01:25 UTC, 399 completed, jobs read with `gh run view --json jobs`):
+
+| What | Median | p90 | Max |
+| --- | --- | --- | --- |
+| client-ci pull request run, wall clock, successful runs | 44.7 min | - | - |
+| An app shard's test step | 11.4 min | 12.3 min | 14.9 min |
+| App shard test-step medians, fastest to slowest shard | 10.7 min | - | 12.4 min |
+| The `libmpv` apt step in a shard | 1.0 min | 4 to 17 min by shard | 24.9 min |
+| `linux build deps` in `linux desktop compiles` | 1.3 min | 20.6 min | 26.7 min |
+| The dart2js suite as one job | 20.6 min | 21.1 min | 21.8 min |
+| A client-ci job's wait for a runner | 5 to 12 min | 70 to 85 min | - |
+
+The test steps are balanced and fast.
+The tail was apt: about 45 shard jobs were cancelled at the 25 minute limit while still inside the `libmpv` step, never inside a test.
+So the eight-shard split stays, `libmpv2` (213 packages) replaces `libmpv-dev` (413) in the shards, the apt steps retry and carry their own step timeout, and the shard limit is 30 minutes, twice the slowest observed test step plus setup.
+Runner-minutes per client PR, from the same data: the dart2js job 21, eight shards about 104, `other-packages` 6, `linux desktop compiles` 4 to 23, the rest under 6.
+
+Cancellation is already per pull request: every workflow with a `pull_request` trigger groups on `github.ref` and cancels in progress, and none cancels on `main`.
+`scripts/lib/test_pr_workflows_cancel_superseded_runs_but_main_never.py` pins both.
+24 of 39 client-ci pull request runs in the window were cancelled by a newer push, which is that rule working.
+Per-job `startedAt` minus run `createdAt` includes time spent waiting for `needs`, and a job cancelled while queued reports a `startedAt`, so a "wasted minutes" figure computed from it is inflated and is not quoted here.
 
 ### Runner labels are pinned
 
@@ -1151,6 +1176,24 @@ Still unconfirmed even after a green build: the launch check's own assertions pa
 `flatpak-builder` was not available locally while writing the launch-check logic, so the `124`-vs-any-other-nonzero-exit split (see above) is reasoned from documented `timeout` and `flatpak run` behavior, not confirmed against a live launch of this bundle.
 It is not yet confirmed that `flatpak run` actually reaches the plugin-loading stage within the 20-second timeout on a GitHub-hosted runner with no display attached at all, that unprivileged flatpak sandboxing works unmodified on `ubuntu-24.04`'s current image, or that some other headless-environment quirk unrelated to a missing shared library (a portal or D-Bus service genuinely absent in that runner) does not also exit nonzero and trip the exit-code assertion.
 If a future run fails on exactly that shape, the fix is to loosen the exit-code assertion, not the `grep` patterns, which are the actual defect class this workflow exists to catch.
+
+## Two green pull requests can break main
+
+It happened twice: a file at 507 lines after two PRs each under 500, and a shared test hitting an unmocked `SharedPreferences` channel.
+`main` has no branch protection or ruleset (`gh api repos/Slim-m-org/slim-m/branches/main/protection` returns 404 on 2026-10-02), and a pull request is tested against the base it branched from, not the `main` it lands on.
+
+| Option | Prevents it | Cost |
+| --- | --- | --- |
+| Merge queue | Yes: each entry is built on top of `main` plus the entries ahead of it, and only then merged | One extra full run per merge instead of per push; needs `merge_group` on each required workflow and a ruleset |
+| Require "up to date with main" | Yes | Every other PR must update its branch and rerun the whole matrix after each merge, which is the stacked-PR rerun that made the queues deeper |
+| Nightly main-health job | No, it detects it a day later | `red-streak-watchdog` already watches `e2e` and `main-builds`; `hygiene`, `client-ci` and `server-ci` on `main` have no equivalent |
+
+The recommendation is the merge queue.
+The repository half is done: `hygiene`, `client-ci`, `server-ci`, `schema-ci` and `licenses` run on `merge_group`, `.github/rulesets/main-merge-queue.json` is an importable ruleset, and `scripts/lib/test_merge_queue_ruleset_matches_the_workflows.py` keeps the two in step.
+The ruleset requires only `hygiene` for now, because it is the one check every pull request reports; `client-ci` and `server-ci` are path-gated, so requiring them would leave an unrelated PR waiting forever for a check that never starts.
+`hygiene` on the merged tree would have caught the 507-line file but not the `SharedPreferences` one.
+The follow-up that closes that second gap is making `client-ci` and `server-ci` always report (a `changes` job and `if:` on the rest, so a skipped job counts as passed) and then adding their names to the ruleset; it was left out because it rewrites 12 jobs and cannot be tested without real runs.
+The steps for the owner are in [CHANGING-CI.md](CHANGING-CI.md), section 5.
 
 ## Notes moved out of workflow headers
 

@@ -1,7 +1,7 @@
 <!-- SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0 -->
 # Changing CI safely
 
-Four incidents in one week showed that a workflow change can pass every check and still break a release or a deploy.
+Five incidents showed that a workflow change can pass every check and still break a release or a deploy.
 Each section says what happened, why nothing caught it, the rule, and the gate that exists now, if one does.
 [ci.md](ci.md) stays the reference for what each workflow does, and this page is only about how to change them.
 
@@ -84,6 +84,26 @@ If a release's verify timed out, rerun it once the checks pass.
 Gate: `copr-catch-up.yml` asks COPR's own API whether it is behind `client/pubspec.yaml` after each `main-builds` run and every six hours, and submits if so.
 `release-tag-watchdog.yml` re-dispatches a release whose verify timed out.
 Nothing equivalent exists for the web image or the Android artifact.
+
+## 5. Two green pull requests can break main
+
+What happened: twice, two pull requests that were each green merged one after the other and `main` went red, once on a file budget (507 lines) and once on a shared test.
+
+Why no gate caught it: a pull request runs against the base it branched from, and `main` has no branch protection or ruleset, so nothing tests the merge result before it lands.
+
+The rule: a required workflow must also trigger on `merge_group`, which ignores `paths:` filters, and a ruleset may only require checks that run for every pull request and every queue entry.
+Do not add a path-gated job's name to the ruleset: it never reports on an unrelated PR and the PR waits forever.
+
+Gate: `scripts/lib/test_merge_queue_ruleset_matches_the_workflows.py` fails when a required context is not a job in a workflow with `merge_group`, or one of the five queue workflows loses the trigger.
+`scripts/lib/test_pr_workflows_cancel_superseded_runs_but_main_never.py` keeps superseded PR runs cancelling and `main` runs never cancelling.
+
+What the owner does in GitHub (the repository does not change settings itself):
+
+1. Settings, Rules, Rulesets, New ruleset, Import a ruleset, choose `.github/rulesets/main-merge-queue.json`.
+2. Check the target is the default branch, enforcement is Active, and the bypass list is Repository admin.
+3. Open a throwaway PR, wait for `hygiene`, press "Merge when ready", and watch the queue entry run `hygiene` (and `client-ci` and `server-ci` if it touched their paths) on the `gh-readonly-queue/main/...` branch.
+4. If a path-gated PR sits at "Expected" forever, remove the ruleset's required check and tell whoever is changing CI; that is the failure the rule above is about.
+5. Release PRs go through the queue like any other PR; confirm the next one merges.
 
 ## After any workflow change
 
