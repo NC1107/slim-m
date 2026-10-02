@@ -27,29 +27,43 @@ import 'package:slimm_design_system/design_system.dart';
 import '../../widgets/call_header_facts.dart';
 
 class CanvasBar extends StatelessWidget {
-  const CanvasBar({super.key, required this.channelId});
+  const CanvasBar({super.key, required this.channelId, this.trailing});
 
   final String channelId;
+
+  /// Undo, the overflow and close at phone width; null where the dock has them.
+  final Widget? trailing;
 
   @override
   Widget build(BuildContext context) {
     final tokens = Theme.of(context).extension<AppTokens>()!;
-    return Container(
-      height: 36,
-      padding: const EdgeInsets.symmetric(horizontal: AppSizes.paneGutter),
-      alignment: Alignment.centerLeft,
-      child: CallHeaderLine(
-        channelId: channelId,
-        mode: 'Canvas',
-        leading: Padding(
-          padding: const EdgeInsets.only(right: AppSpacing.s8),
-          child: Icon(
-            AppIcons.canvas,
-            size: AppSizes.icon16,
-            color: tokens.textSecondary,
-          ),
+    final trailing = this.trailing;
+    final line = CallHeaderLine(
+      channelId: channelId,
+      mode: 'Canvas',
+      stacked: trailing != null,
+      leading: Padding(
+        padding: const EdgeInsets.only(right: AppSpacing.s8),
+        child: Icon(
+          AppIcons.canvas,
+          size: AppSizes.icon16,
+          color: tokens.textSecondary,
         ),
       ),
+    );
+    return Container(
+      height: trailing == null ? 36 : AppSizes.rowTouch + AppSpacing.s8,
+      padding: const EdgeInsets.symmetric(horizontal: AppSizes.paneGutter),
+      alignment: Alignment.centerLeft,
+      child: trailing == null
+          ? line
+          : Row(
+              children: [
+                Expanded(child: line),
+                const SizedBox(width: AppSpacing.s8),
+                trailing,
+              ],
+            ),
     );
   }
 }

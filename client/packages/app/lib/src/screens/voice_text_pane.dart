@@ -95,133 +95,55 @@ class VoiceCallWithChatPane extends ConsumerWidget {
   }
 }
 
-/// The compact equivalent: the call fills the screen, with a floating
-/// toggle (desktop-vs-mobile.md rule 2, "2-4 short options" - here the
-/// two-way call/chat choice, shown as the same `AppIconButton` toggle
-/// `_VoiceConversationHeader` uses at desktop widths rather than a
-/// segmented row) that swaps the whole body for the channel's own
-/// transcript. Swapped, not tabbed alongside a persistent header: an
-/// inline header here cost `CallStageLayout` a fixed slice of height on
-/// every width, and `ui_snapshot_test.dart`'s `voice-in-call` matrix -
-/// which pins the exact "three boxes did not fit a phone" bug this stage
-/// was already tuned against - overflowed by 21px at `phone-landscape`
-/// (844x390, the shortest shipped viewport) the moment a first version of
-/// this pane added one. [_ChatToggleChip] floats over the call instead, so
-/// it costs the call view nothing - deliberately its own small widget
-/// rather than `FloatingDockCard`, which `floating_dock_edge_gap_test.dart`
-/// already finds by type expecting exactly one match, the real call dock.
-class VoiceCallWithChatTabs extends StatefulWidget {
+/// The compact equivalent: the call fills the screen until the app bar's
+/// [VoiceChatAction] (desktop-vs-mobile.md rule 2, a two-way call/chat choice)
+/// swaps the whole body for the channel's own transcript. Swapped, not tabbed
+/// alongside a persistent header: an inline header here cost `CallStageLayout`
+/// a fixed slice of height on every width, and `ui_snapshot_test.dart`'s
+/// `voice-in-call` matrix overflowed by 21px at `phone-landscape` the moment
+/// a first version added one. The toggle lives in the app bar, next to
+/// members, so nothing floats over the call stage.
+class VoiceCallWithChatTabs extends ConsumerWidget {
   const VoiceCallWithChatTabs({
     required this.channelId,
     required this.call,
-    this.initiallyChatOpen = false,
     super.key,
   });
 
   final String channelId;
   final Widget call;
 
-  /// Start on the chat rather than the call; see `VoiceScreen.openChat`.
-  final bool initiallyChatOpen;
-
   @override
-  State<VoiceCallWithChatTabs> createState() => _VoiceCallWithChatTabsState();
-}
-
-class _VoiceCallWithChatTabsState extends State<VoiceCallWithChatTabs> {
-  late bool _chatOpen = widget.initiallyChatOpen;
-
-  @override
-  Widget build(BuildContext context) {
-    final tokens = Theme.of(context).extension<AppTokens>()!;
+  Widget build(BuildContext context, WidgetRef ref) {
+    final chatOpen = ref.watch(voiceChatPaneVisibleProvider);
     return AppFadeIn(
-      key: ValueKey('voice-chat-open-$_chatOpen'),
+      key: ValueKey('voice-chat-open-$chatOpen'),
       offset: 0,
-      child: _chatOpen
-          ? Column(
-              children: [
-                Container(
-                  height: 48,
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: AppSpacing.s12,
-                  ),
-                  decoration: BoxDecoration(
-                    border: Border(
-                      bottom: BorderSide(color: tokens.borderSubtle),
-                    ),
-                  ),
-                  child: Row(
-                    children: [
-                      AppIconButton(
-                        icon: AppIcons.back,
-                        semanticLabel: 'Back to call',
-                        onPressed: () => setState(() => _chatOpen = false),
-                      ),
-                      const SizedBox(width: AppSpacing.s8),
-                      Text(
-                        'Chat',
-                        style: AppText.body.copyWith(
-                          color: tokens.textPrimary,
-                          fontWeight: AppWeights.medium,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                // showHeader: false for the same reason the docked pane withholds it - see ChannelScreen's own doc.
-                Expanded(
-                  child: ChannelScreen(
-                    channelId: widget.channelId,
-                    showHeader: false,
-                  ),
-                ),
-              ],
-            )
-          : Stack(
-              children: [
-                Positioned.fill(child: widget.call),
-                Align(
-                  alignment: Alignment.topRight,
-                  child: SafeArea(
-                    bottom: false,
-                    minimum: const EdgeInsets.all(AppSpacing.s12),
-                    child: _ChatToggleChip(
-                      onPressed: () => setState(() => _chatOpen = true),
-                    ),
-                  ),
-                ),
-              ],
-            ),
+      // showHeader: false for the same reason the docked pane withholds it - see ChannelScreen's own doc.
+      child: chatOpen
+          ? ChannelScreen(channelId: channelId, showHeader: false)
+          : call,
     );
   }
 }
 
-/// A single floating icon button over the call, in the same raised/bordered/
-/// shadowed shape `FloatingDockCard` uses for the call and canvas docks -
-/// see [VoiceCallWithChatTabs]'s own doc for why this is a separate widget
-/// rather than that one.
-class _ChatToggleChip extends StatelessWidget {
-  const _ChatToggleChip({required this.onPressed});
-
-  final VoidCallback onPressed;
+/// The text chat toggle in a voice channel's app bar, lit while the chat is
+/// open. It drives [voiceChatPaneVisibleProvider], the same state the desktop
+/// header's toggle drives, so a resize across the dock width keeps the choice.
+class VoiceChatAction extends ConsumerWidget {
+  const VoiceChatAction({super.key});
 
   @override
-  Widget build(BuildContext context) {
-    final tokens = Theme.of(context).extension<AppTokens>()!;
-    return Container(
-      padding: const EdgeInsets.all(AppSpacing.s4),
-      decoration: BoxDecoration(
-        color: tokens.surfaceRaised,
-        borderRadius: BorderRadius.circular(AppRadii.window),
-        border: Border.all(color: tokens.borderSubtle),
-        // AppShadows.canvasTile, not float: this chip rests here permanently, and a permanent floater takes the resting lift (see canvas_presence_bubble.dart).
-        boxShadow: AppShadows.canvasTile,
-      ),
-      child: AppIconButton(
-        icon: AppIcons.hash,
-        semanticLabel: 'Toggle text chat',
-        onPressed: onPressed,
-      ),
+  Widget build(BuildContext context, WidgetRef ref) {
+    final open = ref.watch(voiceChatPaneVisibleProvider);
+    return AppIconButton(
+      icon: AppIcons.chat,
+      semanticLabel: 'Toggle text chat',
+      tooltip: 'Text chat',
+      active: open,
+      touch: true,
+      onPressed: () =>
+          ref.read(voiceChatPaneVisibleProvider.notifier).state = !open,
     );
   }
 }

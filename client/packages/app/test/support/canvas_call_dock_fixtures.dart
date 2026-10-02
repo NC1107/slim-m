@@ -47,6 +47,7 @@ pumpCanvasCallDock(
   double width = 800,
   bool? touch,
   bool hug = false,
+  bool compact = false,
   Brightness brightness = Brightness.dark,
   Key? boundaryKey,
 }) async {
@@ -69,6 +70,7 @@ pumpCanvasCallDock(
         ? null
         : CallDockData(voice: callVoice, controller: controller),
     canvas: canvas,
+    compact: compact,
   );
   await tester.pumpWidget(
     UncontrolledProviderScope(

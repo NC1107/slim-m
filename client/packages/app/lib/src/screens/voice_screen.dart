@@ -36,6 +36,7 @@ import '../routing/breakpoints.dart';
 import '../routing/routes.dart';
 import '../widgets/bot_call_controls.dart';
 import '../widgets/call_stage_layout.dart';
+import '../widgets/dock_height_reporter.dart';
 import '../widgets/member_profile.dart';
 import '../widgets/participant_call_menu.dart';
 import 'voice_call_dock.dart';
@@ -122,10 +123,12 @@ class _VoiceScreenState extends ConsumerState<VoiceScreen> {
   /// then it counts as already attempted, and the chat opens instead.
   void _arrive() {
     _autoJoinedFor = widget.openChat ? widget.channelId : null;
-    if (!widget.openChat) return;
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) {
-        ref.read(voiceChatPaneVisibleProvider.notifier).state = true;
+      if (!mounted) return;
+      // A phone has no docked pane to remember, so an arrival starts on the call unless it came to read.
+      final compact = LayoutClass.of(context) == LayoutClass.compact;
+      if (widget.openChat || compact) {
+        ref.read(voiceChatPaneVisibleProvider.notifier).state = widget.openChat;
       }
     });
   }
@@ -266,11 +269,7 @@ class _VoiceScreenState extends ConsumerState<VoiceScreen> {
       color: tokens.surfaceBase,
       child: canDock
           ? VoiceCallWithChatPane(channelId: channelId, call: callBody)
-          : VoiceCallWithChatTabs(
-              channelId: channelId,
-              call: callBody,
-              initiallyChatOpen: widget.openChat,
-            ),
+          : VoiceCallWithChatTabs(channelId: channelId, call: callBody),
     );
   }
 }
@@ -293,14 +292,41 @@ class _VoiceScreenState extends ConsumerState<VoiceScreen> {
 /// carries one at every width; see `voice_call_dock.dart` for the full
 /// reasoning, and `canvas_pane_test.dart` for the header affordance this is
 /// in addition to, not a replacement for.
-class _InCall extends ConsumerWidget {
+class _InCall extends ConsumerStatefulWidget {
   const _InCall({required this.channelId, required this.isDm});
 
   final String channelId;
   final bool isDm;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<_InCall> createState() => _InCallState();
+}
+
+class _InCallState extends ConsumerState<_InCall> {
+  /// The dock's real height on a phone, where bot controls and the call row
+  /// make it vary; null until measured, and unused where the dock floats
+  /// over a stage that is wide enough to leave room.
+  double? _dockHeight;
+
+  String get channelId => widget.channelId;
+  bool get isDm => widget.isDm;
+
+  void _onDockHeight(double height) {
+    if (mounted && _dockHeight != height) setState(() => _dockHeight = height);
+  }
+
+  /// Dock plus the margin [SafeArea] keeps below it.
+  double? _clearance(BuildContext context) {
+    final height = _dockHeight;
+    if (height == null || LayoutClass.of(context) != LayoutClass.compact) {
+      return null;
+    }
+    final inset = MediaQuery.paddingOf(context).bottom;
+    return height + (inset > AppSpacing.s12 ? inset : AppSpacing.s12);
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final voice = ref.watch(voiceControllerProvider);
     // autoDispose: hold the roster while a call is shown, or a tile's menu and card read it unloaded.
     ref.listen(membersProvider, (_, _) {});
@@ -319,6 +345,7 @@ class _InCall extends ConsumerWidget {
           controller: controller,
           onOpenProfile: (anchor, p) => _openProfile(anchor, ref, p),
           isDm: isDm,
+          dockClearance: _clearance(context) ?? defaultDockClearance,
           menuItemsBuilder: (context, participant, close) =>
               participantCallMenuItems(
                 context,
@@ -336,13 +363,19 @@ class _InCall extends ConsumerWidget {
             child: AppFadeIn(
               key: ValueKey('call-dock-$channelId'),
               offset: 0,
-              child: VoiceCallDock(
-                controller: controller,
-                voice: VoiceFlags.from(voice),
-                canvasChannelId: isDm ? null : channelId,
-                botControls: botGroups.isEmpty
-                    ? null
-                    : BotCallControls(channelId: channelId, groups: botGroups),
+              child: DockHeightReporter(
+                onHeight: _onDockHeight,
+                child: VoiceCallDock(
+                  controller: controller,
+                  voice: VoiceFlags.from(voice),
+                  canvasChannelId: isDm ? null : channelId,
+                  botControls: botGroups.isEmpty
+                      ? null
+                      : BotCallControls(
+                          channelId: channelId,
+                          groups: botGroups,
+                        ),
+                ),
               ),
             ),
           ),

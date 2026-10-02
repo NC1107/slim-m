@@ -50,7 +50,9 @@ import '../voice_call_controls.dart';
 import '../../providers/voice_controller.dart';
 import '../../providers/voice_flags.dart';
 import '../../widgets/floating_dock_card.dart';
+import 'canvas_compact_dock.dart';
 import 'canvas_dock_toggle.dart';
+import 'canvas_dock_tools.dart';
 import 'canvas_pen_style.dart';
 import 'canvas_tools_row.dart';
 
@@ -166,19 +168,30 @@ CallDockData? callDockDataFor(
 const _oneRowMinWidth = 800.0;
 
 class CanvasCallDock extends StatelessWidget {
-  const CanvasCallDock({super.key, this.call, this.canvas})
-    : assert(
-        call != null || canvas != null,
-        'a dock with neither a call nor a canvas has nothing to show',
-      );
+  const CanvasCallDock({
+    super.key,
+    this.call,
+    this.canvas,
+    this.compact = false,
+  }) : assert(
+         call != null || canvas != null,
+         'a dock with neither a call nor a canvas has nothing to show',
+       );
 
   final CallDockData? call;
   final CanvasDockData? canvas;
+
+  /// A phone-width pane: the tools and the call get a card each, and undo,
+  /// the overflow and close move to the header (`CanvasCompactEditGroup`).
+  final bool compact;
 
   @override
   Widget build(BuildContext context) {
     final call = this.call;
     final canvas = this.canvas;
+    if (compact && canvas != null) {
+      return CanvasCompactDock(call: call, canvas: canvas);
+    }
     if (call == null) {
       return LayoutBuilder(
         builder: (context, constraints) => FloatingDockCard(
@@ -202,7 +215,7 @@ class CanvasCallDock extends StatelessWidget {
                   Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      Flexible(child: _ToolsRow(canvas: canvas)),
+                      Flexible(child: CanvasDockToolsRow(canvas: canvas)),
                       const SizedBox(width: AppSpacing.s8),
                       const DockVerticalDivider(),
                       const SizedBox(width: AppSpacing.s8),
@@ -219,7 +232,7 @@ class CanvasCallDock extends StatelessWidget {
   static Widget _inlineCanvasRow(CanvasDockData canvas) => Row(
     mainAxisSize: MainAxisSize.min,
     children: [
-      Flexible(child: _ToolsRow(canvas: canvas)),
+      Flexible(child: CanvasDockToolsRow(canvas: canvas)),
       ..._toggleAfterGap(canvas),
     ],
   );
@@ -227,14 +240,14 @@ class CanvasCallDock extends StatelessWidget {
   /// Tools on their own row so the eraser never scrolls out of reach; undo,
   /// the overflow and the canvas toggle share the row beneath.
   static List<Widget> _stackedCanvasRows(CanvasDockData canvas) {
-    if (canvas.fullscreen) return [_ToolsRow(canvas: canvas)];
+    if (canvas.fullscreen) return [CanvasDockToolsRow(canvas: canvas)];
     return [
       if (!canvas.activityLogOpen)
-        _ToolsRow(canvas: canvas, part: CanvasToolsRowPart.toolsOnly),
+        CanvasDockToolsRow(canvas: canvas, part: CanvasToolsRowPart.toolsOnly),
       Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          _ToolsRow(canvas: canvas, part: CanvasToolsRowPart.editOnly),
+          CanvasDockToolsRow(canvas: canvas, part: CanvasToolsRowPart.editOnly),
           ..._toggleAfterGap(canvas),
         ],
       ),
@@ -258,54 +271,4 @@ class CanvasCallDock extends StatelessWidget {
       if (toggle != null) ...[const SizedBox(width: AppSpacing.s8), toggle],
     ];
   }
-}
-
-/// The canvas half of the dock: the full tool strip normally, or the single
-/// way back out of fullscreen while the chrome is dropped.
-class _ToolsRow extends StatelessWidget {
-  const _ToolsRow({required this.canvas, this.part = CanvasToolsRowPart.all});
-
-  final CanvasDockData canvas;
-  final CanvasToolsRowPart part;
-
-  @override
-  Widget build(BuildContext context) => canvas.fullscreen
-      ? AppIconButton(
-          icon: AppIcons.expand,
-          semanticLabel: 'Exit fullscreen',
-          tooltip: 'Exit fullscreen',
-          // The same glyph entering it carries, lit - AppIconButton's own selected-tool convention, and there is no shrink glyph in AppIcons to reach for instead.
-          active: true,
-          onPressed: canvas.onToggleFullscreen,
-        )
-      : CanvasToolsRow(
-          tool: canvas.tool,
-          onToolChanged: canvas.onToolChanged,
-          canDraw: canvas.canDraw,
-          canUndo: canvas.canUndo,
-          onUndo: canvas.onUndo,
-          canManage: canvas.canManage,
-          objectCount: canvas.objectCount,
-          onClear: canvas.onClear,
-          onPasteImage: canvas.onPasteImage,
-          onRecenter: canvas.onRecenter,
-          selection: canvas.selection,
-          onBringToFront: canvas.onBringToFront,
-          onSendToBack: canvas.onSendToBack,
-          onDeleteSelected: canvas.onDeleteSelected,
-          activityLogOpen: canvas.activityLogOpen,
-          onToggleActivityLog: canvas.onToggleActivityLog,
-          shapeKind: canvas.shapeKind,
-          onShapeKindChanged: canvas.onShapeKindChanged,
-          pen: canvas.pen,
-          onPenChanged: canvas.onPenChanged,
-          hasSelfBubble: canvas.hasSelfBubble,
-          selfBubbleHidden: canvas.selfBubbleHidden,
-          onToggleSelfBubbleHidden: canvas.onToggleSelfBubbleHidden,
-          hiddenTiles: canvas.hiddenTiles,
-          onShowTile: canvas.onShowTile,
-          onToggleFullscreen: canvas.onToggleFullscreen,
-          showTools: !canvas.activityLogOpen,
-          part: part,
-        );
 }

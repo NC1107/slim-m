@@ -17,9 +17,13 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../providers/dock_reservation.dart';
 
 class DockHeightReporter extends ConsumerStatefulWidget {
-  const DockHeightReporter({super.key, required this.child});
+  const DockHeightReporter({super.key, required this.child, this.onHeight});
 
   final Widget child;
+
+  /// Told the measured height instead of the shared reservation, for a dock
+  /// whose only reader is its own screen and not the shell's snackbars.
+  final ValueChanged<double>? onHeight;
 
   @override
   ConsumerState<DockHeightReporter> createState() => _DockHeightReporterState();
@@ -39,6 +43,11 @@ class _DockHeightReporterState extends ConsumerState<DockHeightReporter> {
     final height = _key.currentContext?.size?.height ?? 0;
     if (height == _lastReported) return;
     _lastReported = height;
+    final local = widget.onHeight;
+    if (local != null) {
+      local(height);
+      return;
+    }
     _reservation.state = height;
   }
 
@@ -50,8 +59,9 @@ class _DockHeightReporterState extends ConsumerState<DockHeightReporter> {
   /// at shutdown, or a test's own during teardown) may already be gone.
   @override
   void dispose() {
+    final local = widget.onHeight != null;
     Future.microtask(() {
-      if (_reservation.mounted) _reservation.state = 0;
+      if (!local && _reservation.mounted) _reservation.state = 0;
     });
     super.dispose();
   }
@@ -59,6 +69,15 @@ class _DockHeightReporterState extends ConsumerState<DockHeightReporter> {
   @override
   Widget build(BuildContext context) {
     WidgetsBinding.instance.addPostFrameCallback((_) => _report());
-    return KeyedSubtree(key: _key, child: widget.child);
+    // The card animates its own size, which no rebuild of this widget would see.
+    return NotificationListener<SizeChangedLayoutNotification>(
+      onNotification: (_) {
+        WidgetsBinding.instance.addPostFrameCallback((_) => _report());
+        return false;
+      },
+      child: SizeChangedLayoutNotifier(
+        child: KeyedSubtree(key: _key, child: widget.child),
+      ),
+    );
   }
 }

@@ -126,14 +126,14 @@ void main() {
       final semantics = tester.ensureSemantics();
       expect(s.voice.joins, isEmpty);
       expect(find.byType(ChannelScreen), findsOneWidget);
-      final backToCall = find.bySemanticsLabel('Back to call');
+      final chatToggle = find.bySemanticsLabel('Toggle text chat');
       expect(
-        backToCall,
+        chatToggle,
         findsOneWidget,
-        reason: 'the compact chat view is showing',
+        reason: 'the compact chat view is showing, with its app bar action lit',
       );
 
-      await tester.tap(backToCall);
+      await tester.tap(chatToggle);
       await tester.pumpAndSettle();
       expect(find.text('Join call'), findsOneWidget);
       expect(

@@ -20,6 +20,7 @@ import '../providers/channel_search_controller.dart';
 import '../providers/pins_controller.dart';
 import '../screens/canvas/canvas_open_button.dart';
 import '../screens/dm_call_button.dart';
+import '../screens/voice_text_pane.dart' show VoiceChatAction;
 import 'channel_title_glyph.dart';
 import 'pinned_messages_sheet.dart';
 import 'threads_sheet.dart';
@@ -86,6 +87,7 @@ class CompactChannelAppBar extends ConsumerWidget
         if (!isVoice) _PinsAction(channelId: channelId),
         if (!isVoice) _ThreadsAction(channelId: channelId),
         DmCallButton(channelId: channelId),
+        if (isVoice) const VoiceChatAction(),
         CanvasOpenButton(channelId: channelId, isVoice: isVoice, isDm: isDm),
         if (!isDm) const _MembersAction(),
         const SizedBox(width: AppSpacing.s8),

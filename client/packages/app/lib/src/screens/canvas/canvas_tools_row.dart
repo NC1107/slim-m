@@ -74,7 +74,11 @@ class CanvasToolsRow extends StatefulWidget {
     required this.onToggleFullscreen,
     this.showTools = true,
     this.part = CanvasToolsRowPart.all,
+    this.overflowOpensBelow = false,
   });
+
+  /// See [CanvasOverflowMenu.opensBelow].
+  final bool overflowOpensBelow;
 
   /// Which tool a tap or drag on the surface draws with. Pen, note and shape
   /// are decision 0004's own three tool-dock tools, each dropping a new
@@ -244,6 +248,7 @@ class _CanvasToolsRowState extends State<CanvasToolsRow> {
           hiddenTiles: widget.hiddenTiles,
           onShowTile: widget.onShowTile,
           onToggleFullscreen: widget.onToggleFullscreen,
+          opensBelow: widget.overflowOpensBelow,
         ),
       ],
     );
