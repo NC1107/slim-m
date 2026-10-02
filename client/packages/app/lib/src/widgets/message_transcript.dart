@@ -455,6 +455,7 @@ class _MessageTranscriptState extends State<MessageTranscript> {
                   threadUnreadCount: extras.threadUnreadCount,
                   // A null replyToId is a null map key here, which is a null lookup - the same "no parent" the row renders as nothing.
                   replyTo: byId[message.replyToId],
+                  replyParentAdjacent: message.replyToId == previous?.id,
                   onReplyTap: switch (message.replyToId) {
                     final String id => () => widget.onJumpToReply(id),
                     null => null,
