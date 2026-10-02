@@ -84,7 +84,7 @@ void main() {
     await tester.tap(find.bySemanticsLabel(_cameraLabel));
     await tester.pumpAndSettle();
 
-    expect(find.text('Photo library'), findsOneWidget);
+    expect(find.text('Choose photo'), findsOneWidget);
     expect(find.text('Browse files'), findsOneWidget);
   });
 
@@ -99,7 +99,7 @@ void main() {
   );
 
   for (final (label, expectedMethod) in [
-    ('Photo library', 'image'),
+    ('Choose photo', 'image'),
     ('Browse files', 'any'),
   ]) {
     testWidgets(
