@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.93.0](https://github.com/Slim-m-org/slim-m/compare/client-v0.92.0...client-v0.93.0) (2026-10-02)
+
+
+### Features
+
+* **client:** hold to lift in the desktop rail, a slimm link that reaches the running linux app, and left anchored poll bars ([#1612](https://github.com/Slim-m-org/slim-m/issues/1612)) ([3a41c14](https://github.com/Slim-m-org/slim-m/commit/3a41c14b1460b4ea125bf8499bacd31d74afa47b))
+
+
+### Bug Fixes
+
+* **client:** a lone channel can be dragged into a category ([#1602](https://github.com/Slim-m-org/slim-m/issues/1602)) ([7c271ab](https://github.com/Slim-m-org/slim-m/commit/7c271abfc59f2abad9a801f1d18758faff801567))
+* **client:** the phone channel list drops the grips and kebabs and tightens its spacing ([#1598](https://github.com/Slim-m-org/slim-m/issues/1598)) ([4bd0325](https://github.com/Slim-m-org/slim-m/commit/4bd0325a32876adfea86195664e06248b034e7ab))
+* seven phone ui fixes from the backlog, one device row per install, and a tidier call screen ([#1611](https://github.com/Slim-m-org/slim-m/issues/1611)) ([99c8f6b](https://github.com/Slim-m-org/slim-m/commit/99c8f6b481905f2c058eb3c5f86466e2c49cc862))
+
 ## [0.92.0](https://github.com/Slim-m-org/slim-m/compare/client-v0.91.1...client-v0.92.0) (2026-10-02)
 
 
