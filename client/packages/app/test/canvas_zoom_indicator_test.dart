@@ -4,15 +4,18 @@
 library;
 
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:slimm_app/src/screens/canvas/canvas_zoom_indicator.dart';
 import 'package:slimm_design_system/design_system.dart';
 import 'package:slimm_voice_canvas/voice_canvas.dart';
 
-Widget _wrap(Widget child) => MaterialApp(
-  theme: buildTheme(Brightness.dark, AppTokens.dark),
-  home: Scaffold(
-    body: SizedBox(width: 400, height: 400, child: Stack(children: [child])),
+Widget _wrap(Widget child) => ProviderScope(
+  child: MaterialApp(
+    theme: buildTheme(Brightness.dark, AppTokens.dark),
+    home: Scaffold(
+      body: SizedBox(width: 400, height: 400, child: Stack(children: [child])),
+    ),
   ),
 );
 

@@ -22,12 +22,14 @@ import 'canvas_activity_log.dart';
 import 'canvas_activity_panel.dart';
 import 'canvas_bar.dart';
 import 'canvas_call_dock.dart';
+import 'canvas_compact_dock.dart';
 import 'canvas_hidden_tiles.dart';
 import 'canvas_object_context_menu.dart';
 import 'canvas_pen_style.dart';
 import 'canvas_pane_hints.dart';
 import 'canvas_presence_layer.dart';
 import 'canvas_presence_roster.dart';
+import 'canvas_summary.dart';
 import 'canvas_selection_semantics.dart';
 import 'canvas_world_edge_glow.dart';
 import 'canvas_zoom_indicator.dart';
@@ -255,6 +257,7 @@ class _CanvasPaneBodyState extends State<CanvasPaneBody> {
   @override
   Widget build(BuildContext context) {
     final tokens = Theme.of(context).extension<AppTokens>()!;
+    final compact = MediaQuery.sizeOf(context).width < kCompactWidth;
     // No AppBar sits above CanvasBar, so this pane insets itself for top/bottom; left stays unconsumed because a rail, not this pane, ever occupies the true left edge.
     return Container(
       color: tokens.surfaceBase,
@@ -262,8 +265,14 @@ class _CanvasPaneBodyState extends State<CanvasPaneBody> {
         left: false,
         child: Column(
           children: [
-            // Identity only, never a control: fullscreen can drop it whole without taking an action with it.
-            if (!widget.fullscreen) CanvasBar(channelId: widget.channelId),
+            // Fullscreen can drop the header whole without taking an action with it: its controls are the dock's, repeated.
+            if (!widget.fullscreen)
+              CanvasBar(
+                channelId: widget.channelId,
+                trailing: compact
+                    ? CanvasCompactEditGroup(canvas: _dockData())
+                    : null,
+              ),
             if (widget.error != null)
               Padding(
                 padding: const EdgeInsets.all(AppSpacing.s12),
@@ -307,6 +316,7 @@ class _CanvasPaneBodyState extends State<CanvasPaneBody> {
                           builder: (context, _) => CanvasCallDock(
                             call: widget.callDock,
                             canvas: _dockData(),
+                            compact: compact,
                           ),
                         ),
                       ),
@@ -368,7 +378,7 @@ class _CanvasPaneBodyState extends State<CanvasPaneBody> {
     valueListenable: widget.document.objectCount,
     builder: (context, count, child) => CanvasActivityPanel(
       activityLog: widget.activityLog,
-      summary: _summary(),
+      summary: canvasSummary(widget.document),
       objectCount: count,
     ),
   );
@@ -377,7 +387,9 @@ class _CanvasPaneBodyState extends State<CanvasPaneBody> {
     valueListenable: widget.document.objectCount,
     builder: (context, count, child) => Semantics(
       container: true,
-      label: widget.loading ? 'Canvas, loading' : 'Canvas, ${_summary()}',
+      label: widget.loading
+          ? 'Canvas, loading'
+          : 'Canvas, ${canvasSummary(widget.document)}',
       child: Stack(
         children: [
           child!,
@@ -483,17 +495,4 @@ class _CanvasPaneBodyState extends State<CanvasPaneBody> {
       ],
     ),
   );
-
-  /// "N objects: X strokes, Y images, Z notes, W shapes", so a screen-reader
-  /// user or the panel header can tell an empty canvas from a busy one.
-  String _summary() {
-    final counts = widget.document.liveCountsByKind;
-    final total = counts.strokes + counts.images + counts.notes + counts.shapes;
-    if (total == 0) return 'no objects';
-    return '$total ${total == 1 ? 'object' : 'objects'}: '
-        '${counts.strokes} ${counts.strokes == 1 ? 'stroke' : 'strokes'}, '
-        '${counts.images} ${counts.images == 1 ? 'image' : 'images'}, '
-        '${counts.notes} ${counts.notes == 1 ? 'note' : 'notes'}, '
-        '${counts.shapes} ${counts.shapes == 1 ? 'shape' : 'shapes'}';
-  }
 }

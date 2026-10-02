@@ -121,10 +121,10 @@ class ConversationPane extends ConsumerWidget {
 }
 
 /// A voice channel's one header: [ChannelHeader] with the toggle for
-/// `voice_text_pane.dart`'s docked chat, offered only at a width
-/// [LayoutClass.fitsThreadPane] can dock it at - `VoiceScreen`'s own
-/// condition - so it is never chrome pointed at a pane that is not there.
-/// The docked pane passes `showHeader: false`, so this is the only bar.
+/// `voice_text_pane.dart`'s chat: docked beside the call where
+/// [LayoutClass.fitsThreadPane] allows it, swapped in over the call below
+/// that, so the toggle is always offered. The chat passes `showHeader: false`,
+/// so this is the only bar.
 class _VoiceConversationHeader extends ConsumerWidget {
   const _VoiceConversationHeader({
     required this.channelId,
@@ -138,9 +138,6 @@ class _VoiceConversationHeader extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final canDock = LayoutClass.of(
-      context,
-    ).fitsThreadPane(MediaQuery.sizeOf(context).width);
     final chatOpen = ref.watch(voiceChatPaneVisibleProvider);
     final search = ref.watch(channelSearchProvider(channelId));
     void setChatOpen(bool open) =>
@@ -157,7 +154,7 @@ class _VoiceConversationHeader extends ConsumerWidget {
         ref.read(channelSearchProvider(channelId).notifier).toggle();
       },
       textChatOpen: chatOpen,
-      onToggleTextChat: canDock ? () => setChatOpen(!chatOpen) : null,
+      onToggleTextChat: () => setChatOpen(!chatOpen),
     );
   }
 }

@@ -18,6 +18,9 @@ pub(super) async fn announce(
     device_name: &str,
     client_kind: Option<&str>,
 ) {
+    if tokens.known_install {
+        return;
+    }
     let unfamiliar = state
         .store
         .is_unfamiliar_sign_in(tokens.user_id, tokens.device_id, device_name, client_kind)

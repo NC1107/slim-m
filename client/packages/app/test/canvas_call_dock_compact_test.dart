@@ -4,7 +4,9 @@
 /// before and after the owner's "the dock can be made way more compact"
 /// report: 70dp to 52dp at desktop-1400 (one row), 131dp to 115dp at
 /// phone-390 (two rows). Both numbers were read off this exact fixture on
-/// `main` before the compaction, not estimated.
+/// `main` before the compaction, not estimated. At phone-390 the dock then
+/// became 176dp of three stacked rows, and the owner's 2026-10-02 report of
+/// "dock ui on mobile a mess in canvas" made it two one-row cards, 124dp.
 ///
 /// Split out of `home_shell_snackbar_dock_test.dart`, which already builds
 /// the identical call-plus-canvas fixture for a different assertion (a
@@ -60,12 +62,11 @@ void main() {
   );
 
   testWidgets(
-    'the stacked dock (phone-390) is 176dp with tools on their own row, '
-    'without shrinking either row below the touch floor',
+    'the phone dock (phone-390) is two one-row cards, 124dp, down from 176dp',
     (tester) async {
       final s = await _pumpCallAndCanvas(tester, width: 390);
 
-      expect(s.container.read(bottomDockReservationProvider), 176);
+      expect(s.container.read(bottomDockReservationProvider), 124);
 
       await teardown(tester, s.container, s.db);
     },

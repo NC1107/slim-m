@@ -8232,6 +8232,15 @@ components:
           nullable: true
           maxLength: 32
           description: The app version opening this session; same absence rule as `client_kind`.
+        install_id:
+          type: string
+          nullable: true
+          description: >
+            A random id the client makes once per install and keeps, 8 to 64
+            characters of letters, digits, "-" and "_". Signing in again with the
+            same id replaces that install's session (the old refresh token is
+            revoked) instead of adding a device. Optional; a client that sends
+            none gets a new device per sign-in, and a malformed one is a 400.
 
     LoginRequest:
       type: object
@@ -8253,6 +8262,10 @@ components:
           nullable: true
           maxLength: 32
           description: See `RegisterRequest.client_version`.
+        install_id:
+          type: string
+          nullable: true
+          description: See `RegisterRequest.install_id`.
 
     RefreshRequest:
       type: object
@@ -8614,6 +8627,10 @@ components:
           type: string
         code:
           type: string
+        install_id:
+          type: string
+          nullable: true
+          description: See `RegisterRequest.install_id`; the challenge does not store one.
     TotpRecoveryCodes:
       type: object
       required: [recovery_codes]

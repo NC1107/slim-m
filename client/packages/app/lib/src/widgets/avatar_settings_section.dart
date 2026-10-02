@@ -1,11 +1,11 @@
 // SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
-/// Settings' profile card: a centred preview of the caller's own picture with
-/// a camera badge that reads as "tap to change", the display name beside its
-/// own rename affordance, and the `@handle` underneath.
+/// Settings' profile card: the caller's own picture, which is itself the
+/// control (a camera badge is the cue), the display name beside its own
+/// rename affordance, and the `@handle` underneath.
 ///
-/// The badge opens the same two-source choice the composer's attach action
-/// already offers, rather than one picker directly: a Photos-only pick
-/// cannot reach a picture that arrived by download or AirDrop. See
+/// Tapping the picture opens `showAvatarPhotoMenu`: take, choose, browse,
+/// remove. Choose and browse stay two rows because a Photos-only pick cannot
+/// reach a picture that arrived by download or AirDrop. See
 /// `attachment_picker.dart`.
 ///
 /// The name and handle used to sit above the settings nav, outside every
@@ -19,6 +19,7 @@
 library;
 
 import 'dart:async';
+import 'dart:typed_data';
 
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
@@ -29,6 +30,7 @@ import 'package:slimm_design_system/design_system.dart';
 import '../providers/providers.dart';
 import 'attachment_picker.dart';
 import 'avatar_crop_sheet.dart';
+import 'avatar_photo_menu.dart';
 import 'edit_display_name_sheet.dart';
 import 'run_guarded.dart';
 import 'settings_section_header.dart';
@@ -37,7 +39,7 @@ import 'user_avatar.dart';
 /// Large enough on its own to clear the 44pt touch minimum, so the badge
 /// never needs a separately expanded hit target the way a small icon button
 /// would.
-const double _avatarSize = AppAvatarSize.s72;
+const double _avatarSize = AppAvatarSize.s56;
 const double _badgeSize = 28;
 
 class AvatarSettingsSection extends ConsumerStatefulWidget {
@@ -52,57 +54,35 @@ class _AvatarSettingsSectionState extends ConsumerState<AvatarSettingsSection>
     with GuardedActionState<AvatarSettingsSection> {
   bool _busy = false;
 
-  Future<AttachmentSource?> _pickSource() {
-    return showAppSheet<AttachmentSource>(
-      context,
-      builder: (sheetContext) {
-        final tokens = Theme.of(sheetContext).extension<AppTokens>()!;
-        const options = [
-          (AppIcons.image, 'Photo library', AttachmentSource.photoLibrary),
-          (AppIcons.attachFile, 'Browse files', AttachmentSource.fileBrowser),
-        ];
-        return SafeArea(
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(
-              AppSpacing.s12,
-              0,
-              AppSpacing.s12,
-              AppSpacing.s12,
-            ),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                for (final (icon, label, source) in options)
-                  AppListRow(
-                    label: label,
-                    leading: Icon(
-                      icon,
-                      size: AppSizes.icon16,
-                      color: tokens.textSecondary,
-                    ),
-                    onTap: () => Navigator.of(sheetContext).pop(source),
-                  ),
-              ],
-            ),
-          ),
-        );
-      },
-    );
-  }
-
   /// Fires the same tick every other tappable in this system does, since a
   /// plain [InkWell] carries none of that on its own.
-  void _onTapChange() {
+  void _onTapChange(bool hasAvatar) {
     AppHaptics.selection();
-    unawaited(_changePicture());
+    unawaited(_openMenu(hasAvatar));
   }
 
-  Future<void> _changePicture() async {
-    final source = await _pickSource();
-    if (source == null || !mounted) return;
-
+  Future<void> _openMenu(bool hasAvatar) async {
+    final action = await showAvatarPhotoMenu(
+      context,
+      canTake: ref.read(avatarCameraCaptureProvider) != null,
+      canRemove: hasAvatar,
+    );
+    if (action == null || !mounted) return;
     // Cleared up front, same precedent as composer.dart's own _pickAttachment: a retry must not keep showing an earlier failure.
     clearActionError();
+    switch (action) {
+      case AvatarPhotoAction.remove:
+        await _remove();
+      case AvatarPhotoAction.take:
+        await _crop(await ref.read(avatarCameraCaptureProvider)!());
+      case AvatarPhotoAction.choose:
+        await _pickFile(AttachmentSource.photoLibrary);
+      case AvatarPhotoAction.browse:
+        await _pickFile(AttachmentSource.fileBrowser);
+    }
+  }
+
+  Future<void> _pickFile(AttachmentSource source) async {
     final FilePickerResult? result;
     try {
       result = await ref.read(attachmentPickerProvider(source))();
@@ -114,8 +94,11 @@ class _AvatarSettingsSectionState extends ConsumerState<AvatarSettingsSection>
     if (files.isEmpty) return;
     // readAsBytes streams from disk; file_picker 12 deprecated withData and
     // PlatformFile.bytes because eager loading OOMs on a large pick.
-    final picked = await files.first.readAsBytes();
-    if (!mounted) return;
+    await _crop(await files.first.readAsBytes());
+  }
+
+  Future<void> _crop(Uint8List? picked) async {
+    if (picked == null || !mounted) return;
 
     // Cropped before upload, not after: the server caps an avatar at 2 MB and
     // a phone photo is routinely past that, so the raw pick simply failed.
@@ -153,7 +136,7 @@ class _AvatarSettingsSectionState extends ConsumerState<AvatarSettingsSection>
     return SettingsSectionCard(
       children: [
         Padding(
-          padding: const EdgeInsets.all(AppSpacing.s8),
+          padding: const EdgeInsets.symmetric(horizontal: AppSpacing.s4),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -166,7 +149,7 @@ class _AvatarSettingsSectionState extends ConsumerState<AvatarSettingsSection>
                     child: AppFocusRing(
                       radius: _avatarSize / 2,
                       builder: (context, onFocusChange) => InkWell(
-                        onTap: enabled ? _onTapChange : null,
+                        onTap: enabled ? () => _onTapChange(hasAvatar) : null,
                         // AppFocusRing replaces this overlay; see its own doc comment.
                         focusColor: Colors.transparent,
                         onFocusChange: onFocusChange,
@@ -278,13 +261,6 @@ class _AvatarSettingsSectionState extends ConsumerState<AvatarSettingsSection>
                     ),
                   ] else
                     const Spacer(),
-                  if (hasAvatar)
-                    AppButton(
-                      label: 'Remove photo',
-                      variant: AppButtonVariant.ghost,
-                      size: AppButtonSize.sm,
-                      onPressed: enabled ? _remove : null,
-                    ),
                 ],
               ),
               if (actionError != null) ...[

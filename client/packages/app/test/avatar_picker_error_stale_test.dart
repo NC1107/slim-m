@@ -108,7 +108,7 @@ void main() {
 
       await tester.tap(_cameraBadge());
       await tester.pumpAndSettle();
-      await tester.tap(find.text('Photo library'));
+      await tester.tap(find.text('Choose photo'));
       await tester.pumpAndSettle();
       expect(
         find.textContaining('Could not open the file picker'),
@@ -122,7 +122,7 @@ void main() {
 
       await tester.tap(_cameraBadge());
       await tester.pumpAndSettle();
-      await tester.tap(find.text('Photo library'));
+      await tester.tap(find.text('Choose photo'));
       await tester.pumpAndSettle();
 
       expect(

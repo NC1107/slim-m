@@ -15,16 +15,22 @@ library;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:slimm_api/api.dart' as api;
 import 'package:slimm_data/data.dart';
 import 'package:slimm_design_system/design_system.dart';
 
 import '../message_preview.dart';
+import '../providers/message_extras.dart';
 import '../providers/user_profiles.dart';
 import 'author_label.dart';
+import 'reply_target_summary.dart';
 
 /// How much of a quoted message's own text is shown before it is cut off - a
 /// compact quote, not a second copy of the message.
 const int _quoteMaxRunes = 120;
+
+/// A caption-height thumbnail, so a quote stays one line.
+const double _quoteThumbEdge = AppSpacing.s20;
 
 class ReplyQuote extends ConsumerWidget {
   const ReplyQuote({super.key, required this.resolved, required this.onTap});
@@ -56,9 +62,23 @@ class ReplyQuote extends ConsumerWidget {
             cachedDisplayName: resolved.authorDisplayName,
             resolution: resolution!,
           );
-    final snippet = resolved == null
-        ? 'Message unavailable'
-        : previewSnippet(resolved.content, maxRunes: _quoteMaxRunes);
+    final attachments = resolved == null
+        ? const <api.Attachment>[]
+        : ref.watch(
+            messageExtrasProvider.select(
+              (extras) => extras[resolved.id]?.attachments ?? const [],
+            ),
+          );
+    final hasText =
+        resolved != null && plainPreview(resolved.content).isNotEmpty;
+    final showThumb = resolved != null && !hasText && attachments.length == 1;
+    final snippet = switch (resolved) {
+      null => 'Message unavailable',
+      _ when !hasText && attachments.isNotEmpty => attachmentKindLabel(
+        attachments,
+      ),
+      _ => previewSnippet(resolved.content, maxRunes: _quoteMaxRunes),
+    };
     final textStyle = AppText.caption.copyWith(
       color: tokens.textSecondary,
       fontStyle: resolved == null ? FontStyle.italic : null,
@@ -83,6 +103,13 @@ class ReplyQuote extends ConsumerWidget {
               children: [
                 Icon(AppIcons.reply, size: 13, color: tokens.textSecondary),
                 const SizedBox(width: AppSpacing.s4),
+                if (showThumb) ...[
+                  ReplyAttachmentThumb(
+                    attachments: attachments,
+                    edge: _quoteThumbEdge,
+                  ),
+                  const SizedBox(width: AppSpacing.s4),
+                ],
                 if (label == null)
                   // A long snippet alone would overflow the row otherwise.
                   Flexible(
