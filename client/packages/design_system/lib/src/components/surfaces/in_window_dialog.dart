@@ -8,11 +8,17 @@
 /// `client/packages/*/lib` may call `showDialog`; a gate enforces it.
 library;
 
+import 'package:flutter/foundation.dart'
+    show TargetPlatform, defaultTargetPlatform, kIsWeb;
 import 'package:flutter/material.dart';
 
 import '../../app_motion.dart';
 
 /// Pushes [builder] as an in-window Material dialog on the root navigator.
+///
+/// Only the Linux build turns windowing on, so other platforms keep calling
+/// Flutter's `showDialog`: with no call to it the macOS AOT build crashed the
+/// snapshot generator ("Class with illegal cid", `_window_macos.dart`) in 0.91.0.
 Future<T?> showInWindowDialog<T>({
   required BuildContext context,
   required WidgetBuilder builder,
@@ -20,6 +26,17 @@ Future<T?> showInWindowDialog<T>({
   AnimationStyle? animationStyle,
   RouteSettings? routeSettings,
 }) {
+  // Linux only: elsewhere showDialog stays reachable (see this function's doc).
+  if (kIsWeb || defaultTargetPlatform != TargetPlatform.linux) {
+    return showDialog<T>(
+      context: context,
+      builder: builder,
+      barrierDismissible: barrierDismissible,
+      animationStyle: animationStyle,
+      routeSettings: routeSettings,
+      useRootNavigator: true,
+    );
+  }
   final navigator = Navigator.of(context, rootNavigator: true);
   final themes = InheritedTheme.capture(from: context, to: navigator.context);
   return navigator.push<T>(

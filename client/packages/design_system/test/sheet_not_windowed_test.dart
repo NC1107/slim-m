@@ -7,6 +7,8 @@ library;
 
 // ignore_for_file: invalid_use_of_internal_member, implementation_imports
 
+import 'package:flutter/foundation.dart'
+    show debugDefaultTargetPlatformOverride;
 import 'package:flutter/material.dart';
 import 'package:flutter/src/foundation/_features.dart' as features;
 import 'package:flutter_test/flutter_test.dart';
@@ -47,6 +49,8 @@ void main() {
 
   testWidgets('showAppSheet at desktop width pushes an in-window DialogRoute',
       (tester) async {
+    // Only the Linux build enables windowing, so only it takes the in-window route.
+    debugDefaultTargetPlatformOverride = TargetPlatform.linux;
     final observer = await _pump(
       tester,
       (context) => TextButton(
@@ -62,10 +66,13 @@ void main() {
 
     expect(observer.pushed.last, isA<DialogRoute<void>>());
     expect(find.text('sheet body'), findsOneWidget);
+    debugDefaultTargetPlatformOverride = null;
   });
 
   testWidgets('showAppTimePicker pushes an in-window DialogRoute',
       (tester) async {
+    // Only the Linux build enables windowing, so only it takes the in-window route.
+    debugDefaultTargetPlatformOverride = TargetPlatform.linux;
     final observer = await _pump(
       tester,
       (context) => TextButton(
@@ -81,5 +88,6 @@ void main() {
 
     expect(observer.pushed.last, isA<DialogRoute<TimeOfDay>>());
     expect(find.byType(TimePickerDialog), findsOneWidget);
+    debugDefaultTargetPlatformOverride = null;
   });
 }

@@ -28,6 +28,7 @@ void main() {
       if (!lib.existsSync()) continue;
       for (final file in lib.listSync(recursive: true).whereType<File>()) {
         if (!file.path.endsWith('.dart')) continue;
+        if (file.path.endsWith('in_window_dialog.dart')) continue;
         final source = codeOnly(file.readAsStringSync());
         for (final m in _windowedCalls.allMatches(source)) {
           offenders.add('${file.path}: ${m.group(1)}');
