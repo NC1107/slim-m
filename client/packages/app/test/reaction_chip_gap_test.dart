@@ -58,7 +58,6 @@ Widget _harness({double? width}) {
       api.ReactionSummary(emoji: _secondEmoji, count: 1, reacted: false),
     ],
     onReactionTap: (_) {},
-    onPickReaction: (_) {},
   );
   return MaterialApp(
     theme: buildTheme(Brightness.light, AppTokens.light),

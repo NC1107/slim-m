@@ -110,11 +110,7 @@ void main() {
         StatefulBuilder(
           builder: (context, setState) {
             setReactions = setState;
-            return ReactionsRow(
-              reactions: reactions,
-              onReactionTap: (_) {},
-              onPickReaction: (_) {},
-            );
+            return ReactionsRow(reactions: reactions, onReactionTap: (_) {});
           },
         ),
       ),
